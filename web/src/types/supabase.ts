@@ -217,6 +217,21 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["notification_log"]["Row"]>;
       };
+      profiles: {
+        Row: {
+          id: string;
+          email: string | null;
+          name: string;
+          role: "admin" | "coach";
+          avatar_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["profiles"]["Row"], "id" | "created_at" | "updated_at"> & {
+          id?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

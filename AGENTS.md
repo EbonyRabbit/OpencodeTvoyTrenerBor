@@ -1326,3 +1326,19 @@ Build a scalable AI-powered fitness ecosystem:
 * automation infrastructure
 * analytics dashboard
 * client retention system
+
+---
+
+# QUALITY GATE WORKFLOW
+
+After implementing any task from TASKS.md:
+
+1. Present `git diff` with summary of changes to the user
+2. Ask the user to run `@code-reviewer` on the changes
+3. Wait for the user to report the rating and fix suggestions
+4. If rating < 9.5:
+   - Implement suggested fixes
+   - Go back to step 1
+5. If rating >= 9.5:
+   - Mark task as completed in TASKS.md
+   - Proceed to next task

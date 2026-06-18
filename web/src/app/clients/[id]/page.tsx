@@ -77,18 +77,15 @@ export default async function ClientProfilePage({
 
   const [
     latestCheckinResult,
-    latestMeasurementResult,
     workoutCountResult,
     checkinCountResult,
     messageCountResult,
     scheduleResult,
+    checkinHistoryResult,
+    measurementHistoryResult,
   ] = await Promise.all([
     safeFetch(
       supabase.from("checkins").select("date, wellbeing, sleep, stress, nutrition_adherence, missed_workouts, complaints").eq("client_id", id).order("date", { ascending: false }).limit(1).maybeSingle(),
-      null,
-    ),
-    safeFetch(
-      supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: false }).limit(1).maybeSingle(),
       null,
     ),
     safeCount(
@@ -104,21 +101,36 @@ export default async function ClientProfilePage({
       supabase.from("program_schedule").select("id, week_number, focus, start_date, end_date").eq("client_id", id).order("week_number", { ascending: true }).limit(52),
       [],
     ),
+    safeFetch(
+      supabase.from("checkins").select("date, wellbeing, sleep, stress").eq("client_id", id).order("date", { ascending: true }).limit(20),
+      [],
+    ),
+    safeFetch(
+      supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: true }).limit(20),
+      [],
+    ),
   ]);
 
   const parsedContent = typedClient.program ? getParsedContent(typedClient.program) : null;
+
+  const measurementHistory = measurementHistoryResult.data ?? [];
+  const latestMeasurement = measurementHistory.length > 0
+    ? measurementHistory[measurementHistory.length - 1]
+    : null;
 
   return (
     <div className="p-6">
       <ClientProfile
         client={typedClient}
         latestCheckin={latestCheckinResult.data}
-        latestMeasurement={latestMeasurementResult.data}
+        latestMeasurement={latestMeasurement}
         workoutCount={workoutCountResult.count}
         checkinCount={checkinCountResult.count}
         messageCount={messageCountResult.count}
         schedule={scheduleResult.data ?? []}
         parsedContent={parsedContent}
+        checkinHistory={checkinHistoryResult.data ?? []}
+        measurementHistory={measurementHistory}
       />
     </div>
   );

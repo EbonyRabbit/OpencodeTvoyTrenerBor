@@ -16,6 +16,7 @@ import {
 } from "@/lib/clients";
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
+import { MiniLineChart } from "./mini-line-chart";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 
@@ -24,6 +25,8 @@ type ClientProgram = Pick<Database["public"]["Tables"]["programs"]["Row"], "id" 
 type CheckinRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress" | "nutrition_adherence" | "missed_workouts" | "complaints">;
 type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
+type CheckinHistoryRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress">;
+type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 
 const MEASUREMENT_DAY_LABELS: Record<number, string> = {
   1: "Понедельник",
@@ -149,6 +152,8 @@ export function ClientProfile({
   messageCount,
   schedule,
   parsedContent,
+  checkinHistory,
+  measurementHistory,
 }: {
   client: ClientRow & { program: ClientProgram | null };
   latestCheckin: CheckinRow | null;
@@ -158,6 +163,8 @@ export function ClientProfile({
   messageCount: number;
   schedule: ScheduleRow[];
   parsedContent: ParsedContent | null;
+  checkinHistory: CheckinHistoryRow[];
+  measurementHistory: MeasurementHistoryRow[];
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
@@ -339,6 +346,54 @@ export function ClientProfile({
           )}
         </SectionCard>
       </div>
+
+      {(checkinHistory.length > 0 || measurementHistory.length > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Прогресс
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {measurementHistory.length > 0 && (
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Вес</h3>
+                <MiniLineChart
+                  data={measurementHistory.map((m) => ({
+                    label: m.date,
+                    value: m.weight,
+                  }))}
+                  color="var(--color-chart-1, #2563eb)"
+                />
+              </div>
+            )}
+            {checkinHistory.length > 0 && (
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Самочувствие</h3>
+                <MiniLineChart
+                  data={checkinHistory.map((c) => ({
+                    label: c.date,
+                    value: c.wellbeing,
+                  }))}
+                  color="var(--color-chart-2, #16a34a)"
+                />
+              </div>
+            )}
+            {checkinHistory.length > 0 && (
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Стресс</h3>
+                <MiniLineChart
+                  data={checkinHistory.map((c) => ({
+                    label: c.date,
+                    value: c.stress,
+                  }))}
+                  color="var(--color-chart-3, #dc2626)"
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {schedule.length > 0 && (
         <Card>

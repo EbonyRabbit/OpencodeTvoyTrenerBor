@@ -50,6 +50,11 @@ export const PAYMENT_FILTER_LABELS: Record<PaymentFilter, string> = {
   pending: "Ожидает",
 };
 
+export const LANGUAGE_LABELS: Record<string, string> = {
+  ru: "Русский",
+  en: "English",
+};
+
 export function escapeSearch(value: string): string {
   return value.replace(/[%_]/g, "\\$&");
 }

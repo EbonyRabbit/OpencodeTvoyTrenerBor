@@ -15,6 +15,8 @@ import {
   LANGUAGE_LABELS,
 } from "@/lib/clients";
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
+import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
+import type { ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 
 type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "access_start_date" | "access_end_date" | "created_at" | "updated_at">;
@@ -146,6 +148,7 @@ export function ClientProfile({
   checkinCount,
   messageCount,
   schedule,
+  parsedContent,
 }: {
   client: ClientRow & { program: ClientProgram | null };
   latestCheckin: CheckinRow | null;
@@ -154,6 +157,7 @@ export function ClientProfile({
   checkinCount: number;
   messageCount: number;
   schedule: ScheduleRow[];
+  parsedContent: ParsedContent | null;
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
@@ -367,6 +371,12 @@ export function ClientProfile({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {client.program && (
+        <div className="rounded-lg border p-4">
+          <ProgramWeekPreview parsed={parsedContent} />
+        </div>
       )}
 
       <Separator />

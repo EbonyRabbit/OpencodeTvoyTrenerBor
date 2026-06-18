@@ -24,9 +24,9 @@ import {
   CLIENT_STATUS_VARIANTS,
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_VARIANTS,
-  FILTER_LABELS,
   type ClientWithProgram,
   type ClientFilter,
+  type PaymentFilter,
 } from "@/lib/clients";
 
 function formatDate(dateStr: string) {
@@ -41,10 +41,10 @@ function formatDate(dateStr: string) {
 
 function EmptyState({
   hasFilter,
-  currentStatus,
+  currentSearch,
 }: {
   hasFilter: boolean;
-  currentStatus: ClientFilter;
+  currentSearch: string;
 }) {
   if (!hasFilter) {
     return (
@@ -66,7 +66,9 @@ function EmptyState({
       role="status"
     >
       <p className="text-lg font-medium">
-        Нет клиентов со статусом «{FILTER_LABELS[currentStatus]}»
+        {currentSearch
+          ? `Клиенты по запросу «${currentSearch}» не найдены`
+          : "Клиенты не найдены. Попробуйте изменить параметры фильтрации"}
       </p>
       <Link
         href="/clients"
@@ -82,10 +84,14 @@ function Paginator({
   page,
   totalPages,
   currentStatus,
+  currentSearch,
+  currentPayment,
 }: {
   page: number;
   totalPages: number;
   currentStatus: ClientFilter;
+  currentSearch: string;
+  currentPayment: PaymentFilter;
 }) {
   const pages: (number | "ellipsis")[] = [];
   const delta = 1;
@@ -111,7 +117,12 @@ function Paginator({
   }
 
   function href(p: number) {
-    return `/clients?page=${p}&status=${currentStatus}`;
+    const params = new URLSearchParams();
+    params.set("page", String(p));
+    params.set("status", currentStatus);
+    if (currentSearch) params.set("q", currentSearch);
+    if (currentPayment !== "all") params.set("payment", currentPayment);
+    return `/clients?${params.toString()}`;
   }
 
   return (
@@ -156,18 +167,22 @@ export function ClientsTable({
   page,
   totalPages,
   currentStatus,
+  currentSearch,
+  currentPayment,
 }: {
   clients: ClientWithProgram[];
   totalCount: number;
   page: number;
   totalPages: number;
   currentStatus: ClientFilter;
+  currentSearch: string;
+  currentPayment: PaymentFilter;
 }) {
   if (totalCount === 0) {
     return (
       <EmptyState
-        hasFilter={currentStatus !== "all"}
-        currentStatus={currentStatus}
+        hasFilter={currentStatus !== "all" || currentPayment !== "all" || !!currentSearch}
+        currentSearch={currentSearch}
       />
     );
   }
@@ -227,6 +242,8 @@ export function ClientsTable({
           page={page}
           totalPages={totalPages}
           currentStatus={currentStatus}
+          currentSearch={currentSearch}
+          currentPayment={currentPayment}
         />
       )}
     </div>

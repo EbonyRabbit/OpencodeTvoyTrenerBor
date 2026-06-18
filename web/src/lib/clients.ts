@@ -40,3 +40,16 @@ export const FILTER_LABELS: Record<ClientFilter, string> = {
   inactive: "Неактивные",
   access_expired: "Доступ истёк",
 };
+
+export const VALID_PAYMENT_FILTERS = ["all", "paid", "pending"] as const;
+export type PaymentFilter = (typeof VALID_PAYMENT_FILTERS)[number];
+
+export const PAYMENT_FILTER_LABELS: Record<PaymentFilter, string> = {
+  all: "Все",
+  paid: "Оплачено",
+  pending: "Ожидает",
+};
+
+export function escapeSearch(value: string): string {
+  return value.replace(/[%_]/g, "\\$&");
+}

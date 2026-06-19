@@ -71,18 +71,19 @@ async function fetchPage(
 
 export async function getClientActivity(clientId: string): Promise<{
   events: ActivityEvent[];
-  loadMore: (offset: number) => Promise<ActivityEvent[]>;
 }> {
   const supabase = await createClient();
   const events = await fetchPage(supabase, clientId, 0);
 
-  return {
-    events,
-    loadMore: async (offset: number) => {
-      const supabaseInner = await createClient();
-      return fetchPage(supabaseInner, clientId, offset);
-    },
-  };
+  return { events };
+}
+
+export async function loadMoreActivity(
+  clientId: string,
+  offset: number,
+): Promise<ActivityEvent[]> {
+  const supabase = await createClient();
+  return fetchPage(supabase, clientId, offset);
 }
 
 export async function getActivePrograms() {
@@ -117,7 +118,7 @@ export async function activateProgram(
 
     const { error } = await sb
       .from("clients")
-      .update({ program_id: programId })
+      .update({ program_id: programId, status: "active" })
       .eq("id", clientId);
     if (error) return { error: error.message };
 

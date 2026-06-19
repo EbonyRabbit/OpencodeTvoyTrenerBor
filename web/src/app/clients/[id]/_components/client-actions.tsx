@@ -62,14 +62,17 @@ export function ClientActions({
     setError(null);
     try {
       const result = await activateProgram(clientId, selectedProgram);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setShowProgramSelect(false);
+      setSelectedProgram("");
+      setPrograms([]);
     } catch {
       setError("Произошла ошибка");
     } finally {
       setActivating(false);
-      setShowProgramSelect(false);
-      setSelectedProgram("");
-      setPrograms([]);
     }
   }, [clientId, selectedProgram]);
 
@@ -235,7 +238,7 @@ export function ClientActions({
         </p>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
     </div>
   );
 }

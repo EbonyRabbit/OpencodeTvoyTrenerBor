@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ActivityFeed } from "./activity-feed";
+import { ClientActions } from "./client-actions";
 import type { ActivityEvent } from "../activity-types";
 import {
   CLIENT_STATUS_LABELS,
@@ -447,11 +448,16 @@ export function ClientProfile({
 
       <Separator />
 
-      <div className="flex flex-wrap gap-3">
-        <Button type="button" variant="outline" disabled>
-          Редактировать
-        </Button>
-        {client.telegram_id && (
+      <ClientActions
+        clientId={client.id}
+        currentProgramId={client.program_id}
+        currentCode={client.connect_code}
+        currentStatus={client.status}
+        currentPaymentStatus={client.payment_status}
+      />
+
+      {client.telegram_id && (
+        <div className="flex justify-end">
           <a
             href={`tg://user?id=${client.telegram_id}`}
             target="_blank"
@@ -460,8 +466,8 @@ export function ClientProfile({
           >
             Написать в Telegram
           </a>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

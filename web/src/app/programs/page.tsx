@@ -1,7 +1,7 @@
 import { verifySession } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
-import { VALID_STATUSES, type ProgramFilter } from "@/lib/programs";
+import { VALID_STATUSES, type ProgramFilter, type ProgramRow } from "@/lib/programs";
 import { ProgramsList } from "./_components/programs-list";
 import { ProgramFilters } from "./_components/program-filters";
 
@@ -51,7 +51,8 @@ export default async function ProgramsPage({
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  const { data: programs, count, error } = await query;
+  const { data: rawPrograms, count, error } = await query;
+  const programs = rawPrograms as ProgramRow[] | null;
 
   if (error) {
     return (

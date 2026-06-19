@@ -40,6 +40,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["clients"]["Row"]>;
+        Relationships: [];
       };
       programs: {
         Row: {
@@ -62,6 +63,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["programs"]["Row"]>;
+        Relationships: [];
       };
       workout_logs: {
         Row: {
@@ -82,6 +84,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["workout_logs"]["Row"]>;
+        Relationships: [];
       };
       measurements: {
         Row: {
@@ -109,6 +112,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["measurements"]["Row"]>;
+        Relationships: [];
       };
       checkins: {
         Row: {
@@ -130,6 +134,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["checkins"]["Row"]>;
+        Relationships: [];
       };
       photos: {
         Row: {
@@ -148,6 +153,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["photos"]["Row"]>;
+        Relationships: [];
       };
       program_schedule: {
         Row: {
@@ -166,6 +172,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["program_schedule"]["Row"]>;
+        Relationships: [];
       };
       exercises: {
         Row: {
@@ -183,6 +190,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["exercises"]["Row"]>;
+        Relationships: [];
       };
       messages: {
         Row: {
@@ -200,6 +208,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
+        Relationships: [];
       };
       notification_log: {
         Row: {
@@ -216,6 +225,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["notification_log"]["Row"]>;
+        Relationships: [];
       };
       profiles: {
         Row: {
@@ -231,6 +241,7 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;

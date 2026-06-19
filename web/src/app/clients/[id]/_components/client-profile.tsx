@@ -450,7 +450,6 @@ export function ClientProfile({
 
       <ClientActions
         clientId={client.id}
-        currentProgramId={client.program_id}
         currentCode={client.connect_code}
         currentStatus={client.status}
         currentPaymentStatus={client.payment_status}

@@ -4,15 +4,18 @@ import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/dal";
-import type { Database } from "@/types/supabase";
+import type { Database, PaymentStatus } from "@/types/supabase";
 import type { ActivityEvent } from "./activity-types";
 import { ACTIVITY_PAGE_SIZE } from "./activity-types";
 
-const sb = createSupabaseClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !serviceKey) {
+  throw new Error("Missing Supabase service role credentials");
+}
+const sb = createSupabaseClient<Database>(supabaseUrl, serviceKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 type RawWorkout = { id: string; created_at: string; exercise: string; sets: number | null; reps: string | null; weight: number | null };
 type RawCheckin = { id: string; created_at: string; wellbeing: number | null; sleep: number | null; stress: number | null };
@@ -99,104 +102,113 @@ export async function activateProgram(
   clientId: string,
   programId: string,
 ): Promise<{ error?: string }> {
-  const { profile } = await verifySession();
-  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
-    return { error: "Нет прав" };
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    const { data: program } = await sb
+      .from("programs")
+      .select("id")
+      .eq("id", programId)
+      .maybeSingle();
+    if (!program) return { error: "Программа не найдена" };
+
+    const { error } = await sb
+      .from("clients")
+      .update({ program_id: programId })
+      .eq("id", clientId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/clients/${clientId}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
-
-  const { data: program } = await sb
-    .from("programs")
-    .select("id")
-    .eq("id", programId)
-    .maybeSingle();
-  if (!program) return { error: "Программа не найдена" };
-
-  const { error } = await sb
-    .from("clients")
-    .update({ program_id: programId })
-    .eq("id", clientId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/clients/${clientId}`);
-  return {};
 }
 
 export async function generateConnectCode(
   clientId: string,
 ): Promise<{ error?: string; code?: string }> {
-  const { profile } = await verifySession();
-  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
-    return { error: "Нет прав" };
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const code = crypto.randomUUID().slice(0, 8).toUpperCase();
+      const { error } = await sb
+        .from("clients")
+        .update({ connect_code: code })
+        .eq("id", clientId);
+      if (!error) {
+        revalidatePath(`/clients/${clientId}`);
+        return { code };
+      }
+      if (error.code !== "23505") return { error: error.message };
+    }
+
+    return { error: "Не удалось сгенерировать уникальный код" };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
-
-  let code: string;
-  let attempts = 0;
-  do {
-    code = crypto.randomUUID().slice(0, 8).toUpperCase();
-    const { data: existing } = await sb
-      .from("clients")
-      .select("id")
-      .eq("connect_code", code)
-      .maybeSingle();
-    if (!existing) break;
-    attempts++;
-  } while (attempts < 5);
-
-  const { error } = await sb
-    .from("clients")
-    .update({ connect_code: code })
-    .eq("id", clientId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/clients/${clientId}`);
-  return { code };
 }
 
 export async function disableClient(
   clientId: string,
 ): Promise<{ error?: string }> {
-  const { profile } = await verifySession();
-  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
-    return { error: "Нет прав" };
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    const { data: client } = await sb
+      .from("clients")
+      .select("status")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+    if (client.status === "inactive" || client.status === "access_expired") {
+      return { error: "Клиент уже отключён" };
+    }
+
+    const { error } = await sb
+      .from("clients")
+      .update({ status: "inactive" })
+      .eq("id", clientId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/clients/${clientId}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
-
-  const { data: client } = await sb
-    .from("clients")
-    .select("status")
-    .eq("id", clientId)
-    .maybeSingle();
-  if (!client) return { error: "Клиент не найден" };
-  if (client.status === "inactive" || client.status === "access_expired") {
-    return { error: "Клиент уже отключён" };
-  }
-
-  const { error } = await sb
-    .from("clients")
-    .update({ status: "inactive" })
-    .eq("id", clientId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/clients/${clientId}`);
-  return {};
 }
 
 export async function togglePayment(
   clientId: string,
-  currentStatus: string,
+  currentStatus: PaymentStatus,
 ): Promise<{ error?: string }> {
-  const { profile } = await verifySession();
-  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
-    return { error: "Нет прав" };
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    const nextStatus: PaymentStatus = currentStatus === "paid" ? "pending" : "paid";
+
+    const { error } = await sb
+      .from("clients")
+      .update({ payment_status: nextStatus })
+      .eq("id", clientId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/clients/${clientId}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
-
-  const nextStatus = currentStatus === "paid" ? "pending" : "paid";
-
-  const { error } = await sb
-    .from("clients")
-    .update({ payment_status: nextStatus })
-    .eq("id", clientId);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/clients/${clientId}`);
-  return {};
 }

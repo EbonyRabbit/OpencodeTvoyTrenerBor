@@ -14,7 +14,8 @@ async function safeFetch<T>(
   try {
     const result = await query;
     return { data: result.data ?? fallback };
-  } catch {
+  } catch (e) {
+    console.error("safeFetch failed:", e);
     return { data: fallback };
   }
 }
@@ -25,7 +26,8 @@ async function safeCount(
   try {
     const result = await query;
     return { count: result.count ?? 0 };
-  } catch {
+  } catch (e) {
+    console.error("safeCount failed:", e);
     return { count: 0 };
   }
 }
@@ -64,7 +66,7 @@ export default async function ClientProfilePage({
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, morning_time, measurement_time, measurement_day, access_start_date, access_end_date, legacy_id, created_at, updated_at, program:programs(id, title, active, template_file_url, parsed_content)")
+    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, morning_time, measurement_time, measurement_day, access_start_date, access_end_date, created_at, updated_at, program:programs(id, title, active, template_file_url, parsed_content)")
     .eq("id", id)
     .single();
 
@@ -72,9 +74,11 @@ export default async function ClientProfilePage({
     notFound();
   }
 
-  const typedClient = client as Database["public"]["Tables"]["clients"]["Row"] & {
+  type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
+  type ClientWithProgram = ClientRow & {
     program: Database["public"]["Tables"]["programs"]["Row"] | null;
   };
+  const typedClient = client as unknown as ClientWithProgram;
 
   const [
     latestCheckinResult,
@@ -103,18 +107,19 @@ export default async function ClientProfilePage({
       [],
     ),
     safeFetch(
-      supabase.from("checkins").select("date, wellbeing, sleep, stress").eq("client_id", id).order("date", { ascending: true }).limit(20),
+      supabase.from("checkins").select("date, wellbeing, sleep, stress").eq("client_id", id).order("date", { ascending: false }).limit(20),
       [],
     ),
     safeFetch(
-      supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: true }).limit(20),
+      supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: false }).limit(20),
       [],
     ),
   ]);
 
   const parsedContent = typedClient.program ? getParsedContent(typedClient.program) : null;
 
-  const measurementHistory = measurementHistoryResult.data ?? [];
+  const measurementHistory = (measurementHistoryResult.data ?? []).reverse();
+  const checkinHistory = (checkinHistoryResult.data ?? []).reverse();
   const latestMeasurement = measurementHistory.length > 0
     ? measurementHistory[measurementHistory.length - 1]
     : null;
@@ -132,7 +137,7 @@ export default async function ClientProfilePage({
         messageCount={messageCountResult.count}
         schedule={scheduleResult.data ?? []}
         parsedContent={parsedContent}
-        checkinHistory={checkinHistoryResult.data ?? []}
+        checkinHistory={checkinHistory}
         measurementHistory={measurementHistory}
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={(offset: number) => loadMoreActivity(id, offset)}

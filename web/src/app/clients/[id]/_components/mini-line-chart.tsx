@@ -79,47 +79,49 @@ export function MiniLineChart({
         strokeLinecap="round"
         points={linePoints}
       />
-      {validPoints.map((p, i) => {
-        const x = 35 + i * stepX;
-        const y = 10 + chartHeight - ((p.value - adjustedMin) / adjustedRange) * chartHeight;
-        const showLabel = visibleIndices.has(i);
-        return (
-          <g key={i}>
-            <circle cx={x} cy={y} r="3" fill={color} />
-            {showLabel && (
-              <text
-                x={x}
-                y={y - 8}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                fontSize="10"
-              >
-                {p.value}
-              </text>
-            )}
-            {showLabel && (
-              <text
-                x={x}
-                y={height - 2}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                fontSize="9"
-              >
-                {formatChartDate(p.label)}
-              </text>
-            )}
-          </g>
-        );
-      })}
+      <g aria-hidden="true">
+        {validPoints.map((p, i) => {
+          const x = 35 + i * stepX;
+          const y = 10 + chartHeight - ((p.value - adjustedMin) / adjustedRange) * chartHeight;
+          const showLabel = visibleIndices.has(i);
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r="3" fill={color} />
+              {showLabel && (
+                <text
+                  x={x}
+                  y={y - 8}
+                  textAnchor="middle"
+                  className="fill-muted-foreground"
+                  fontSize="11"
+                >
+                  {p.value}
+                </text>
+              )}
+              {showLabel && (
+                <text
+                  x={x}
+                  y={height - 2}
+                  textAnchor="middle"
+                  className="fill-muted-foreground"
+                  fontSize="10"
+                >
+                  {formatChartDate(p.label)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </g>
     </svg>
   );
 }
 
 function getVisibleIndices(count: number): Set<number> {
-  if (count <= 8) {
+  if (count <= 6) {
     return new Set(Array.from({ length: count }, (_, i) => i));
   }
-  const step = Math.floor(count / 6);
+  const step = Math.max(1, Math.floor(count / 5));
   const indices = new Set<number>();
   for (let i = 0; i < count; i += step) {
     indices.add(i);

@@ -23,8 +23,7 @@ import { MiniLineChart } from "./mini-line-chart";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 
-type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "access_start_date" | "access_end_date" | "created_at" | "updated_at">;
-type ClientProgram = Pick<Database["public"]["Tables"]["programs"]["Row"], "id" | "title" | "active" | "template_file_url">;
+type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "access_start_date" | "access_end_date" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; template_file_url: string | null } | null };
 type CheckinRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress" | "nutrition_adherence" | "missed_workouts" | "complaints">;
 type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
@@ -52,12 +51,11 @@ function formatDate(date: string | null): string {
 
 function formatTime(time: string | null): string {
   if (!time) return "—";
-  try {
-    const [h, m] = time.split(":");
-    return `${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`;
-  } catch {
-    return "—";
-  }
+  const parts = time.split(":");
+  const h = parts[0];
+  const m = parts[1];
+  if (!h || isNaN(Number(h)) || (m !== undefined && isNaN(Number(m)))) return "—";
+  return `${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`;
 }
 
 function daysSince(date: string | null): number | null {
@@ -160,7 +158,7 @@ export function ClientProfile({
   initialActivityEvents,
   loadMoreActivity,
 }: {
-  client: ClientRow & { program: ClientProgram | null };
+  client: ClientRow;
   latestCheckin: CheckinRow | null;
   latestMeasurement: MeasurementRow | null;
   workoutCount: number;
@@ -370,11 +368,11 @@ export function ClientProfile({
                     label: m.date,
                     value: m.weight,
                   }))}
-                  color="var(--color-chart-1, #2563eb)"
+                  color="var(--color-primary, #2563eb)"
                 />
               </div>
             )}
-            {checkinHistory.length > 0 && (
+            {checkinHistory.some((c) => c.wellbeing !== null) && (
               <div>
                 <h3 className="mb-2 text-sm font-medium">Самочувствие</h3>
                 <MiniLineChart
@@ -386,7 +384,7 @@ export function ClientProfile({
                 />
               </div>
             )}
-            {checkinHistory.length > 0 && (
+            {checkinHistory.some((c) => c.stress !== null) && (
               <div>
                 <h3 className="mb-2 text-sm font-medium">Стресс</h3>
                 <MiniLineChart

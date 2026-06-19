@@ -7,6 +7,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ActivityFeed } from "./activity-feed";
+import type { ActivityEvent } from "../activity-types";
 import {
   CLIENT_STATUS_LABELS,
   CLIENT_STATUS_VARIANTS,
@@ -154,6 +156,8 @@ export function ClientProfile({
   parsedContent,
   checkinHistory,
   measurementHistory,
+  initialActivityEvents,
+  loadMoreActivity,
 }: {
   client: ClientRow & { program: ClientProgram | null };
   latestCheckin: CheckinRow | null;
@@ -165,6 +169,8 @@ export function ClientProfile({
   parsedContent: ParsedContent | null;
   checkinHistory: CheckinHistoryRow[];
   measurementHistory: MeasurementHistoryRow[];
+  initialActivityEvents: ActivityEvent[];
+  loadMoreActivity: (offset: number) => Promise<ActivityEvent[]>;
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
@@ -433,6 +439,11 @@ export function ClientProfile({
           <ProgramWeekPreview parsed={parsedContent} />
         </div>
       )}
+
+      <ActivityFeed
+        initialEvents={initialActivityEvents}
+        loadMore={loadMoreActivity}
+      />
 
       <Separator />
 

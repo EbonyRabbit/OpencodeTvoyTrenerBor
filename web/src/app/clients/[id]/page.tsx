@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase-server";
 import { getParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
+import { getClientActivity } from "./actions";
 
 async function safeFetch<T>(
   query: PromiseLike<{ data: T | null; error: unknown }>,
@@ -118,6 +119,8 @@ export default async function ClientProfilePage({
     ? measurementHistory[measurementHistory.length - 1]
     : null;
 
+  const { events: initialActivityEvents, loadMore: loadMoreActivity } = await getClientActivity(id);
+
   return (
     <div className="p-6">
       <ClientProfile
@@ -131,6 +134,8 @@ export default async function ClientProfilePage({
         parsedContent={parsedContent}
         checkinHistory={checkinHistoryResult.data ?? []}
         measurementHistory={measurementHistory}
+        initialActivityEvents={initialActivityEvents}
+        loadMoreActivity={loadMoreActivity}
       />
     </div>
   );

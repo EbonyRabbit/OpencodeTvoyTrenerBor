@@ -4,6 +4,7 @@ import { verifySession } from "@/lib/dal";
 import { createClient } from "@/lib/supabase-server";
 import { safeFetch, safeCount } from "@/lib/safe-fetch";
 import { CheckinsTable } from "./_components/checkins-table";
+import { CheckinTrends } from "./_components/checkin-trends";
 
 const PAGE_SIZE = 25;
 
@@ -55,7 +56,7 @@ export default async function CheckinsPage({
   const rawPage = parseInt(sp.page ?? "1", 10) || 1;
   const currentPage = Math.max(1, rawPage);
 
-  const [{ data: checkins }, { count }] = await Promise.all([
+  const [{ data: checkins }, { count }, { data: chartData }] = await Promise.all([
     safeFetch(
       supabase
         .from("checkins")
@@ -71,7 +72,18 @@ export default async function CheckinsPage({
         .select("*", { count: "exact", head: true })
         .eq("client_id", id),
     ),
+    safeFetch(
+      supabase
+        .from("checkins")
+        .select("date, wellbeing, sleep, stress, nutrition_adherence")
+        .eq("client_id", id)
+        .order("date", { ascending: false })
+        .limit(20),
+      [],
+    ),
   ]);
+
+  const chartHistory = [...(chartData ?? [])].reverse();
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const clampedPage = Math.min(currentPage, totalPages);
@@ -83,6 +95,7 @@ export default async function CheckinsPage({
   return (
     <div className="p-6">
       <div className="mx-auto max-w-5xl space-y-6">
+        <CheckinTrends data={chartHistory} />
         <CheckinsTable
           clientId={client.id}
           clientName={client.name}

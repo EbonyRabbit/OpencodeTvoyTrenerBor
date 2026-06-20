@@ -25,6 +25,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
+import { buildPageUrl, getPageNumbers } from "@/lib/pagination";
 import type { Database } from "@/types/supabase";
 
 type CheckinRow = Database["public"]["Tables"]["checkins"]["Row"];
@@ -48,10 +49,6 @@ function ScoreValue({ value }: { value: number | null }) {
         ? "text-yellow-600"
         : "text-red-600";
   return <span className={`font-medium ${color}`}>{value}/10</span>;
-}
-
-function buildPageUrl(clientId: string, page: number): string {
-  return `/clients/${clientId}/checkins?page=${page}`;
 }
 
 export function CheckinsTable({
@@ -244,7 +241,7 @@ export function CheckinsTable({
             {currentPage > 1 && (
               <PaginationItem>
                 <PaginationPrevious
-                  href={buildPageUrl(clientId, currentPage - 1)}
+                  href={buildPageUrl(`/clients/${clientId}/checkins`, currentPage - 1)}
                   text="Назад"
                   aria-label="Предыдущая страница"
                 />
@@ -258,7 +255,7 @@ export function CheckinsTable({
               ) : (
                 <PaginationItem key={page}>
                   <PaginationLink
-                    href={buildPageUrl(clientId, page)}
+                    href={buildPageUrl(`/clients/${clientId}/checkins`, page)}
                     isActive={page === currentPage}
                     aria-label={`Страница ${page}`}
                     aria-current={page === currentPage ? "page" : undefined}
@@ -271,7 +268,7 @@ export function CheckinsTable({
             {currentPage < totalPages && (
               <PaginationItem>
                 <PaginationNext
-                  href={buildPageUrl(clientId, currentPage + 1)}
+                  href={buildPageUrl(`/clients/${clientId}/checkins`, currentPage + 1)}
                   text="Вперёд"
                   aria-label="Следующая страница"
                 />
@@ -284,32 +281,3 @@ export function CheckinsTable({
   );
 }
 
-function getPageNumbers(
-  current: number,
-  total: number,
-): (number | "ellipsis")[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-
-  const pages: (number | "ellipsis")[] = [1];
-
-  if (current > 3) {
-    pages.push("ellipsis");
-  }
-
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-
-  for (let i = start; i <= end; i++) {
-    pages.push(i);
-  }
-
-  if (current < total - 2) {
-    pages.push("ellipsis");
-  }
-
-  pages.push(total);
-
-  return pages;
-}

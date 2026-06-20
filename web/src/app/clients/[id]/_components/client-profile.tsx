@@ -351,6 +351,14 @@ export function ClientProfile({
               {latestMeasurement.hips != null && (
                 <InfoRow label="Бёдра" value={`${latestMeasurement.hips} см`} />
               )}
+              <div className="pt-3">
+                <Link
+                  href={`/clients/${client.id}/measurements`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Все замеры →
+                </Link>
+              </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">

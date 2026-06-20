@@ -423,7 +423,9 @@ export function ClientProfile({
       </SectionCard>
 
       <SectionCard title="Дисциплина">
-        <InfoRow label="Тренировок выполнено" value={String(workoutCount)} />
+        <p className="text-sm text-muted-foreground">
+          Процент выполненных тренировок относительно плана программы.
+        </p>
         <div className="pt-3">
           <Link
             href={`/clients/${client.id}/workouts`}

@@ -285,17 +285,7 @@ export function ClientProfile({
       <div className="grid gap-6 sm:grid-cols-3">
         <SectionCard title="Статистика">
           <InfoRow label="Тренировок" value={String(workoutCount)} />
-          <InfoRow
-            label="Чек-инов"
-            value={
-              <Link
-                href={`/clients/${client.id}/checkins`}
-                className="underline-offset-4 hover:underline"
-              >
-                {String(checkinCount)}
-              </Link>
-            }
-          />
+          <InfoRow label="Чек-инов" value={String(checkinCount)} />
           <InfoRow label="Сообщений" value={String(messageCount)} />
           <InfoRow label="Недель в расписании" value={String(schedule.length)} />
         </SectionCard>
@@ -329,10 +319,10 @@ export function ClientProfile({
                   <p className="mt-0.5 text-sm">{latestCheckin.complaints}</p>
                 </div>
               )}
-              <div className="pt-2">
+              <div className="pt-3">
                 <Link
                   href={`/clients/${client.id}/checkins`}
-                  className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   Все чек-ины →
                 </Link>
@@ -471,8 +461,8 @@ export function ClientProfile({
         currentPaymentStatus={client.payment_status}
       />
 
-      {client.telegram_id && (
-        <div className="flex justify-end">
+      <div className="flex justify-end">
+        {client.telegram_id ? (
           <a
             href={`tg://user?id=${client.telegram_id}`}
             target="_blank"
@@ -481,8 +471,16 @@ export function ClientProfile({
           >
             Написать в Telegram
           </a>
-        </div>
-      )}
+        ) : (
+          <span
+            className={buttonVariants({ variant: "outline" }) + " pointer-events-none opacity-50"}
+            aria-disabled="true"
+            title="Клиент не подключён к боту"
+          >
+            Нет Telegram
+          </span>
+        )}
+      </div>
     </div>
   );
 }

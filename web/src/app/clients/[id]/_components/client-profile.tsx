@@ -373,48 +373,66 @@ export function ClientProfile({
         </SectionCard>
       </div>
 
-      {latestPhotos.length > 0 && (
-        <SectionCard title="Последние фото">
-          <div className="grid grid-cols-3 gap-2">
-            {latestPhotos.slice(0, 6).map((photo) => (
-              <Link
-                key={photo.id}
-                href={`/clients/${client.id}/photos`}
-                className="group relative aspect-[3/4] w-full overflow-hidden rounded-md border bg-muted"
-                aria-label={`${PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}`}
-              >
-                {photo.drive_url ? (
-                  <Image
-                    src={getDriveThumbnailUrl(photo.drive_url)}
-                    alt={PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}
-                    fill
-                    className="object-cover transition-transform group-hover:scale-105"
-                    sizes="(max-width: 640px) 33vw, 15vw"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <span className="text-xs text-muted-foreground">—</span>
-                  </div>
-                )}
-                <Badge
-                  className="absolute left-1 top-1 text-[10px]"
-                  variant="secondary"
+      <SectionCard title="Последние фото">
+        {latestPhotos.length > 0 ? (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              {latestPhotos.slice(0, 6).map((photo) => (
+                <Link
+                  key={photo.id}
+                  href={`/clients/${client.id}/photos`}
+                  className="group relative aspect-[3/4] w-full overflow-hidden rounded-md border bg-muted"
+                  aria-label={`${PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}`}
                 >
-                  {PHOTO_TYPE_LABELS[photo.type] ?? photo.type}
-                </Badge>
-              </Link>
-            ))}
-          </div>
-          <div className="pt-3">
-            <Link
-              href={`/clients/${client.id}/photos`}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Все фото →
-            </Link>
-          </div>
-        </SectionCard>
-      )}
+                  {photo.drive_url ? (
+                    <Image
+                      src={getDriveThumbnailUrl(photo.drive_url)}
+                      alt={PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105"
+                      sizes="(max-width: 640px) 33vw, 15vw"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <span className="text-xs text-muted-foreground">—</span>
+                    </div>
+                  )}
+                  <Badge
+                    className="absolute left-1 top-1 text-[10px]"
+                    variant="secondary"
+                  >
+                    {PHOTO_TYPE_LABELS[photo.type] ?? photo.type}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Нет прогресс-фото
+          </p>
+        )}
+        <div className="pt-3">
+          <Link
+            href={`/clients/${client.id}/photos`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Все фото →
+          </Link>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Дисциплина">
+        <InfoRow label="Тренировок выполнено" value={String(workoutCount)} />
+        <div className="pt-3">
+          <Link
+            href={`/clients/${client.id}/workouts`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Дисциплина →
+          </Link>
+        </div>
+      </SectionCard>
 
       {(checkinHistory.length > 0 || measurementHistory.length > 0) && (
         <Card>

@@ -64,7 +64,7 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Adherence — {clientName}</CardTitle>
+            <CardTitle>Дисциплина — {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
@@ -90,7 +90,7 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Adherence — {clientName}</CardTitle>
+            <CardTitle>Дисциплина — {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
@@ -117,7 +117,7 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Adherence — {clientName}</CardTitle>
+            <CardTitle>Дисциплина — {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
@@ -144,14 +144,14 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Adherence — {clientName}</CardTitle>
+            <CardTitle>Дисциплина — {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Нет завершённых недель для расчёта adherence. Возможно, программа
+              Нет завершённых недель для расчёта дисциплины. Возможно, программа
               только началась или расписание не соответствует программе.
             </p>
           </CardContent>
@@ -181,10 +181,10 @@ export function WorkoutView({
       </Link>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card role="region" aria-label="Общий adherence">
+        <Card role="region" aria-label="Общая дисциплина">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Общий adherence
+              Общая дисциплина
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -231,14 +231,14 @@ export function WorkoutView({
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Динамика adherence по неделям
+              Динамика дисциплины по неделям
             </CardTitle>
           </CardHeader>
           <CardContent>
             <MiniLineChart
               data={chartData}
               color="var(--color-chart-2, #16a34a)"
-              label="Adherence"
+              label="Дисциплина"
               height={160}
             />
           </CardContent>
@@ -247,13 +247,13 @@ export function WorkoutView({
 
       <Card>
         <CardHeader>
-          <CardTitle>Adherence по неделям</CardTitle>
+          <CardTitle>Дисциплина по неделям</CardTitle>
           <CardDescription>
             {programName ?? "Без программы"}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <Table aria-label="Adherence по неделям">
+          <Table aria-label="Дисциплина по неделям">
             <TableHeader>
               <TableRow>
                 <TableHead scope="col">Неделя</TableHead>
@@ -266,7 +266,7 @@ export function WorkoutView({
                   Выполнено
                 </TableHead>
                 <TableHead scope="col" className="text-center">
-                  Adherence
+                  Дисциплина
                 </TableHead>
               </TableRow>
             </TableHeader>

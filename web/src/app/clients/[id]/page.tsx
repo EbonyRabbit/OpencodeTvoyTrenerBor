@@ -3,34 +3,10 @@ import type { Metadata } from "next";
 import { verifySession } from "@/lib/dal";
 import { createClient } from "@/lib/supabase-server";
 import { getParsedContent } from "@/lib/program-utils";
+import { safeFetch, safeCount } from "@/lib/safe-fetch";
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
 import { getClientActivity, loadMoreActivity } from "./actions";
-
-async function safeFetch<T>(
-  query: PromiseLike<{ data: T | null; error: unknown }>,
-  fallback: T | null,
-): Promise<{ data: T | null }> {
-  try {
-    const result = await query;
-    return { data: result.data ?? fallback };
-  } catch (e) {
-    console.error("safeFetch failed:", e);
-    return { data: fallback };
-  }
-}
-
-async function safeCount(
-  query: PromiseLike<{ count: number | null; error: unknown }>,
-): Promise<{ count: number }> {
-  try {
-    const result = await query;
-    return { count: result.count ?? 0 };
-  } catch (e) {
-    console.error("safeCount failed:", e);
-    return { count: 0 };
-  }
-}
 
 export async function generateMetadata({
   params,
@@ -140,7 +116,7 @@ export default async function ClientProfilePage({
         checkinHistory={checkinHistory}
         measurementHistory={measurementHistory}
         initialActivityEvents={initialActivityEvents}
-        loadMoreActivity={(offset: number) => loadMoreActivity(id, offset)}
+        loadMoreActivity={loadMoreActivity.bind(null, id)}
       />
     </div>
   );

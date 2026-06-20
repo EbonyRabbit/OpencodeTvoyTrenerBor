@@ -70,7 +70,7 @@ function daysSince(date: string | null): number | null {
   }
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between py-1.5 text-sm">
       <span className="text-muted-foreground">{label}</span>
@@ -285,7 +285,17 @@ export function ClientProfile({
       <div className="grid gap-6 sm:grid-cols-3">
         <SectionCard title="Статистика">
           <InfoRow label="Тренировок" value={String(workoutCount)} />
-          <InfoRow label="Чек-инов" value={String(checkinCount)} />
+          <InfoRow
+            label="Чек-инов"
+            value={
+              <Link
+                href={`/clients/${client.id}/checkins`}
+                className="underline-offset-4 hover:underline"
+              >
+                {String(checkinCount)}
+              </Link>
+            }
+          />
           <InfoRow label="Сообщений" value={String(messageCount)} />
           <InfoRow label="Недель в расписании" value={String(schedule.length)} />
         </SectionCard>
@@ -319,6 +329,14 @@ export function ClientProfile({
                   <p className="mt-0.5 text-sm">{latestCheckin.complaints}</p>
                 </div>
               )}
+              <div className="pt-2">
+                <Link
+                  href={`/clients/${client.id}/checkins`}
+                  className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  Все чек-ины →
+                </Link>
+              </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">

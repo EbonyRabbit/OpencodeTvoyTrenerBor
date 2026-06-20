@@ -64,6 +64,7 @@ export default async function ClientProfilePage({
     scheduleResult,
     checkinHistoryResult,
     measurementHistoryResult,
+    latestPhotosResult,
   ] = await Promise.all([
     safeFetch(
       supabase.from("checkins").select("date, wellbeing, sleep, stress, nutrition_adherence, missed_workouts, complaints").eq("client_id", id).order("date", { ascending: false }).limit(1).maybeSingle(),
@@ -88,6 +89,10 @@ export default async function ClientProfilePage({
     ),
     safeFetch(
       supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: false }).limit(20),
+      [],
+    ),
+    safeFetch(
+      supabase.from("photos").select("id, date, type, drive_url").eq("client_id", id).order("date", { ascending: false }).limit(6),
       [],
     ),
   ]);
@@ -115,6 +120,7 @@ export default async function ClientProfilePage({
         parsedContent={parsedContent}
         checkinHistory={checkinHistory}
         measurementHistory={measurementHistory}
+        latestPhotos={latestPhotosResult.data ?? []}
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
       />

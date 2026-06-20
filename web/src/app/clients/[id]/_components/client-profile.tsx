@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -20,6 +21,7 @@ import {
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
 import { MiniLineChart } from "./mini-line-chart";
+import { getDriveThumbnailUrl, PHOTO_TYPE_LABELS } from "@/lib/photos";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 
@@ -29,6 +31,7 @@ type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], 
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
 type CheckinHistoryRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress">;
 type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
+type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url">;
 
 const MEASUREMENT_DAY_LABELS: Record<number, string> = {
   1: "Понедельник",
@@ -157,6 +160,7 @@ export function ClientProfile({
   measurementHistory,
   initialActivityEvents,
   loadMoreActivity,
+  latestPhotos,
 }: {
   client: ClientRow;
   latestCheckin: CheckinRow | null;
@@ -170,6 +174,7 @@ export function ClientProfile({
   measurementHistory: MeasurementHistoryRow[];
   initialActivityEvents: ActivityEvent[];
   loadMoreActivity: (offset: number) => Promise<ActivityEvent[]>;
+  latestPhotos: PhotoRow[];
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
@@ -367,6 +372,49 @@ export function ClientProfile({
           )}
         </SectionCard>
       </div>
+
+      {latestPhotos.length > 0 && (
+        <SectionCard title="Последние фото">
+          <div className="grid grid-cols-3 gap-2">
+            {latestPhotos.slice(0, 6).map((photo) => (
+              <Link
+                key={photo.id}
+                href={`/clients/${client.id}/photos`}
+                className="group relative aspect-[3/4] w-full overflow-hidden rounded-md border bg-muted"
+                aria-label={`${PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}`}
+              >
+                {photo.drive_url ? (
+                  <Image
+                    src={getDriveThumbnailUrl(photo.drive_url)}
+                    alt={PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}
+                    fill
+                    className="object-cover transition-transform group-hover:scale-105"
+                    sizes="(max-width: 640px) 33vw, 15vw"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <span className="text-xs text-muted-foreground">—</span>
+                  </div>
+                )}
+                <Badge
+                  className="absolute left-1 top-1 text-[10px]"
+                  variant="secondary"
+                >
+                  {PHOTO_TYPE_LABELS[photo.type] ?? photo.type}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+          <div className="pt-3">
+            <Link
+              href={`/clients/${client.id}/photos`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Все фото →
+            </Link>
+          </div>
+        </SectionCard>
+      )}
 
       {(checkinHistory.length > 0 || measurementHistory.length > 0) && (
         <Card>

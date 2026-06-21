@@ -537,7 +537,13 @@ export function ClientProfile({
         currentPaymentStatus={client.payment_status}
       />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Link
+          href={`/clients/${client.id}/chat`}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          Чат
+        </Link>
         {client.telegram_id ? (
           <a
             href={`tg://user?id=${client.telegram_id}`}

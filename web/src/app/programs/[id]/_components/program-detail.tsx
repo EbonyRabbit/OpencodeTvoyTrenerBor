@@ -1,9 +1,11 @@
 "use client";
 
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -17,6 +19,8 @@ import {
   type ProgramRow,
 } from "@/lib/program-utils";
 import { ProgramWeekPreview } from "./program-week-preview";
+import { toggleProgramStatus, getAssignableClients, assignToClient } from "../actions";
+import { Loader2 } from "lucide-react";
 
 function formatPrice(price: number | null): string {
   if (price === null) return "По запросу";
@@ -56,6 +60,88 @@ export function ProgramDetail({
   const parsed = getParsedContent(program);
   const hasExcel = hasTemplate(program);
 
+  const [toggling, setToggling] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+
+  const [showAssign, setShowAssign] = useState(false);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [clients, setClients] = useState<Array<{ id: string; name: string; program_id: string | null }>>([]);
+  const [selectedClient, setSelectedClient] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleToggle = useCallback(async () => {
+    if (program.active) {
+      const confirmed = window.confirm(
+        `Деактивировать программу "${program.title}"?\n\nКлиенты с этой программой продолжат видеть её, но новые назначения будут невозможны.`,
+      );
+      if (!confirmed) return;
+    }
+
+    setToggling(true);
+    setToggleError(null);
+    setSuccessMsg(null);
+    try {
+      const result = await toggleProgramStatus(program.id, !program.active);
+      if (result.error) {
+        setToggleError(result.error);
+      } else {
+        setSuccessMsg(program.active ? "Программа деактивирована" : "Программа опубликована");
+      }
+    } catch {
+      setToggleError("Произошла ошибка");
+    } finally {
+      setToggling(false);
+    }
+  }, [program.id, program.active, program.title]);
+
+  const handleOpenAssign = useCallback(async () => {
+    setAssignError(null);
+    setLoadingClients(true);
+    try {
+      const result = await getAssignableClients();
+      if (result.error) {
+        setAssignError(result.error);
+        return;
+      }
+      setClients(result.clients);
+      setShowAssign(true);
+    } catch {
+      setAssignError("Произошла ошибка");
+    } finally {
+      setLoadingClients(false);
+    }
+  }, []);
+
+  const handleAssign = useCallback(async () => {
+    if (!selectedClient) return;
+    setAssigning(true);
+    setAssignError(null);
+    setSuccessMsg(null);
+    try {
+      const result = await assignToClient(program.id, selectedClient);
+      if (result.error) {
+        setAssignError(result.error);
+        return;
+      }
+      setSuccessMsg("Программа назначена клиенту");
+      setShowAssign(false);
+      setSelectedClient("");
+      setClients([]);
+    } catch {
+      setAssignError("Произошла ошибка");
+    } finally {
+      setAssigning(false);
+    }
+  }, [program.id, selectedClient]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [successMsg]);
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Link
@@ -83,6 +169,26 @@ export function ProgramDetail({
           <AlertDescription>
             Назначить программу клиенту нельзя — требуется загрузить шаблон .xlsx
           </AlertDescription>
+        </Alert>
+      )}
+
+      {toggleError && (
+        <Alert role="alert" variant="destructive">
+          <AlertTitle>Ошибка</AlertTitle>
+          <AlertDescription>{toggleError}</AlertDescription>
+        </Alert>
+      )}
+
+      {assignError && (
+        <Alert role="alert" variant="destructive">
+          <AlertTitle>Ошибка назначения</AlertTitle>
+          <AlertDescription>{assignError}</AlertDescription>
+        </Alert>
+      )}
+
+      {successMsg && (
+        <Alert role="alert" variant="default" className="border-green-500 bg-green-50 text-green-800">
+          <AlertDescription>{successMsg}</AlertDescription>
         </Alert>
       )}
 
@@ -134,13 +240,94 @@ export function ProgramDetail({
             Редактировать
           </Link>
         )}
-        <Button
-          type="button"
-          disabled={!hasExcel}
-          title={!hasExcel ? "Загрузите шаблон перед назначением" : undefined}
-        >
-          Назначить клиенту
-        </Button>
+
+        {status === "active" ? (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleToggle}
+            disabled={toggling}
+          >
+            {toggling ? "Деактивация..." : "Деактивировать"}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="default"
+            onClick={handleToggle}
+            disabled={toggling || !hasExcel}
+            title={!hasExcel ? "Загрузите шаблон перед публикацией" : undefined}
+          >
+            {toggling ? "Публикация..." : "Опубликовать"}
+          </Button>
+        )}
+
+        {!showAssign ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loadingClients || !hasExcel || !program.active}
+            title={
+              !hasExcel
+                ? "Загрузите шаблон перед назначением"
+                : !program.active
+                  ? "Опубликуйте программу перед назначением"
+                  : undefined
+            }
+            onClick={handleOpenAssign}
+          >
+            {loadingClients ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Загрузка...
+              </>
+            ) : (
+              "Назначить клиенту"
+            )}
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Select value={selectedClient} onValueChange={(v) => setSelectedClient(v ?? "")}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Выберите клиента" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.length === 0 ? (
+                  <SelectItem value="__none__" disabled>
+                    Нет клиентов
+                  </SelectItem>
+                ) : (
+                  clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                      {c.program_id ? " —есть программа" : ""}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAssign}
+              disabled={!selectedClient || assigning}
+            >
+              {assigning ? "Сохранение..." : "Сохранить"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setShowAssign(false);
+                setSelectedClient("");
+                setClients([]);
+              }}
+            >
+              Отмена
+            </Button>
+          </div>
+        )}
       </div>
 
       <Separator />

@@ -103,7 +103,7 @@ OpenCode/
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | 1.1 | Инициализация проекта `bot/` | Создать `bot/package.json` с зависимостями: `grammy`, `node-cron`, `@supabase/supabase-js`, `date-fns-tz`, `i18next` | ✅ |
-| 1.2 | TypeScript конфиг | Создать `bot/tsconfig.json` (target: ES2022, module: NodeNext, strict) | pending |
+| 1.2 | TypeScript конфиг | Создать `bot/tsconfig.json` (target: ES2022, module: NodeNext, strict) | ✅ |
 | 1.3 | Конфигурация | Создать `bot/src/config.ts` — чтение env vars, экспорт объекта конфигурации | pending |
 | 1.4 | Supabase клиент | Скопировать `supabase-admin.ts` из `web/src/lib/` в `bot/src/lib/` | pending |
 | 1.5 | Типы БД | Скопировать `types/supabase.ts` из `web/src/types/` в `bot/src/lib/types.ts` | pending |

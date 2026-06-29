@@ -1,0 +1,39 @@
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (value === undefined || value === "") {
+    throw new Error(
+      `Missing required environment variable: ${name}. ` +
+        `Set it in your .env file or shell environment.`
+    );
+  }
+  return value;
+}
+
+function optionalEnv(name: string, fallback: string): string {
+  return process.env[name] ?? fallback;
+}
+
+function optionalPort(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const parsed = parseInt(raw, 10);
+  if (Number.isNaN(parsed) || parsed < 0 || parsed > 65535) {
+    throw new Error(`Invalid ${name}: ${raw}. Expected 0-65535.`);
+  }
+  return parsed;
+}
+
+export const config = {
+  telegram: {
+    botToken: requireEnv("TELEGRAM_BOT_TOKEN"),
+    webhookSecret: requireEnv("TELEGRAM_WEBHOOK_SECRET"),
+  },
+  supabase: {
+    url: requireEnv("SUPABASE_URL").replace(/\/+$/, ""),
+    serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  },
+  coachChatId: BigInt(requireEnv("COACH_CHAT_ID")),
+  nodeEnv: optionalEnv("NODE_ENV", "development"),
+  port: optionalPort("PORT", 3001),
+  webhookPath: optionalEnv("WEBHOOK_PATH", "/webhook"),
+} as const;

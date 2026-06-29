@@ -107,9 +107,9 @@ OpenCode/
 | 1.3 | Конфигурация | Создать `bot/src/config.ts` — чтение env vars, экспорт объекта конфигурации | ✅ |
 | 1.4 | Supabase клиент | Скопировать `supabase-admin.ts` из `web/src/lib/` в `bot/src/lib/` | ✅ |
 | 1.5 | Типы БД | Скопировать `types/supabase.ts` из `web/src/types/` в `bot/src/lib/types.ts` | ✅ |
-| 1.6 | Миграция БД: `bot_state` | Создать таблицу для состояний разговоров (заменяет Bot State sheet) | pending |
-| 1.7 | Миграция БД: `bot_logs` | Создать таблицу логов бота (заменяет Bot Logs sheet) | pending |
-| 1.8 | Миграция БД: `bot_schedule` | Создать таблицу отложенных напоминаний (заменяет Bot Schedule sheet) | pending |
+| 1.6 | Миграция БД: `bot_state` | Создать таблицу для состояний разговоров (заменяет Bot State sheet) | ✅ |
+| 1.7 | Миграция БД: `bot_logs` | Создать таблицу логов бота (заменяет Bot Logs sheet) | ✅ |
+| 1.8 | Миграция БД: `bot_schedule` | Создать таблицу отложенных напоминаний (заменяет Bot Schedule sheet) | ✅ |
 | 1.9 | .env.local | Настроить переменные окружения (BOT_TOKEN, SUPABASE_URL, SERVICE_ROLE_KEY, COACH_CHAT_ID) | pending |
 | 1.10 | Базовый entry point | Создать `bot/src/index.ts` — запуск grammY в режиме webhook | pending |
 | 1.11 | Dockerfile | Создать Dockerfile для деплоя на Railway | pending |

@@ -110,7 +110,7 @@ OpenCode/
 | 1.6 | Миграция БД: `bot_state` | Создать таблицу для состояний разговоров (заменяет Bot State sheet) | ✅ |
 | 1.7 | Миграция БД: `bot_logs` | Создать таблицу логов бота (заменяет Bot Logs sheet) | ✅ |
 | 1.8 | Миграция БД: `bot_schedule` | Создать таблицу отложенных напоминаний (заменяет Bot Schedule sheet) | ✅ |
-| 1.9 | .env.local | Настроить переменные окружения (BOT_TOKEN, SUPABASE_URL, SERVICE_ROLE_KEY, COACH_CHAT_ID) | pending |
+| 1.9 | .env.local | Настроить переменные окружения (BOT_TOKEN, SUPABASE_URL, SERVICE_ROLE_KEY, COACH_CHAT_ID) | ✅ |
 | 1.10 | Базовый entry point | Создать `bot/src/index.ts` — запуск grammY в режиме webhook | pending |
 | 1.11 | Dockerfile | Создать Dockerfile для деплоя на Railway | pending |
 | 1.12 | Тест запуска | Убедиться, что бот стартует и отвечает на `ping` | pending |

@@ -2,6 +2,7 @@ import { Bot, type Context, BotError, GrammyError, HttpError } from "grammy";
 import { config } from "./config.js";
 import { startHandler } from "./handlers/start.js";
 import { menuHandler } from "./handlers/menu.js";
+import { myProgramHandler } from "./handlers/my-program.js";
 
 export interface MyContext extends Context {
   clientId?: string;
@@ -30,9 +31,13 @@ bot.use(async (ctx, next) => {
 
 bot.command("start", startHandler);
 bot.command("menu", menuHandler);
+bot.command("myprogram", myProgramHandler);
 
 bot.on("message:text", (ctx) => {
-  console.log(`Received message from ${ctx.from?.id}: ${ctx.message.text}`);
+  const preview = ctx.message.text.length > 50
+    ? ctx.message.text.slice(0, 50) + "..."
+    : ctx.message.text;
+  console.log(`Received message from ${ctx.from?.id}: ${preview}`);
   return ctx.reply("pong");
 });
 

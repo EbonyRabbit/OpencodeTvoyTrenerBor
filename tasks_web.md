@@ -125,7 +125,7 @@ OpenCode/
 | 2.2 | Поиск клиента | Функция `findClientByTelegramId(telegramId)` — запрос в Supabase `clients` | ✅ |
 | 2.3 | Команда `/start` | Приветствие: активные клиенты → меню; неактивные → "подключиться по коду"; новые → "купить программу" | ✅ |
 | 2.4 | Подключение по коду | Ввод 8-символьного кода → связка `telegram_id` с клиентом в Supabase | ✅ |
-| 2.5 | Команда `/menu` | Адаптивный список команд на основе `status` и `payment_status` клиента | pending |
+| 2.5 | Команда `/menu` | Адаптивный список команд на основе `status` и `payment_status` клиента | ✅ |
 | 2.6 | Команда `/myprogram` | Показ текущей программы, ссылки на spreadsheet (если есть), кода подключения | pending |
 | 2.7 | Машин состояний | Модуль `state/machine.ts`: `getState`, `setState`, `clearState` (Supabase `bot_state`) | pending |
 | 2.8 | Роутинг callback | Обработка inline-кнопок: `today_open`, `exercise_log:*`, `exercise_skip:*`, `skip_workout`, и т.д. | pending |

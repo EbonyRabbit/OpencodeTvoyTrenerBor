@@ -1,14 +1,7 @@
 import "dotenv/config";
-import { Bot } from "grammy";
 import { config } from "./config.js";
 import { createApp } from "./app.js";
-
-const bot = new Bot(config.telegram.botToken);
-
-bot.on("message", (ctx) => {
-  console.log(`Received message from ${ctx.from?.id}: ${ctx.message.text}`);
-  return ctx.reply("pong");
-});
+import { bot } from "./bot.js";
 
 const { server } = createApp({
   bot,

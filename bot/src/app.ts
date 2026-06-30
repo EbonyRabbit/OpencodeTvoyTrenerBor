@@ -1,8 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { type Bot, webhookCallback } from "grammy";
+import type { MyContext } from "./bot.js";
 
 export interface AppOptions {
-  bot: Bot;
+  bot: Bot<MyContext>;
   webhookPath: string;
   webhookSecret: string;
 }

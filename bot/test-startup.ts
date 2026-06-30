@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { Bot } from "grammy";
 import { createApp } from "./src/app.js";
 
 const MOCK_TOKEN = "0000000000:FAKE-TEST-TOKEN-NOT-REAL";
@@ -14,23 +13,19 @@ process.env.COACH_CHAT_ID = "123456789";
 process.env.PORT = String(MOCK_PORT);
 process.env.WEBHOOK_PATH = "/webhook";
 
-const bot = new Bot(MOCK_TOKEN, {
-  botInfo: {
-    id: 123456789,
-    is_bot: true,
-    first_name: "TestBot",
-    username: "test_bot",
-    can_join_groups: true,
-    can_read_all_group_messages: false,
-    supports_inline_queries: false,
-    can_connect_to_business: false,
-    has_main_web_app: false,
-  },
-});
+const { bot } = await import("./src/bot.js");
 
-bot.on("message", (ctx) => {
-  return ctx.reply("pong");
-});
+bot.botInfo = {
+  id: 123456789,
+  is_bot: true,
+  first_name: "TestBot",
+  username: "test_bot",
+  can_join_groups: true,
+  can_read_all_group_messages: false,
+  supports_inline_queries: false,
+  can_connect_to_business: false,
+  has_main_web_app: false,
+};
 
 const { server } = createApp({
   bot,

@@ -1,5 +1,6 @@
 import { Bot, type Context, BotError, GrammyError, HttpError } from "grammy";
 import { config } from "./config.js";
+import { startHandler } from "./handlers/start.js";
 
 export interface MyContext extends Context {
   clientId?: string;
@@ -25,6 +26,8 @@ bot.use(async (ctx, next) => {
     console.log(`  ↳ ${updateType} processed in ${Date.now() - start}ms`);
   }
 });
+
+bot.command("start", startHandler);
 
 bot.on("message:text", (ctx) => {
   console.log(`Received message from ${ctx.from?.id}: ${ctx.message.text}`);

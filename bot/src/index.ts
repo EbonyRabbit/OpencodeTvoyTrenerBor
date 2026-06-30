@@ -1,7 +1,7 @@
 import "dotenv/config";
-import { createServer, type IncomingMessage, type ServerResponse } from "http";
-import { Bot, webhookCallback } from "grammy";
+import { Bot } from "grammy";
 import { config } from "./config.js";
+import { createApp } from "./app.js";
 
 const bot = new Bot(config.telegram.botToken);
 
@@ -10,32 +10,10 @@ bot.on("message", (ctx) => {
   return ctx.reply("pong");
 });
 
-const handleUpdate = webhookCallback(bot, "http", {
-  secretToken: config.telegram.webhookSecret,
-});
-
-const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  if (req.url === "/health" && req.method === "GET") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true }));
-    return;
-  }
-
-  if (req.url === config.webhookPath && req.method === "POST") {
-    try {
-      await handleUpdate(req, res);
-    } catch (err) {
-      console.error("Webhook handler error:", err);
-      if (!res.headersSent) {
-        res.writeHead(500);
-        res.end("Internal Server Error");
-      }
-    }
-    return;
-  }
-
-  res.writeHead(404);
-  res.end("Not Found");
+const { server } = createApp({
+  bot,
+  webhookPath: config.webhookPath,
+  webhookSecret: config.telegram.webhookSecret,
 });
 
 server.on("error", (err) => {

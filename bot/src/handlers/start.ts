@@ -1,5 +1,12 @@
 import type { MyContext } from "../bot.js";
-import { findClientByTelegramId, type Client } from "../lib/clients.js";
+import {
+  findClientByTelegramId,
+  findClientByConnectCode,
+  connectClientToTelegram,
+  type Client,
+} from "../lib/clients.js";
+
+const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
 function buildMenuMessage(client: Client): string {
   const lines = [`Привет, ${client.name}!`];
@@ -38,11 +45,34 @@ export async function startHandler(ctx: MyContext): Promise<void> {
   }
 
   const text = ctx.message?.text ?? "";
-  const payload = text.split(" ")[1];
+  const rawPayload = text.split(" ")[1];
+  const code = rawPayload?.trim().toUpperCase() ?? "";
 
-  if (payload) {
-    // TODO: implement connect-by-code logic in task 2.4
-    await ctx.reply(`Получен код: ${payload}. Подключение будет доступно позже.`);
+  if (rawPayload) {
+    if (!CODE_REGEX.test(code)) {
+      await ctx.reply("Неверный формат кода. Код должен содержать 8 символов (буквы и цифры).");
+      return;
+    }
+
+    try {
+      const existing = await findClientByTelegramId(telegramId);
+      if (existing) {
+        await ctx.reply("Ваш аккаунт уже подключён. Используйте /menu.");
+        return;
+      }
+
+      const client = await findClientByConnectCode(code);
+      if (!client) {
+        await ctx.reply("Код не найден. Проверьте код или обратитесь к тренеру.");
+        return;
+      }
+
+      await connectClientToTelegram(client.id, telegramId);
+      await ctx.reply(buildMenuMessage(client));
+    } catch (err) {
+      console.error(`[START] Connect error for ${telegramId}:`, err);
+      await ctx.reply("Ошибка подключения. Попробуйте позже.");
+    }
     return;
   }
 

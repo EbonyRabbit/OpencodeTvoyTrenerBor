@@ -269,6 +269,26 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["plan_pauses"]["Row"]>;
         Relationships: [];
       };
+      bot_state: {
+        Row: {
+          telegram_id: number;
+          client_id: string | null;
+          action: string | null;
+          step: string | null;
+          data: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          telegram_id: number;
+          client_id?: string | null;
+          action?: string | null;
+          step?: string | null;
+          data?: Json;
+        };
+        Update: Partial<Database["public"]["Tables"]["bot_state"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

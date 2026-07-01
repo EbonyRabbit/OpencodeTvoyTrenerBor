@@ -3,10 +3,12 @@ import { config } from "./config.js";
 import { startHandler } from "./handlers/start.js";
 import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
+import { getState, type BotState } from "./state/machine.js";
 
 export interface MyContext extends Context {
   clientId?: string;
   language?: "ru" | "en";
+  state?: BotState | null;
 }
 
 export const bot = new Bot<MyContext>(config.telegram.botToken);
@@ -21,6 +23,15 @@ bot.use(async (ctx, next) => {
   const userId = ctx.from?.id ?? "unknown";
 
   console.log(`[${new Date().toISOString()}] ${updateType} from ${userId}`);
+
+  if (ctx.from?.id) {
+    try {
+      ctx.state = await getState(ctx.from.id);
+    } catch (err) {
+      console.warn(`[STATE] Failed to load state for ${ctx.from?.id}:`, err);
+      ctx.state = null;
+    }
+  }
 
   try {
     await next();

@@ -6,10 +6,11 @@ import { myProgramHandler } from "./handlers/my-program.js";
 import { callbackRouter } from "./handlers/callbacks.js";
 import { getState, type BotState } from "./state/machine.js";
 import type { Client } from "./lib/clients.js";
+import { resolveLanguage, type Language } from "./i18n/index.js";
 
 export interface MyContext extends Context {
   clientId?: string;
-  language?: "ru" | "en";
+  language: Language;
   state?: BotState | null;
   client?: Client;
 }
@@ -26,6 +27,8 @@ bot.use(async (ctx, next) => {
   const userId = ctx.from?.id ?? "unknown";
 
   console.log(`[${new Date().toISOString()}] ${updateType} from ${userId}`);
+
+  ctx.language = resolveLanguage(ctx.from?.language_code);
 
   if (ctx.from?.id) {
     try {

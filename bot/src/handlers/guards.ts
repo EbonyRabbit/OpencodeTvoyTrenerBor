@@ -1,6 +1,7 @@
 import type { MyContext } from "../bot.js";
 import { findClientByTelegramId } from "../lib/clients.js";
 import type { Client } from "../lib/clients.js";
+import { t, applyClientLanguage } from "../i18n/index.js";
 
 export interface GuardResult {
   client: Client;
@@ -9,28 +10,30 @@ export interface GuardResult {
 export async function guardActiveClient(ctx: MyContext): Promise<GuardResult | string> {
   const telegramId = ctx.from?.id;
   if (!telegramId) {
-    return "Ошибка: не удалось определить пользователя.";
+    return t("error.user_not_identified", ctx.language);
   }
 
   const client = await findClientByTelegramId(telegramId);
   if (!client) {
-    return "Сессия истекла. Отправьте /start для начала работы.";
+    return t("greeting.session_expired", ctx.language);
   }
 
+  applyClientLanguage(ctx, client.language);
+
   if (client.status === "access_expired") {
-    return "Ваш доступ истёк. Продлите программу у тренера.";
+    return t("client.access_expired", ctx.language);
   }
 
   if (client.status === "inactive") {
-    return "Аккаунт неактивен. Свяжитесь с тренером.";
+    return t("client.inactive", ctx.language);
   }
 
   if (client.payment_status === "pending") {
-    return "Ожидается подтверждение оплаты.";
+    return t("client.payment_pending", ctx.language);
   }
 
   if (!client.program_id) {
-    return "Программа ещё не назначена. Ожидайте — тренер скоро свяжется с вами.";
+    return t("client.no_program", ctx.language);
   }
 
   return { client };

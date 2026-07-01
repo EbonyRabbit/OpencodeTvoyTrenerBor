@@ -1,57 +1,40 @@
 import type { MyContext } from "../bot.js";
 import { findClientByTelegramId } from "../lib/clients.js";
+import { t } from "../i18n/index.js";
+import { guardActiveClient } from "./guards.js";
 
 export async function menuHandler(ctx: MyContext): Promise<void> {
   const telegramId = ctx.from?.id;
 
   if (!telegramId) {
-    await ctx.reply("Ошибка: не удалось определить вашего пользователя.");
+    await ctx.reply(t("error.user_not_identified", ctx.language));
     return;
   }
 
   try {
-    const client = await findClientByTelegramId(telegramId);
-
-    if (!client) {
-      await ctx.reply("Добро пожаловать! Приобретите программу у тренера для начала тренировок.");
+    const guard = await guardActiveClient(ctx);
+    if (typeof guard === "string") {
+      await ctx.reply(guard);
       return;
     }
 
-    if (client.status === "access_expired") {
-      await ctx.reply("Ваш доступ истёк. Продлите программу у тренера.");
-      return;
-    }
-
-    if (client.status === "inactive") {
-      await ctx.reply("Аккаунт неактивен. Свяжитесь с тренером.");
-      return;
-    }
-
-    if (client.payment_status === "pending") {
-      await ctx.reply("Ожидается подтверждение оплаты.");
-      return;
-    }
-
-    if (!client.program_id) {
-      await ctx.reply("Ожидается назначение программы.");
-      return;
-    }
+    const { client } = guard;
 
     const lines = [
-      `Привет, ${client.name ?? "клиент"}!`,
+      t("greeting.hello", ctx.language, { name: client.name ?? t("greeting.default_name", ctx.language) }),
       "",
-      "Доступные команды:",
-      "/today — тренировка дня",
-      "/checkin — чек-ин",
-      "/myprogram — моя программа",
-      "/settings — настройки",
+      t("menu.title", ctx.language),
+      t("menu.today", ctx.language),
+      t("menu.checkin", ctx.language),
+      t("menu.myprogram", ctx.language),
+      t("menu.settings", ctx.language),
     ];
 
     await ctx.reply(lines.join("\n"));
   } catch (err) {
-    console.error(`[MENU] Error for ${telegramId}:`, err);
+    console.error(`[MENU] Error for ${ctx.from?.id}:`, err);
     try {
-      await ctx.reply("Сервис временно недоступен. Попробуйте позже.");
+      await ctx.reply(t("error.service_unavailable", ctx.language));
     } catch {
       // fallback reply failed
     }

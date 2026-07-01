@@ -1,5 +1,4 @@
 import type { MyContext } from "../bot.js";
-import { findClientByTelegramId } from "../lib/clients.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import {
   getParsedContent,
@@ -8,54 +7,34 @@ import {
   getCurrentWeek,
   getWorkoutDaysCount,
 } from "../lib/program-utils.js";
+import { t, applyClientLanguage } from "../i18n/index.js";
+import { guardActiveClient } from "./guards.js";
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
-const TRUNCATION_SUFFIX = "\n\n⚠️ Сообщение обрезано. Полная версия в таблице.";
 
 export async function myProgramHandler(ctx: MyContext): Promise<void> {
   const telegramId = ctx.from?.id;
 
   if (!telegramId) {
-    await ctx.reply("Ошибка: не удалось определить вашего пользователя.");
+    await ctx.reply(t("error.user_not_identified", ctx.language));
     return;
   }
 
   try {
-    const client = await findClientByTelegramId(telegramId);
-
-    if (!client) {
-      await ctx.reply("Добро пожаловать! Приобретите программу у тренера для начала тренировок.");
+    const guard = await guardActiveClient(ctx);
+    if (typeof guard === "string") {
+      await ctx.reply(guard);
       return;
     }
 
-    const safeName = client.name ?? "клиент";
-
-    if (client.status === "access_expired") {
-      await ctx.reply("Ваш доступ истёк. Продлите программу у тренера.");
-      return;
-    }
-
-    if (client.status === "inactive") {
-      await ctx.reply("Аккаунт неактивен. Свяжитесь с тренером.");
-      return;
-    }
-
-    if (client.payment_status === "pending") {
-      await ctx.reply("Ожидается подтверждение оплаты.");
-      return;
-    }
+    const { client } = guard;
 
     if (!client.program_id) {
-      await ctx.reply(
-        [
-          `Привет, ${safeName}!`,
-          "",
-          "Программа ещё не назначена.",
-          "Ожидайте — тренер скоро свяжется с вами.",
-        ].join("\n"),
-      );
+      await ctx.reply(t("client.no_program", ctx.language));
       return;
     }
+
+    const safeName = client.name ?? t("greeting.default_name", ctx.language);
 
     const { data: program, error: programError } = await supabaseAdmin
       .from("programs")
@@ -65,17 +44,16 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
 
     if (programError) {
       console.error(`[MYPROGRAM] Program query error for ${telegramId}:`, programError.message);
-      await ctx.reply("Сервис временно недоступен. Попробуйте позже.");
+      await ctx.reply(t("error.service_unavailable", ctx.language));
       return;
     }
 
     if (!program) {
       await ctx.reply(
         [
-          `Привет, ${safeName}!`,
+          t("greeting.hello", ctx.language, { name: safeName }),
           "",
-          "Программа не найдена в системе.",
-          "Свяжитесь с тренером для уточнения.",
+          t("client.program_not_found", ctx.language),
         ].join("\n"),
       );
       return;
@@ -94,35 +72,39 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
     const parsed = getParsedContent(program.parsed_content);
     const totalWeeks = getTotalWeeks(parsed);
     const currentWeek = getCurrentWeek(schedule ?? []);
+    const truncationSuffix = t("program.truncation_suffix", ctx.language);
 
     const lines: string[] = [
-      `Привет, ${safeName}!`,
+      t("greeting.hello", ctx.language, { name: safeName }),
       "",
-      `📋 Программа: ${program.title}`,
+      t("program.title_label", ctx.language, { title: program.title }),
     ];
 
     if (program.type) {
-      lines.push(`🏷 Тип: ${program.type}`);
+      lines.push(t("program.type_label", ctx.language, { type: program.type }));
     }
 
     if (program.duration_weeks) {
-      lines.push(`⏱ Длительность: ${program.duration_weeks} нед.`);
+      lines.push(t("program.duration_label", ctx.language, { weeks: program.duration_weeks }));
     }
 
     if (totalWeeks > 0 && currentWeek !== null) {
       const currentWeekData = parsed?.weeks?.find((w) => w.week_number === currentWeek);
-      const label = currentWeekData?.week_label || `Неделя ${currentWeek}`;
-      const deload = currentWeekData?.is_deload ? " (дельоад)" : "";
-      lines.push(`📅 Текущая: ${label}${deload} (${currentWeek} из ${totalWeeks})`);
+      const label = currentWeekData?.week_label || t("program.week_fallback", ctx.language, { week: currentWeek });
+      if (currentWeekData?.is_deload) {
+        lines.push(t("program.current_week_deload", ctx.language, { label, current: currentWeek, total: totalWeeks }));
+      } else {
+        lines.push(t("program.current_week", ctx.language, { label, current: currentWeek, total: totalWeeks }));
+      }
 
       const workoutDays = getWorkoutDaysCount(parsed, currentWeek);
       if (workoutDays > 0) {
-        lines.push(`💪 Тренировочных дней: ${workoutDays}`);
+        lines.push(t("program.workout_days", ctx.language, { count: workoutDays }));
       }
 
       if (currentWeekData?.days && currentWeekData.days.length > 0) {
         lines.push("");
-        lines.push("Дни недели:");
+        lines.push(t("program.days_header", ctx.language));
         for (const day of currentWeekData.days) {
           const exCount = day.exercises?.length ?? 0;
           const icon = exCount > 0 ? "✅" : "⬜";
@@ -130,34 +112,34 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
         }
       }
     } else if (totalWeeks > 0) {
-      lines.push(`📅 Всего недель: ${totalWeeks}`);
+      lines.push(t("program.total_weeks", ctx.language, { count: totalWeeks }));
     }
 
     const spreadsheetUrl = buildSpreadsheetUrl(client.spreadsheet_id);
     if (spreadsheetUrl) {
       lines.push("");
-      lines.push(`📊 Таблица: ${spreadsheetUrl}`);
+      lines.push(t("program.spreadsheet", ctx.language, { url: spreadsheetUrl }));
     }
 
     if (program.description) {
       lines.push("");
-      lines.push(`📝 ${program.description}`);
+      lines.push(t("program.description", ctx.language, { text: program.description }));
     }
 
     const message = lines.join("\n");
     if (message.length > TELEGRAM_MAX_MESSAGE_LENGTH) {
-      const limit = TELEGRAM_MAX_MESSAGE_LENGTH - TRUNCATION_SUFFIX.length - 1;
+      const limit = TELEGRAM_MAX_MESSAGE_LENGTH - truncationSuffix.length - 1;
       const truncated = message.slice(0, limit);
       const lastNewline = truncated.lastIndexOf("\n");
       const safeTruncated = lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated;
-      await ctx.reply(safeTruncated + TRUNCATION_SUFFIX);
+      await ctx.reply(safeTruncated + truncationSuffix);
     } else {
       await ctx.reply(message);
     }
   } catch (err) {
     console.error(`[MYPROGRAM] Error for ${telegramId}:`, err);
     try {
-      await ctx.reply("Сервис временно недоступен. Попробуйте позже.");
+      await ctx.reply(t("error.service_unavailable", ctx.language));
     } catch {
       // fallback reply failed
     }

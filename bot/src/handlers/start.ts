@@ -5,42 +5,29 @@ import {
   connectClientToTelegram,
   type Client,
 } from "../lib/clients.js";
+import { t, applyClientLanguage, type Language } from "../i18n/index.js";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
-function buildMenuMessage(client: Client): string {
-  const lines = [`Привет, ${client.name}!`];
+function buildConnectedMessage(client: Client, lang: Language): string {
+  const lines = [t("greeting.hello", lang, { name: client.name ?? t("greeting.default_name", lang) })];
 
   if (!client.program_id) {
-    lines.push("Ожидается назначение программы.");
+    lines.push(t("client.no_program", lang));
   } else {
-    lines.push("Вы подключены. Используйте /menu для навигации.");
+    lines.push(t("menu.title", lang));
+    lines.push(t("menu.today", lang));
+    lines.push(t("menu.myprogram", lang));
   }
 
   return lines.join("\n");
-}
-
-function buildConnectMessage(): string {
-  return [
-    "Подключите аккаунт к боту.",
-    "Отправьте /start <код> — код подключения от вашего тренера.",
-    "Если у вас нет кода, свяжитесь с тренером.",
-  ].join("\n");
-}
-
-function buildNewUserMessage(): string {
-  return [
-    "Добро пожаловать!",
-    "Чтобы начать тренировки с ботом, приобретите программу у тренера.",
-    "После оплаты вы получите код подключения.",
-  ].join("\n");
 }
 
 export async function startHandler(ctx: MyContext): Promise<void> {
   const telegramId = ctx.from?.id;
 
   if (!telegramId) {
-    await ctx.reply("Ошибка: не удалось определить вашего пользователя.");
+    await ctx.reply(t("error.user_not_identified", ctx.language));
     return;
   }
 
@@ -50,28 +37,29 @@ export async function startHandler(ctx: MyContext): Promise<void> {
 
   if (rawPayload) {
     if (!CODE_REGEX.test(code)) {
-      await ctx.reply("Неверный формат кода. Код должен содержать 8 символов (буквы и цифры).");
+      await ctx.reply(t("error.user_not_identified", ctx.language));
       return;
     }
 
     try {
       const existing = await findClientByTelegramId(telegramId);
       if (existing) {
-        await ctx.reply("Ваш аккаунт уже подключён. Используйте /menu.");
+        await ctx.reply(t("client.no_program", ctx.language));
         return;
       }
 
       const client = await findClientByConnectCode(code);
       if (!client) {
-        await ctx.reply("Код не найден. Проверьте код или обратитесь к тренеру.");
+        await ctx.reply(t("client.program_not_found", ctx.language));
         return;
       }
 
+      applyClientLanguage(ctx, client.language);
       await connectClientToTelegram(client.id, telegramId);
-      await ctx.reply(buildMenuMessage(client));
+      await ctx.reply(buildConnectedMessage(client, ctx.language));
     } catch (err) {
       console.error(`[START] Connect error for ${telegramId}:`, err);
-      await ctx.reply("Ошибка подключения. Попробуйте позже.");
+      await ctx.reply(t("error.connection_error", ctx.language));
     }
     return;
   }
@@ -80,18 +68,20 @@ export async function startHandler(ctx: MyContext): Promise<void> {
     const client = await findClientByTelegramId(telegramId);
 
     if (!client) {
-      await ctx.reply(buildNewUserMessage());
+      await ctx.reply(t("greeting.welcome_new", ctx.language));
       return;
     }
+
+    applyClientLanguage(ctx, client.language);
 
     if (client.status === "active" && client.payment_status === "paid") {
-      await ctx.reply(buildMenuMessage(client));
+      await ctx.reply(buildConnectedMessage(client, ctx.language));
       return;
     }
 
-    await ctx.reply(buildConnectMessage());
+    await ctx.reply(t("client.no_program", ctx.language));
   } catch (err) {
     console.error(`[START] Error handling /start for ${telegramId}:`, err);
-    await ctx.reply("Сервис временно недоступен. Попробуйте позже.");
+    await ctx.reply(t("error.service_unavailable", ctx.language));
   }
 }

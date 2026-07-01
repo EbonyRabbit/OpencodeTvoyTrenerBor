@@ -1,5 +1,6 @@
 import type { MyContext } from "../bot.js";
 import { guardActiveClient } from "./guards.js";
+import { t } from "../i18n/index.js";
 
 type CallbackHandler = (ctx: MyContext, params: string) => Promise<void>;
 
@@ -38,7 +39,7 @@ export async function callbackRouter(ctx: MyContext): Promise<void> {
     guard = await guardActiveClient(ctx);
   } catch (err) {
     console.error(`[CALLBACK] Guard failed for ${ctx.from?.id}:`, err);
-    await ctx.answerCallbackQuery({ text: "Ошибка подключения. Попробуйте позже.", show_alert: true }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: t("error.connection_error", ctx.language), show_alert: true }).catch(() => {});
     return;
   }
 
@@ -56,7 +57,7 @@ export async function callbackRouter(ctx: MyContext): Promise<void> {
   const handler = callbackHandlers.get(prefix);
   if (!handler) {
     console.warn(`[CALLBACK] Unknown callback_data: ${query.data} from ${ctx.from?.id}`);
-    await ctx.answerCallbackQuery({ text: "Неизвестное действие. Обновите меню." }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: t("error.unknown_callback", ctx.language) }).catch(() => {});
     return;
   }
 
@@ -66,7 +67,7 @@ export async function callbackRouter(ctx: MyContext): Promise<void> {
   } catch (err) {
     console.error(`[CALLBACK] Error handling ${query.data} for ${ctx.from?.id}:`, err);
     await ctx.answerCallbackQuery({
-      text: "Произошла ошибка. Попробуйте ещё раз.",
+      text: t("error.callback_error", ctx.language),
       show_alert: true,
     }).catch(() => {});
   }
@@ -78,27 +79,27 @@ registerCallback("exercise_skip", handleExerciseSkip);
 registerCallback("skip_workout", handleSkipWorkout);
 
 async function handleTodayOpen(ctx: MyContext, _params: string): Promise<void> {
-  await ctx.reply("🏋️ Загрузка тренировки дня...");
+  await ctx.reply(t("callback.loading_workout", ctx.language));
 }
 
 async function handleExerciseLog(ctx: MyContext, params: string): Promise<void> {
   const index = Number(params);
   if (!Number.isInteger(index) || index < 0) {
-    await ctx.reply("Некорректный индекс упражнения.");
+    await ctx.reply(t("error.invalid_exercise_index", ctx.language));
     return;
   }
-  await ctx.reply(`📝 Логирование упражнения #${index}...`);
+  await ctx.reply(t("callback.exercise_logging", ctx.language, { index }));
 }
 
 async function handleExerciseSkip(ctx: MyContext, params: string): Promise<void> {
   const index = Number(params);
   if (!Number.isInteger(index) || index < 0) {
-    await ctx.reply("Некорректный индекс упражнения.");
+    await ctx.reply(t("error.invalid_exercise_index", ctx.language));
     return;
   }
-  await ctx.reply(`⏭ Упражнение #${index} пропущено.`);
+  await ctx.reply(t("callback.exercise_skipped", ctx.language, { index }));
 }
 
 async function handleSkipWorkout(ctx: MyContext, _params: string): Promise<void> {
-  await ctx.reply("⏭ Тренировка пропущена.");
+  await ctx.reply(t("callback.workout_skipped", ctx.language));
 }

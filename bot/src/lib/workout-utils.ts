@@ -1,19 +1,23 @@
 import { supabaseAdmin } from "./supabase-admin.js";
 import type { Client } from "./clients.js";
-import { getParsedContent, type ParsedExercise } from "./program-utils.js";
+import { getParsedContent, type ParsedExercise, type ParsedDay } from "./program-utils.js";
 import { t, type Language } from "../i18n/index.js";
 
 const DEFAULT_TIMEZONE = "Europe/Moscow";
 
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
-export interface TodayWorkout {
-  day_name: string;
-  exercises: ParsedExercise[];
+export interface WorkoutPlan {
   week_number: number;
   is_deload: boolean;
   goal: string | null;
+  days: ParsedDay[];
 }
+
+export type TodayWorkout = WorkoutPlan & {
+  day_name: string;
+  exercises: ParsedExercise[];
+};
 
 interface WorkoutSender {
   reply: (text: string, options?: Record<string, unknown>) => Promise<unknown>;
@@ -35,6 +39,57 @@ function getTodayDateStr(timezone: string): string {
   return formatter.format(new Date());
 }
 
+export async function getWorkoutPlan(
+  client: Client,
+  scheduleWeek: number,
+  scheduleContext?: { is_deload: boolean; focus: string | null },
+): Promise<WorkoutPlan | null> {
+  if (!client.program_id) return null;
+
+  let scheduleData = scheduleContext;
+
+  if (!scheduleData) {
+    const { data, error } = await supabaseAdmin
+      .from("program_schedule")
+      .select("is_deload, focus")
+      .eq("client_id", client.id)
+      .eq("week_number", scheduleWeek)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`[WORKOUT] Schedule query error for ${client.id}:`, error.message);
+      return null;
+    }
+
+    if (!data) return null;
+    scheduleData = data;
+  }
+
+  const { data: program, error: programError } = await supabaseAdmin
+    .from("programs")
+    .select("parsed_content")
+    .eq("id", client.program_id)
+    .maybeSingle();
+
+  if (programError) {
+    console.error(`[WORKOUT] Program query error for ${client.id}:`, programError.message);
+    return null;
+  }
+
+  const parsed = getParsedContent(program?.parsed_content ?? null);
+  if (!parsed) return null;
+
+  const weekData = parsed.weeks?.find((w) => w.week_number === scheduleWeek);
+  if (!weekData?.days) return null;
+
+  return {
+    week_number: scheduleWeek,
+    is_deload: scheduleData.is_deload,
+    goal: scheduleData.focus,
+    days: weekData.days,
+  };
+}
+
 export async function getTodayWorkout(client: Client): Promise<TodayWorkout | null> {
   if (!client.program_id) return null;
 
@@ -42,44 +97,30 @@ export async function getTodayWorkout(client: Client): Promise<TodayWorkout | nu
   const todayName = getTodayDayName(tz);
   const todayStr = getTodayDateStr(tz);
 
-  const [scheduleResult, programResult] = await Promise.all([
-    supabaseAdmin
-      .from("program_schedule")
-      .select("week_number, start_date, end_date, is_deload, focus")
-      .eq("client_id", client.id)
-      .order("start_date"),
-    supabaseAdmin
-      .from("programs")
-      .select("parsed_content")
-      .eq("id", client.program_id)
-      .maybeSingle(),
-  ]);
+  const { data: schedule, error: scheduleError } = await supabaseAdmin
+    .from("program_schedule")
+    .select("week_number, start_date, end_date, is_deload, focus")
+    .eq("client_id", client.id);
 
-  if (scheduleResult.error) {
-    console.error(`[WORKOUT] Schedule query error for ${client.id}:`, scheduleResult.error.message);
+  if (scheduleError) {
+    console.error(`[WORKOUT] Schedule query error for ${client.id}:`, scheduleError.message);
     return null;
   }
 
-  if (programResult.error) {
-    console.error(`[WORKOUT] Program query error for ${client.id}:`, programResult.error.message);
-    return null;
-  }
-
-  const schedule = scheduleResult.data ?? [];
-  const currentWeekRow = schedule.find((w) => {
+  const currentWeekRow = (schedule ?? []).find((w) => {
     if (!w.start_date || !w.end_date) return false;
     return todayStr >= w.start_date && todayStr <= w.end_date;
   });
 
   if (!currentWeekRow) return null;
 
-  const parsed = getParsedContent(programResult.data?.parsed_content ?? null);
-  if (!parsed) return null;
+  const plan = await getWorkoutPlan(client, currentWeekRow.week_number, {
+    is_deload: currentWeekRow.is_deload,
+    focus: currentWeekRow.focus,
+  });
+  if (!plan) return null;
 
-  const weekData = parsed.weeks?.find((w) => w.week_number === currentWeekRow.week_number);
-  if (!weekData?.days) return null;
-
-  const matchedDay = weekData.days.find((d) => {
+  const matchedDay = plan.days.find((d) => {
     const normalizedName = d.day_name.toLowerCase();
     return normalizedName.includes(todayName);
   });
@@ -87,11 +128,9 @@ export async function getTodayWorkout(client: Client): Promise<TodayWorkout | nu
   if (!matchedDay?.exercises?.length) return null;
 
   return {
+    ...plan,
     day_name: matchedDay.day_name,
     exercises: matchedDay.exercises,
-    week_number: currentWeekRow.week_number,
-    is_deload: currentWeekRow.is_deload,
-    goal: currentWeekRow.focus,
   };
 }
 

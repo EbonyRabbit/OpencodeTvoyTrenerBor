@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { startHandler } from "./handlers/start.js";
 import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
+import { todayHandler } from "./handlers/today.js";
 import { callbackRouter } from "./handlers/callbacks.js";
 import { getState, type BotState } from "./state/machine.js";
 import type { Client } from "./lib/clients.js";
@@ -48,6 +49,7 @@ bot.use(async (ctx, next) => {
 
 bot.command("start", startHandler);
 bot.command("menu", menuHandler);
+bot.command("today", todayHandler);
 bot.command("myprogram", myProgramHandler);
 
 bot.on("callback_query:data", callbackRouter);

@@ -3,12 +3,15 @@ import { config } from "./config.js";
 import { startHandler } from "./handlers/start.js";
 import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
+import { callbackRouter } from "./handlers/callbacks.js";
 import { getState, type BotState } from "./state/machine.js";
+import type { Client } from "./lib/clients.js";
 
 export interface MyContext extends Context {
   clientId?: string;
   language?: "ru" | "en";
   state?: BotState | null;
+  client?: Client;
 }
 
 export const bot = new Bot<MyContext>(config.telegram.botToken);
@@ -43,6 +46,8 @@ bot.use(async (ctx, next) => {
 bot.command("start", startHandler);
 bot.command("menu", menuHandler);
 bot.command("myprogram", myProgramHandler);
+
+bot.on("callback_query:data", callbackRouter);
 
 bot.on("message:text", (ctx) => {
   const preview = ctx.message.text.length > 50

@@ -189,6 +189,47 @@ export function formatWorkoutMessage(workout: TodayWorkout, lang: Language): str
   return lines.join("\n").trim();
 }
 
+export function formatSingleExercise(
+  index: number,
+  total: number,
+  ex: ParsedExercise,
+  lang: Language,
+): string {
+  const lines: string[] = [];
+
+  lines.push(t("workout.exercise_header", lang, { current: index + 1, total }));
+  lines.push("");
+  lines.push(ex.name);
+
+  if (ex.block) {
+    lines.push("");
+    lines.push(t("workout.exercise_block", lang, { block: ex.block }));
+  }
+
+  if (ex.sets && ex.reps) {
+    lines.push(t("workout.exercise_sets_reps", lang, { sets: ex.sets, reps: ex.reps }));
+  }
+
+  if (ex.weight) {
+    lines.push(t("workout.exercise_weight", lang, { weight: ex.weight }));
+  }
+
+  if (ex.rpe) {
+    lines.push(t("workout.exercise_rpe", lang, { rpe: ex.rpe }));
+  }
+
+  if (ex.rest) {
+    lines.push(t("workout.exercise_rest_detail", lang, { rest: ex.rest }));
+  }
+
+  if (ex.notes) {
+    lines.push("");
+    lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+  }
+
+  return lines.join("\n");
+}
+
 export function truncateMessage(message: string, suffix: string): string {
   if (message.length <= TELEGRAM_MAX_MESSAGE_LENGTH) return message;
   const limit = TELEGRAM_MAX_MESSAGE_LENGTH - suffix.length - 1;
@@ -228,7 +269,10 @@ export async function sendTodayWorkout(
   const message = formatWorkoutMessage(workout, sender.language);
   const truncated = truncateMessage(message, t("program.truncation_suffix", sender.language));
 
-  const buttons = [[{ text: t("workout.skip_button", sender.language), callback_data: "skip_workout" }]];
+  const buttons = [
+    [{ text: t("workout.open_button", sender.language), callback_data: "today_open" }],
+    [{ text: t("workout.skip_button", sender.language), callback_data: "skip_workout" }],
+  ];
 
   await sender.reply(truncated, {
     reply_markup: {

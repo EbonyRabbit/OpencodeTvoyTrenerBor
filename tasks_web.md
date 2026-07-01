@@ -129,7 +129,7 @@ OpenCode/
 | 2.6 | Команда `/myprogram` | Показ текущей программы, ссылки на spreadsheet (если есть), кода подключения | ✅ |
 | 2.7 | Машин состояний | Модуль `state/machine.ts`: `getState`, `setState`, `clearState` (Supabase `bot_state`) | ✅ |
 | 2.8 | Роутинг callback | Обработка inline-кнопок: `today_open`, `exercise_log:*`, `exercise_skip:*`, `skip_workout`, и т.д. | ✅ |
-| 2.9 | Локализация | Утилита `i18n.ts` — выбор языка на основе `client.language` | pending |
+| 2.9 | Локализация | Утилита `i18n.ts` — выбор языка на основе `client.language` | ✅ |
 
 ---
 

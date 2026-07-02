@@ -7,8 +7,9 @@ import {
 } from "../lib/workout-utils.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
-import { startExerciseLogging } from "./wizard.js";
-import { handleWizardSkip } from "./wizard.js";
+import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
+import { supabaseAdmin } from "../lib/supabase-admin.js";
+import { getTodayDateStr } from "../lib/workout-utils.js";
 
 type CallbackHandler = (ctx: MyContext, params: string) => Promise<void>;
 
@@ -237,12 +238,62 @@ async function handleExerciseNext(ctx: MyContext, params: string): Promise<void>
 }
 
 async function handleSkipWorkout(ctx: MyContext, _params: string): Promise<void> {
-  await ctx.answerCallbackQuery({ text: t("callback.workout_skipped", ctx.language) }).catch(() => {});
-  if (ctx.from?.id) {
+  if (!ctx.from?.id) return;
+
+  await ctx.answerCallbackQuery().catch(() => {});
+
+  if (ctx.client) {
     try {
-      await clearState(ctx.from.id);
+      await setState(ctx.from.id, {
+        action: "skip_workout",
+        step: "reason",
+        data: {},
+      }, ctx.state);
     } catch (err) {
-      console.warn(`[CALLBACK] clearState failed for ${ctx.from?.id}:`, err);
+      console.warn(`[CALLBACK] setState failed for ${ctx.from.id}:`, err);
+      await ctx.reply(t("error.service_unavailable", ctx.language));
+      return;
     }
   }
+
+  await ctx.reply(t("wizard.skip_reason_prompt", ctx.language));
+}
+
+export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
+  if (!ctx.state || ctx.state.action !== "skip_workout" || !ctx.from?.id || !ctx.client) return false;
+
+  const text = ctx.message?.text?.trim();
+  if (!text) return false;
+
+  const reason = text === "/skip" ? t("wizard.skip_no_reason", ctx.language) : text;
+
+  const tz = ctx.client.timezone || "Europe/Moscow";
+  const todayStr = getTodayDateStr(tz);
+
+  const { error } = await supabaseAdmin.from("workout_logs").insert({
+    client_id: ctx.client.id,
+    date: todayStr,
+    week: null,
+    exercise: "[SKIP]",
+    sets: null,
+    reps: null,
+    weight: null,
+    rpe: null,
+    comment: reason,
+  });
+
+  if (error) {
+    console.error(`[SKIP] Insert error for ${ctx.from.id}:`, error.message);
+    await ctx.reply(t("error.service_unavailable", ctx.language));
+  } else {
+    await ctx.reply(t("wizard.skip_logged", ctx.language, { reason }));
+  }
+
+  try {
+    await clearState(ctx.from.id);
+  } catch (err) {
+    console.warn(`[CALLBACK] clearState failed for ${ctx.from.id}:`, err);
+  }
+
+  return true;
 }

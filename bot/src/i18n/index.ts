@@ -92,6 +92,10 @@ const resources = {
         summary_weight: "Вес: {{weight}} кг",
         summary_rpe: "RPE: {{rpe}}",
         summary_comment: "Комментарий: {{comment}}",
+        skip_reason_prompt: "📝 Напиши причину пропуска (или отправь /skip чтобы пропустить):",
+        skip_reason_hint: "Причина записана. Вернись к тренировке через /today",
+        skip_logged: "✅ Пропуск записан: {{reason}}",
+        skip_no_reason: "Без указания причины",
       },
       callback: {
         exercise_logging: "📝 Логирование упражнения #{{index}}...",
@@ -191,6 +195,10 @@ const resources = {
         summary_weight: "Weight: {{weight}} kg",
         summary_rpe: "RPE: {{rpe}}",
         summary_comment: "Comment: {{comment}}",
+        skip_reason_prompt: "📝 Write the reason for skipping (or send /skip to skip):",
+        skip_reason_hint: "Reason recorded. Come back via /today",
+        skip_logged: "✅ Skip logged: {{reason}}",
+        skip_no_reason: "No reason given",
       },
       callback: {
         exercise_logging: "📝 Logging exercise #{{index}}...",

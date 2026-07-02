@@ -4,7 +4,7 @@ import { startHandler } from "./handlers/start.js";
 import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
 import { todayHandler } from "./handlers/today.js";
-import { callbackRouter } from "./handlers/callbacks.js";
+import { callbackRouter, handleSkipReason } from "./handlers/callbacks.js";
 import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
@@ -41,7 +41,7 @@ bot.use(async (ctx, next) => {
       ctx.state = null;
     }
 
-    if (ctx.state?.action === "exercise_log") {
+    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout") {
       try {
         const client = await findClientByTelegramId(ctx.from.id);
         if (client) ctx.client = client;
@@ -75,6 +75,14 @@ bot.on("message:text", async (ctx) => {
       if (workout) {
         await startExerciseLogging(ctx, result.nextExerciseIndex, workout);
       }
+    }
+    return;
+  }
+
+  if (ctx.state?.action === "skip_workout") {
+    const handled = await handleSkipReason(ctx);
+    if (!handled) {
+      await ctx.reply(t("wizard.skip_reason_prompt", ctx.language));
     }
     return;
   }

@@ -141,7 +141,7 @@ OpenCode/
 | 3.2 | Чтение плана тренировки | Функция `getWorkoutPlan(client, scheduleWeek)` — чтение из Supabase или legacy spreadsheet | ✅ |
 | 3.3 | Показ упражнения | Кнопки: "Выполнил" (логирование), "Пропустить", навигация по упражнениям | ✅ |
 | 3.4 | Wizard логирования | 5 шагов: подходы → повторы → вес → RPE → комментарий | ✅ |
-| 3.5 | Запись результата | INSERT в `workout_logs` (Supabase): client_id, date, week, exercise, sets, reps, weight, rpe, comment | pending |
+| 3.5 | Запись результата | INSERT в `workout_logs` (Supabase): client_id, date, week, exercise, sets, reps, weight, rpe, comment | ✅ |
 | 3.6 | Пропуск тренировки | Логирование пропуска с причиной | pending |
 | 3.7 | Отображение прогресса | Показ выполненных упражнений за сегодня | pending |
 | 3.8 | Evening poll | Ответ "да/нет/перенести" на вечерний опрос | pending |

@@ -51,7 +51,7 @@ function getStepPrompt(step: MeasurementStep, lang: Language): string {
   const hintKey = `measure.hint_${step}` as `measure.hint_${MeasurementStep}`;
   const prompt = t(promptKey, lang);
   const hint = t(hintKey, lang);
-  return `${prompt}\n${hint}`;
+  return `${prompt}\n${hint}\n\n💡 /skip — пропустить`;
 }
 
 function getNextStep(current: MeasurementStep): MeasurementStep | null {
@@ -93,6 +93,11 @@ function buildSummary(data: MeasurementData, lang: Language): string {
 }
 
 export async function startMeasurements(ctx: MyContext): Promise<void> {
+  if (!ctx.from?.id) {
+    await ctx.reply(t("error.user_not_identified", ctx.language));
+    return;
+  }
+
   const client = ctx.client;
   if (!client) {
     await ctx.reply(t("error.user_not_identified", ctx.language));
@@ -101,21 +106,36 @@ export async function startMeasurements(ctx: MyContext): Promise<void> {
 
   const lang = (client.language || "ru") as Language;
 
-  await setState(ctx.from!.id, {
-    action: "measurements",
-    step: "weight",
-    data: {},
-  });
+  try {
+    await setState(ctx.from.id, {
+      action: "measurements",
+      step: "weight",
+      data: {},
+    });
+  } catch (err) {
+    console.error(`[MEASURE] setState failed for ${ctx.from.id}:`, err);
+    await ctx.reply(t("error.service_unavailable", lang));
+    return;
+  }
 
   await ctx.reply(`${t("measure.title", lang)}\n\n${getStepPrompt("weight", lang)}`);
 }
 
 export async function handleMeasurementsInput(ctx: MyContext): Promise<void> {
   const client = ctx.client;
-  if (!client || !ctx.from?.id) return;
+  if (!client || !ctx.from?.id) {
+    await ctx.reply(t("error.user_not_identified", ctx.language));
+    return;
+  }
 
   const state = ctx.state;
   if (!state || state.action !== "measurements" || !state.step) return;
+
+  if (!STEP_INDEX.has(state.step as MeasurementStep)) {
+    await ctx.reply(t("error.service_unavailable", ctx.language));
+    await clearState(ctx.from.id);
+    return;
+  }
 
   const lang = (client.language || "ru") as Language;
   const currentStep = state.step as MeasurementStep;
@@ -128,11 +148,17 @@ export async function handleMeasurementsInput(ctx: MyContext): Promise<void> {
       return;
     }
 
-    await setState(ctx.from.id, {
-      action: "measurements",
-      step: nextStep,
-      data: state.data,
-    });
+    try {
+      await setState(ctx.from.id, {
+        action: "measurements",
+        step: nextStep,
+        data: state.data,
+      });
+    } catch (err) {
+      console.error(`[MEASURE] setState failed for ${ctx.from.id}:`, err);
+      await ctx.reply(t("error.service_unavailable", lang));
+      return;
+    }
 
     await ctx.reply(getStepPrompt(nextStep, lang));
     return;
@@ -158,11 +184,17 @@ export async function handleMeasurementsInput(ctx: MyContext): Promise<void> {
     return;
   }
 
-  await setState(ctx.from.id, {
-    action: "measurements",
-    step: nextStep,
-    data,
-  });
+  try {
+    await setState(ctx.from.id, {
+      action: "measurements",
+      step: nextStep,
+      data,
+    });
+  } catch (err) {
+    console.error(`[MEASURE] setState failed for ${ctx.from.id}:`, err);
+    await ctx.reply(t("error.service_unavailable", lang));
+    return;
+  }
 
   await ctx.reply(getStepPrompt(nextStep, lang));
 }

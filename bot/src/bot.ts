@@ -5,9 +5,11 @@ import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
 import { todayHandler } from "./handlers/today.js";
 import { callbackRouter } from "./handlers/callbacks.js";
+import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
+import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
-import type { Client } from "./lib/clients.js";
-import { resolveLanguage, type Language } from "./i18n/index.js";
+import { findClientByTelegramId, type Client } from "./lib/clients.js";
+import { resolveLanguage, type Language, t } from "./i18n/index.js";
 
 export interface MyContext extends Context {
   clientId?: string;
@@ -38,6 +40,15 @@ bot.use(async (ctx, next) => {
       console.warn(`[STATE] Failed to load state for ${ctx.from?.id}:`, err);
       ctx.state = null;
     }
+
+    if (ctx.state?.action === "exercise_log") {
+      try {
+        const client = await findClientByTelegramId(ctx.from.id);
+        if (client) ctx.client = client;
+      } catch (err) {
+        console.warn(`[CLIENT] Failed to load client for ${ctx.from?.id}:`, err);
+      }
+    }
   }
 
   try {
@@ -54,7 +65,20 @@ bot.command("myprogram", myProgramHandler);
 
 bot.on("callback_query:data", callbackRouter);
 
-bot.on("message:text", (ctx) => {
+bot.on("message:text", async (ctx) => {
+  if (ctx.state?.action === "exercise_log") {
+    const result = await handleWizardInput(ctx);
+    if (result.type === "expired") {
+      await ctx.reply(t("wizard.wizard_expired", ctx.language));
+    } else if (result.type === "completed" && result.nextExerciseIndex != null && ctx.client) {
+      const workout = await getTodayWorkout(ctx.client);
+      if (workout) {
+        await startExerciseLogging(ctx, result.nextExerciseIndex, workout);
+      }
+    }
+    return;
+  }
+
   const preview = ctx.message.text.length > 50
     ? ctx.message.text.slice(0, 50) + "..."
     : ctx.message.text;

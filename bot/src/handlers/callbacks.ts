@@ -7,6 +7,8 @@ import {
 } from "../lib/workout-utils.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
+import { startExerciseLogging } from "./wizard.js";
+import { handleWizardSkip } from "./wizard.js";
 
 type CallbackHandler = (ctx: MyContext, params: string) => Promise<void>;
 
@@ -84,6 +86,7 @@ registerCallback("exercise_skip", handleExerciseSkip);
 registerCallback("exercise_prev", handleExercisePrev);
 registerCallback("exercise_next", handleExerciseNext);
 registerCallback("skip_workout", handleSkipWorkout);
+registerCallback("wizard_skip", handleWizardSkip);
 
 function buildExerciseKeyboard(
   index: number,
@@ -187,9 +190,19 @@ async function handleExerciseLog(ctx: MyContext, params: string): Promise<void> 
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: t("callback.exercise_logging", ctx.language, { index: index + 1 }) }).catch(() => {});
+  if (!ctx.client) {
+    await ctx.answerCallbackQuery({ text: t("error.user_not_identified", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
 
-  // TODO: Task 3.4 — start exercise logging flow (sets → reps → weight → RPE → comment)
+  const workout = await getTodayWorkout(ctx.client);
+  if (!workout || !workout.exercises[index]) {
+    await ctx.answerCallbackQuery({ text: t("error.invalid_exercise_index", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
+  await ctx.answerCallbackQuery().catch(() => {});
+  await startExerciseLogging(ctx, index, workout);
 }
 
 async function handleExerciseSkip(ctx: MyContext, params: string): Promise<void> {

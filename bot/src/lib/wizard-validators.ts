@@ -37,3 +37,11 @@ export function parseRpe(input: string): string | null {
   if (Number.isInteger(num) && num >= 1 && num <= 10) return String(num);
   return null;
 }
+
+export function parseMeasurement(input: string): string | null {
+  const trimmed = input.trim().toLowerCase().replace(/кг|kg|см|cm/g, "").trim();
+  if (!trimmed) return null;
+  const num = Number(trimmed);
+  if (!isNaN(num) && num >= 0 && num <= 300) return String(num);
+  return null;
+}

@@ -5,11 +5,14 @@ import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
 import { todayHandler } from "./handlers/today.js";
 import { callbackRouter, handleSkipReason } from "./handlers/callbacks.js";
+import { guardActiveClient } from "./handlers/guards.js";
 import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
+import { startMeasurements, handleMeasurementsInput } from "./handlers/measurements.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
 import { findClientByTelegramId, type Client } from "./lib/clients.js";
 import { resolveLanguage, type Language, t } from "./i18n/index.js";
+import { startEveningPollCron } from "./cron/evening-scheduler.js";
 
 export interface MyContext extends Context {
   clientId?: string;
@@ -41,7 +44,7 @@ bot.use(async (ctx, next) => {
       ctx.state = null;
     }
 
-    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout") {
+    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements") {
       try {
         const client = await findClientByTelegramId(ctx.from.id);
         if (client) ctx.client = client;
@@ -62,6 +65,15 @@ bot.command("start", startHandler);
 bot.command("menu", menuHandler);
 bot.command("today", todayHandler);
 bot.command("myprogram", myProgramHandler);
+bot.command("measure", async (ctx) => {
+  const guard = await guardActiveClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await startMeasurements(ctx);
+});
 
 bot.on("callback_query:data", callbackRouter);
 
@@ -84,6 +96,11 @@ bot.on("message:text", async (ctx) => {
     if (!handled) {
       await ctx.reply(t("wizard.skip_reason_prompt", ctx.language));
     }
+    return;
+  }
+
+  if (ctx.state?.action === "measurements") {
+    await handleMeasurementsInput(ctx);
     return;
   }
 

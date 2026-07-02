@@ -45,3 +45,33 @@ export function parseMeasurement(input: string): string | null {
   if (!isNaN(num) && num >= 0 && num <= 300) return String(num);
   return null;
 }
+
+export function parseScale1to10(input: string): string | null {
+  const trimmed = input.trim();
+  const num = Number(trimmed);
+  if (Number.isInteger(num) && num >= 1 && num <= 10) return String(num);
+  return null;
+}
+
+export function parseHours(input: string): string | null {
+  const trimmed = input.trim().toLowerCase().replace(/час|hour/g, "").trim();
+  if (!trimmed) return null;
+  const num = Number(trimmed);
+  if (!isNaN(num) && num >= 0 && num <= 24) return String(num);
+  return null;
+}
+
+export function parsePercentage(input: string): string | null {
+  const trimmed = input.trim().replace(/%/, "").trim();
+  if (!trimmed) return null;
+  const num = Number(trimmed);
+  if (!isNaN(num) && num >= 0 && num <= 100) return String(num);
+  return null;
+}
+
+export function parseCount(input: string): string | null {
+  const trimmed = input.trim();
+  const num = Number(trimmed);
+  if (Number.isInteger(num) && num >= 0 && num <= 30) return String(num);
+  return null;
+}

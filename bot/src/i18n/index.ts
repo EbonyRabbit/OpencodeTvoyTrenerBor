@@ -96,6 +96,10 @@ const resources = {
         skip_reason_hint: "Причина записана. Вернись к тренировке через /today",
         skip_logged: "✅ Пропуск записан: {{reason}}",
         skip_no_reason: "Без указания причины",
+        progress_title: "📊 Прогресс за сегодня",
+        progress_done: "✅ {{exercise}}",
+        progress_remaining: "⬜ {{exercise}}",
+        progress_none: "Пока нет выполненных упражнений.",
       },
       callback: {
         exercise_logging: "📝 Логирование упражнения #{{index}}...",
@@ -199,6 +203,10 @@ const resources = {
         skip_reason_hint: "Reason recorded. Come back via /today",
         skip_logged: "✅ Skip logged: {{reason}}",
         skip_no_reason: "No reason given",
+        progress_title: "📊 Today's Progress",
+        progress_done: "✅ {{exercise}}",
+        progress_remaining: "⬜ {{exercise}}",
+        progress_none: "No exercises completed yet.",
       },
       callback: {
         exercise_logging: "📝 Logging exercise #{{index}}...",

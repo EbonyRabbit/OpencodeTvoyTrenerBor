@@ -2,6 +2,7 @@ import "dotenv/config";
 import { config } from "./config.js";
 import { createApp } from "./app.js";
 import { bot } from "./bot.js";
+import { startEveningPollCron } from "./cron/evening-scheduler.js";
 
 const { server } = createApp({
   bot,
@@ -17,6 +18,8 @@ server.on("error", (err) => {
 async function main(): Promise<void> {
   await bot.init();
   console.log(`Bot initialized: @${bot.botInfo.username}`);
+
+  startEveningPollCron(bot);
 
   await new Promise<void>((resolve) => {
     server.listen(config.port, () => {

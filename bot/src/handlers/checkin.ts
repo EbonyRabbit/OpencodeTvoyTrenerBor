@@ -2,6 +2,7 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
+import { config } from "../config.js";
 import { type Client } from "../lib/clients.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
 import {
@@ -258,6 +259,8 @@ async function completeCheckin(
 
     const summary = buildSummary(data, lang);
     await ctx.reply(`${t("checkin.saved", lang)}\n\n${t("checkin.summary", lang, { data: summary })}`);
+
+    await notifyCoach(client, data, lang);
   } catch (err) {
     console.error(`[CHECKIN] Error completing checkin for ${client.id}:`, err);
     await ctx.reply(t("error.service_unavailable", lang));
@@ -267,6 +270,35 @@ async function completeCheckin(
     } catch (err) {
       console.error(`[CHECKIN] clearState failed:`, err);
     }
+  }
+}
+
+async function notifyCoach(
+  client: Client,
+  data: CheckinData,
+  lang: Language,
+): Promise<void> {
+  try {
+    const coachChatId = Number(config.coachChatId);
+    if (!coachChatId) return;
+
+    const lines: string[] = [
+      `📋 Чек-ин от ${client.name || client.id}`,
+      "",
+      `Самочувствие: ${data.wellbeing ?? "—"}`,
+      `Сон: ${data.sleep ?? "—"}`,
+      `Стресс: ${data.stress ?? "—"}`,
+      `Придержание: ${data.adherence ?? "—"}%`,
+      `Пропущено: ${data.missed_workouts ?? "—"}`,
+    ];
+
+    if (data.complaints) lines.push(`Жалобы: ${data.complaints}`);
+    if (data.comment) lines.push(`Комментарий: ${data.comment}`);
+
+    const bot = (await import("../bot.js")).bot;
+    await bot.api.sendMessage(coachChatId, lines.join("\n"));
+  } catch (err) {
+    console.warn(`[CHECKIN] Failed to notify coach:`, err);
   }
 }
 

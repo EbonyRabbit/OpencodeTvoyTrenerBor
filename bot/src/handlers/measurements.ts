@@ -244,6 +244,10 @@ async function completeMeasurements(
     console.error(`[MEASURE] Error completing measurements for ${client.id}:`, err);
     await ctx.reply(t("error.service_unavailable", lang));
   } finally {
-    await clearState(ctx.from!.id);
+    try {
+      await clearState(ctx.from!.id);
+    } catch (err) {
+      console.error(`[MEASURE] clearState failed:`, err);
+    }
   }
 }

@@ -2,8 +2,7 @@ import { supabaseAdmin } from "./supabase-admin.js";
 import type { Client } from "./clients.js";
 import { getParsedContent, type ParsedExercise, type ParsedDay } from "./program-utils.js";
 import { t, type Language } from "../i18n/index.js";
-
-const DEFAULT_TIMEZONE = "Europe/Moscow";
+import { DEFAULT_TIMEZONE } from "./constants.js";
 
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 

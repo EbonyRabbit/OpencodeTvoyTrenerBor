@@ -2,7 +2,7 @@ import "dotenv/config";
 import { config } from "./config.js";
 import { createApp } from "./app.js";
 import { bot } from "./bot.js";
-import { startEveningPollCron } from "./cron/evening-scheduler.js";
+import { startScheduler, stopScheduler } from "./cron/scheduler.js";
 
 const { server } = createApp({
   bot,
@@ -19,7 +19,7 @@ async function main(): Promise<void> {
   await bot.init();
   console.log(`Bot initialized: @${bot.botInfo.username}`);
 
-  startEveningPollCron(bot);
+  startScheduler(bot);
 
   await new Promise<void>((resolve) => {
     server.listen(config.port, () => {
@@ -47,6 +47,7 @@ async function main(): Promise<void> {
 
 function shutdown(signal: string): void {
   console.log(`${signal} received, shutting down...`);
+  stopScheduler();
   server.close(() => {
     console.log("Server closed");
     process.exit(0);

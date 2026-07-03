@@ -3,8 +3,7 @@ import { t, type Language } from "../i18n/index.js";
 import { type Client } from "../lib/clients.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayWorkout, getTodayDateStr } from "../lib/workout-utils.js";
-
-const DEFAULT_TIMEZONE = "Europe/Moscow";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 
 export { DEFAULT_TIMEZONE };
 

@@ -14,7 +14,6 @@ import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
 import { findClientByTelegramId, type Client } from "./lib/clients.js";
 import { resolveLanguage, type Language, t } from "./i18n/index.js";
-import { startEveningPollCron } from "./cron/evening-scheduler.js";
 
 export interface MyContext extends Context {
   clientId?: string;

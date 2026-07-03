@@ -209,6 +209,12 @@ const resources = {
         summary_complaints: "Жалобы",
         summary_comment: "Комментарий",
       },
+      resume: {
+        resumed_header: "💪 Тренировки возобновлены!",
+        no_workout_today: "Сегодня выходной. Отдыхайте и восстанавливайтесь!",
+        reminder_in_2_days: "📅 {{name}}, напоминаю: через 2 дня возобновляются тренировки! Приготовьтесь 💪",
+        reminder_tomorrow: "📅 {{name}}, напоминаю: завтра возобновляются тренировки! Будьте готовы 💪",
+      },
     },
   },
   en: {
@@ -418,6 +424,12 @@ const resources = {
         summary_missed: "Missed",
         summary_complaints: "Complaints",
         summary_comment: "Comment",
+      },
+      resume: {
+        resumed_header: "💪 Workouts resumed!",
+        no_workout_today: "Today is a rest day. Relax and recover!",
+        reminder_in_2_days: "📅 {{name}}, reminder: your workouts resume in 2 days! Get ready 💪",
+        reminder_tomorrow: "📅 {{name}}, reminder: your workouts resume tomorrow! Be ready 💪",
       },
     },
   },

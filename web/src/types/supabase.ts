@@ -11,6 +11,9 @@ export type NotificationType =
   | "checkin"
   | "alert"
   | "payment";
+export type PauseReason = "sick" | "vacation" | "injury" | "personal" | "other";
+export type ResumeStrategy = "skip" | "shift" | "deload" | "rollback";
+export type PauseStatus = "active" | "resuming" | "completed";
 
 export interface Database {
   public: {
@@ -163,6 +166,9 @@ export interface Database {
           sheet_name: string | null;
           start_date: string | null;
           end_date: string | null;
+          original_start_date: string | null;
+          original_end_date: string | null;
+          is_deload: boolean;
           focus: string | null;
           status: string | null;
           created_at: string;
@@ -241,6 +247,28 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
+        Relationships: [];
+      };
+      plan_pauses: {
+        Row: {
+          id: string;
+          client_id: string;
+          pause_start: string;
+          pause_end: string | null;
+          planned_resume_date: string | null;
+          reason: PauseReason;
+          strategy: ResumeStrategy;
+          status: PauseStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["plan_pauses"]["Row"], "id" | "created_at" | "updated_at" | "pause_end" | "strategy" | "planned_resume_date"> & {
+          id?: string;
+          pause_end?: string | null;
+          planned_resume_date?: string | null;
+          strategy?: ResumeStrategy;
+        };
+        Update: Partial<Database["public"]["Tables"]["plan_pauses"]["Row"]>;
         Relationships: [];
       };
     };

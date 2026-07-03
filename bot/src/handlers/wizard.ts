@@ -5,6 +5,7 @@ import { getTodayDateStr } from "../lib/workout-utils.js";
 import { parseSets, parseReps, parseWeight, parseRpe } from "../lib/wizard-validators.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
+import { markAsSent } from "../cron/dedup.js";
 
 const DEFAULT_TIMEZONE = "Europe/Moscow";
 
@@ -230,6 +231,11 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
     await ctx.reply(t("error.service_unavailable", ctx.language));
     await clearState(ctx.from.id).catch(() => {});
     return { type: "expired" };
+  }
+
+  const dedupResult = await markAsSent(`workout_completed:${ctx.client.id}:${todayStr}`);
+  if (dedupResult === "error") {
+    console.warn(`[WIZARD] Dedup write failed for ${ctx.client.id}`);
   }
 
   const summary = buildSummary(data, ctx.language);

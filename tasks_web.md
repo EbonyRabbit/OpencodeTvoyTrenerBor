@@ -181,7 +181,7 @@ OpenCode/
 | 6.2 | Утреннее уведомление | Проверка `morning_time` каждого клиента → отправка плана тренировки | ✅ |
 | 6.3 | Вечерний опрос | Проверка: тренировка существовала + не выполнена + не пропущена → отправка poll в 20:00 | ✅ |
 | 6.4 | Напоминание замеров | В `measurement_day` + `measurement_time` → отправка чеклиста замеров | ✅ |
-| 6.5 | Дедупликация | Флаги в Supabase: `morning_sent`, `meas_sent`, `workout_completed`, `workout_skipped`, `workout_polled` | pending |
+| 6.5 | Дедупликация | Флаги в Supabase: `morning_sent`, `meas_sent`, `workout_completed`, `workout_skipped`, `workout_polled` | ✅ |
 | 6.6 | Автовозобновление пауз | При наступлении `resume_date` → вызов `resumePlan()` | pending |
 | 6.7 | Напоминание возобновления | За 2 дня до `resume_date` → уведомление "приготовьтесь" | pending |
 | 6.8 | Timezone-aware логика | Корректный расчёт времени с учётом `client.timezone` | pending |

@@ -12,6 +12,7 @@ import { handleEveningYes, handleEveningNo, handleEveningPostpone } from "./even
 import { startMeasurements } from "./measurements.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
+import { markAsSent } from "../cron/dedup.js";
 
 type CallbackHandler = (ctx: MyContext, params: string) => Promise<void>;
 
@@ -292,6 +293,10 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
     console.error(`[SKIP] Insert error for ${ctx.from.id}:`, error.message);
     await ctx.reply(t("error.service_unavailable", ctx.language));
   } else {
+    const dedupResult = await markAsSent(`workout_skipped:${ctx.client.id}:${todayStr}`);
+    if (dedupResult === "error") {
+      console.warn(`[SKIP] Dedup write failed for ${ctx.client.id}`);
+    }
     await ctx.reply(t("wizard.skip_logged", ctx.language, { reason }));
   }
 

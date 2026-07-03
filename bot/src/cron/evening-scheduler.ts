@@ -93,6 +93,23 @@ export async function runEveningPoll(bot: Bot<MyContext>): Promise<void> {
         if (!workout) continue;
 
         const todayStr = getTodayDateStr(tz);
+
+        const { data: existingLogs } = await supabaseAdmin
+          .from("workout_logs")
+          .select("exercise")
+          .eq("client_id", client.id)
+          .eq("date", todayStr);
+
+        const hasCompletion = (existingLogs ?? []).some(
+          (log) => log.exercise && log.exercise !== "[SKIP]" && !log.exercise.startsWith("[EVENING_"),
+        );
+        if (hasCompletion) continue;
+
+        const hasSkip = (existingLogs ?? []).some(
+          (log) => log.exercise === "[SKIP]",
+        );
+        if (hasSkip) continue;
+
         const dedupKey = `evening_poll:${client.id}:${todayStr}`;
 
         const dedupResult = await markAsSent(dedupKey, DEDUP_TTL_HOURS);

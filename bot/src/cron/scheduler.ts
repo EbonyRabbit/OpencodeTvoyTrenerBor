@@ -4,6 +4,7 @@ import type { MyContext } from "../bot.js";
 import { cleanupExpired } from "./dedup.js";
 import { runEveningPoll } from "./evening-scheduler.js";
 import { runMorningNotification } from "./morning.js";
+import { runMeasurementReminder } from "./measurement-reminder.js";
 import { logBotEvent } from "./logger.js";
 
 const CLEANUP_CRON = "0 * * * *";
@@ -54,6 +55,10 @@ export function startScheduler(bot: Bot<MyContext>): void {
 
   tasks.push(
     cron.schedule(POLL_CRON, wrapWithGuard("morning_notification", () => runMorningNotification(bot))),
+  );
+
+  tasks.push(
+    cron.schedule(POLL_CRON, wrapWithGuard("measurement_reminder", () => runMeasurementReminder(bot))),
   );
 
   console.log(`[SCHEDULER] ${tasks.length} cron tasks started`);

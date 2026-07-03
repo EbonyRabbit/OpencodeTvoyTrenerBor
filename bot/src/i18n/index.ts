@@ -162,6 +162,11 @@ const resources = {
         trends_delta_down: "📉 {{label}}: {{prev}} → {{current}} ({{delta}})",
         trends_no_change: "➡️ {{label}}: {{current}} (без изменений)",
         trends_measures: "({{count}} замеров)",
+        reminder: {
+          greeting: "Доброе утро, {{name}}! 💪",
+          body: "Сегодня день замеров! 📏\n\nЗапишите свои показатели, чтобы отслеживать прогресс:",
+          button: "📏 Начать замеры",
+        },
       },
       photo: {
         title: "📸 Загрузка фото",
@@ -367,6 +372,11 @@ const resources = {
         trends_delta_down: "📉 {{label}}: {{prev}} → {{current}} ({{delta}})",
         trends_no_change: "➡️ {{label}}: {{current}} (no change)",
         trends_measures: "({{count}} measurements)",
+        reminder: {
+          greeting: "Good morning, {{name}}! 💪",
+          body: "Today is measurement day! 📏\n\nLog your measurements to track progress:",
+          button: "📏 Start measurements",
+        },
       },
       photo: {
         title: "📸 Photo Upload",

@@ -101,6 +101,10 @@ const resources = {
         progress_remaining: "⬜ {{exercise}}",
         progress_none: "Пока нет выполненных упражнений.",
       },
+      morning: {
+        greeting: "Доброе утро, {{name}}! 💪",
+        header: "План тренировки на сегодня:",
+      },
       evening: {
         poll_question: "Тренировка сегодня была?",
         btn_yes: "Да",
@@ -301,6 +305,10 @@ const resources = {
         progress_done: "✅ {{exercise}}",
         progress_remaining: "⬜ {{exercise}}",
         progress_none: "No exercises completed yet.",
+      },
+      morning: {
+        greeting: "Good morning, {{name}}! 💪",
+        header: "Today's workout plan:",
       },
       evening: {
         poll_question: "Did you work out today?",

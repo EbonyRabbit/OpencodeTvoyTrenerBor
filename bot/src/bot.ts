@@ -12,6 +12,7 @@ import { startPhotos, handlePhotoMessage } from "./handlers/photos.js";
 import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
+import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
 import { findClientByTelegramId, type Client } from "./lib/clients.js";
@@ -116,6 +117,18 @@ bot.command("resume", async (ctx) => {
   }
   ctx.client = guard.client;
   await startResume(ctx);
+});
+
+bot.command("programs", programsHandler);
+
+bot.on("callback_query:data", async (ctx, next) => {
+  const data = ctx.callbackQuery?.data;
+  if (data?.startsWith("program_request:")) {
+    const programId = data.slice("program_request:".length);
+    await handleProgramRequestCallback(ctx, programId);
+    return;
+  }
+  await next();
 });
 
 bot.on("callback_query:data", callbackRouter);

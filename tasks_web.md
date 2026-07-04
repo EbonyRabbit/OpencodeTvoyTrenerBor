@@ -194,8 +194,8 @@ OpenCode/
 |---|--------|----------|--------|
 | 7.1 | Паузы | `/pause` — запуск wizard: количество → причина → дата возобновления | ✅ |
 | 7.2 | Возобновление | `/resume` — ручное возобновление + выбор стратегии (skip/shift/deload/rollback) | ✅ |
-| 7.3 | Переиспользование plan-adjustment | Импорт `plan-adjustment.ts` из `web/src/lib/` для логики пауз | pending |
-| 7.4 | Каталог программ | `/programs` — список активных программ из Supabase `programs` | pending |
+| 7.3 | Переиспользование plan-adjustment | Импорт `plan-adjustment.ts` из `web/src/lib/` для логики пауз | ✅ |
+| 7.4 | Каталог программ | `/programs` — список активных программ из Supabase `programs` | ✅ |
 | 7.5 | Покупка программы | Выбор программы → переход на страницу оплаты (будущее) | pending |
 | 7.6 | Свободный чат | Пересылка сообщений coach ↔ client через Supabase `messages` | pending |
 | 7.7 | Админ-команды | `/debug_today`, `recalcSchedule`, `generateCodes` — для тренера | pending |

@@ -14,6 +14,7 @@ import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
+import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
 import { findClientByTelegramId, type Client } from "./lib/clients.js";
@@ -124,6 +125,9 @@ bot.command("programs", programsHandler);
 
 bot.command("chat", startCoachChat);
 bot.command("chat_end", endCoachChat);
+bot.command("debug_today", adminDebugToday);
+bot.command("recalc_schedule", adminRecalcSchedule);
+bot.command("generate_codes", adminGenerateCodes);
 
 bot.on("callback_query:data", async (ctx, next) => {
   const data = ctx.callbackQuery?.data;

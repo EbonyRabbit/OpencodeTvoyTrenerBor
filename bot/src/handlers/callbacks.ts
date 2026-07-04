@@ -10,6 +10,7 @@ import { setState, clearState } from "../state/machine.js";
 import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
 import { handleEveningYes, handleEveningNo, handleEveningPostpone } from "./evening-poll.js";
 import { startMeasurements } from "./measurements.js";
+import { handleResumeCallback } from "./resume.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
@@ -96,6 +97,7 @@ registerCallback("evening_yes", async (ctx) => { await handleEveningYes(ctx); })
 registerCallback("evening_no", async (ctx) => { await handleEveningNo(ctx); });
 registerCallback("evening_postpone", async (ctx) => { await handleEveningPostpone(ctx); });
 registerCallback("measurements_start", async (ctx) => { await startMeasurements(ctx); });
+registerCallback("resume", async (ctx, strategy) => { await handleResumeCallback(ctx, strategy); });
 
 function buildExerciseKeyboard(
   index: number,

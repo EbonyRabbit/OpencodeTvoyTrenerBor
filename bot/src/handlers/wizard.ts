@@ -6,8 +6,7 @@ import { parseSets, parseReps, parseWeight, parseRpe } from "../lib/wizard-valid
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { markAsSent } from "../cron/dedup.js";
-
-const DEFAULT_TIMEZONE = "Europe/Moscow";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 
 export interface WizardData {
   exercise_index: number;

@@ -5,6 +5,7 @@ import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
 import { type Client } from "../lib/clients.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import {
   parseScale1to10,
   parseHours,
@@ -229,7 +230,7 @@ async function completeCheckin(
   lang: Language,
 ): Promise<void> {
   try {
-    const tz = client.timezone || "Europe/Moscow";
+    const tz = client.timezone || DEFAULT_TIMEZONE;
     const todayStr = getTodayDateStr(tz);
 
     const week = await getCurrentWeek(client);
@@ -305,12 +306,15 @@ async function notifyCoach(
 async function getCurrentWeek(client: Client): Promise<number | null> {
   if (!client.program_id) return null;
 
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+
   const { data } = await supabaseAdmin
     .from("program_schedule")
     .select("week_number")
     .eq("client_id", client.id)
-    .lte("start_date", new Date().toISOString().split("T")[0])
-    .gte("end_date", new Date().toISOString().split("T")[0])
+    .lte("start_date", todayStr)
+    .gte("end_date", todayStr)
     .limit(1)
     .single();
 

@@ -1,5 +1,7 @@
 import { config } from "../config.js";
 import { supabaseAdmin } from "./supabase-admin.js";
+import { getTodayDateStr } from "./workout-utils.js";
+import { DEFAULT_TIMEZONE } from "./constants.js";
 
 const TELEGRAM_API = `https://api.telegram.org/bot${config.telegram.botToken}`;
 
@@ -28,8 +30,10 @@ export async function uploadPhotoToStorage(
   week: number | null,
   photoType: string,
   fileBuffer: Uint8Array,
+  timezone?: string,
 ): Promise<string> {
-  const date = new Date().toISOString().split("T")[0];
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const date = getTodayDateStr(tz);
   const weekPart = week != null ? `week${week}` : "noweek";
   const path = `clients/${clientId}/${weekPart}_${date}/${photoType}.jpg`;
 
@@ -49,8 +53,10 @@ export async function savePhotoRecord(
   week: number | null,
   photoType: string,
   storagePath: string,
+  timezone?: string,
 ): Promise<void> {
-  const date = new Date().toISOString().split("T")[0];
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const date = getTodayDateStr(tz);
 
   const { error } = await supabaseAdmin
     .from("photos")

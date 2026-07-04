@@ -12,6 +12,7 @@ import { handleEveningYes, handleEveningNo, handleEveningPostpone } from "./even
 import { startMeasurements } from "./measurements.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { markAsSent } from "../cron/dedup.js";
 
 type CallbackHandler = (ctx: MyContext, params: string) => Promise<void>;
@@ -274,7 +275,7 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
 
   const reason = text === "/skip" ? t("wizard.skip_no_reason", ctx.language) : text;
 
-  const tz = ctx.client.timezone || "Europe/Moscow";
+  const tz = ctx.client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
 
   const { error } = await supabaseAdmin.from("workout_logs").insert({

@@ -4,6 +4,7 @@ import { setState, clearState } from "../state/machine.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { parseMeasurement } from "../lib/wizard-validators.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { type Client } from "../lib/clients.js";
 
 const MEASUREMENT_STEPS = [
@@ -206,7 +207,7 @@ async function completeMeasurements(
   lang: Language,
 ): Promise<void> {
   try {
-    const tz = client.timezone || "Europe/Moscow";
+    const tz = client.timezone || DEFAULT_TIMEZONE;
     const todayStr = getTodayDateStr(tz);
 
     const logEntry = {

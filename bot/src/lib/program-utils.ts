@@ -64,15 +64,11 @@ export function getTotalWeeks(parsed: ParsedContent | null): number {
 
 export function getCurrentWeek(
   schedule: { week_number: number; start_date: string | null; end_date: string | null }[],
+  todayStr: string,
 ): number | null {
-  // Note: schedule dates are in UTC, new Date() is UTC in Node.js
-  const now = new Date();
   for (const week of schedule) {
     if (!week.start_date || !week.end_date) continue;
-    const start = new Date(week.start_date);
-    const end = new Date(week.end_date);
-    end.setUTCHours(23, 59, 59, 999);
-    if (now >= start && now <= end) {
+    if (todayStr >= week.start_date && todayStr <= week.end_date) {
       return week.week_number;
     }
   }

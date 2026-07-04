@@ -9,6 +9,8 @@ import {
 } from "../lib/program-utils.js";
 import { t, applyClientLanguage } from "../i18n/index.js";
 import { guardActiveClient } from "./guards.js";
+import { getTodayDateStr } from "../lib/workout-utils.js";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
@@ -71,7 +73,9 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
 
     const parsed = getParsedContent(program.parsed_content);
     const totalWeeks = getTotalWeeks(parsed);
-    const currentWeek = getCurrentWeek(schedule ?? []);
+    const tz = client.timezone || DEFAULT_TIMEZONE;
+    const todayStr = getTodayDateStr(tz);
+    const currentWeek = getCurrentWeek(schedule ?? [], todayStr);
     const truncationSuffix = t("program.truncation_suffix", ctx.language);
 
     const lines: string[] = [

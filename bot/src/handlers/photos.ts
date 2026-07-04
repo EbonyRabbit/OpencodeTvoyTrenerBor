@@ -4,6 +4,8 @@ import { setState, clearState } from "../state/machine.js";
 import { type Client } from "../lib/clients.js";
 import { getTelegramFile, downloadTelegramFile, uploadPhotoToStorage, savePhotoRecord } from "../lib/photo-utils.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
+import { getTodayDateStr } from "../lib/workout-utils.js";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 
 const PHOTO_STEPS = ["front", "side", "back"] as const;
 
@@ -94,8 +96,9 @@ export async function handlePhotoMessage(ctx: MyContext): Promise<void> {
     const fileBuffer = await downloadTelegramFile(fileInfo.file_path);
 
     const week = await getCurrentWeek(client);
-    const storagePath = await uploadPhotoToStorage(client.id, week, currentStep, fileBuffer);
-    await savePhotoRecord(client.id, week, currentStep, storagePath);
+    const tz = client.timezone || DEFAULT_TIMEZONE;
+    const storagePath = await uploadPhotoToStorage(client.id, week, currentStep, fileBuffer, tz);
+    await savePhotoRecord(client.id, week, currentStep, storagePath, tz);
 
     const data = { ...(state.data as PhotoData), [currentStep]: storagePath };
     const nextStep = getNextStep(currentStep);
@@ -143,12 +146,15 @@ async function completePhotos(
 async function getCurrentWeek(client: Client): Promise<number | null> {
   if (!client.program_id) return null;
 
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+
   const { data } = await supabaseAdmin
     .from("program_schedule")
     .select("week_number")
     .eq("client_id", client.id)
-    .lte("start_date", new Date().toISOString().split("T")[0])
-    .gte("end_date", new Date().toISOString().split("T")[0])
+    .lte("start_date", todayStr)
+    .gte("end_date", todayStr)
     .limit(1)
     .single();
 

@@ -23,6 +23,35 @@ export async function getActivePause(clientId: string): Promise<PlanPause | null
   return data;
 }
 
+export type PauseCreateResult =
+  | { ok: true }
+  | { ok: false; code: "ALREADY_ACTIVE" | "DB_ERROR"; details?: string };
+
+export async function createPause(
+  clientId: string,
+  pauseStart: string,
+  reason: PauseReason,
+  plannedResumeDate?: string | null,
+): Promise<PauseCreateResult> {
+  const existing = await getActivePause(clientId);
+  if (existing) {
+    return { ok: false, code: "ALREADY_ACTIVE" };
+  }
+
+  const { error } = await supabaseAdmin
+    .from("plan_pauses")
+    .insert({
+      client_id: clientId,
+      pause_start: pauseStart,
+      reason,
+      status: "active",
+      planned_resume_date: plannedResumeDate ?? null,
+    });
+
+  if (error) return { ok: false, code: "DB_ERROR", details: error.message };
+  return { ok: true };
+}
+
 async function claimPause(pauseId: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin
     .from("plan_pauses")

@@ -1,3 +1,5 @@
+import type { PauseReason } from "./types.js";
+
 export function parseSets(input: string): string | null {
   const trimmed = input.trim();
   const num = Number(trimmed);
@@ -74,4 +76,47 @@ export function parseCount(input: string): string | null {
   const num = Number(trimmed);
   if (Number.isInteger(num) && num >= 0 && num <= 30) return String(num);
   return null;
+}
+
+export function parseDate(input: string): string | null {
+  const trimmed = input.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+
+  if (m < 1 || m > 12) return null;
+  if (d < 1 || d > 31) return null;
+
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) {
+    return null;
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
+const PAUSE_REASON_MAP: Record<string, PauseReason> = {
+  "1": "sick",
+  "2": "vacation",
+  "3": "injury",
+  "4": "personal",
+  "5": "other",
+  sick: "sick",
+  болезнь: "sick",
+  vacation: "vacation",
+  отпуск: "vacation",
+  injury: "injury",
+  травма: "injury",
+  personal: "personal",
+  личное: "personal",
+  other: "other",
+  другое: "other",
+};
+
+export function parsePauseReason(input: string): PauseReason | null {
+  return PAUSE_REASON_MAP[input.trim().toLowerCase()] ?? null;
 }

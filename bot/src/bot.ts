@@ -10,6 +10,7 @@ import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
 import { startMeasurements, handleMeasurementsInput } from "./handlers/measurements.js";
 import { startPhotos, handlePhotoMessage } from "./handlers/photos.js";
 import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
+import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
 import { findClientByTelegramId, type Client } from "./lib/clients.js";
@@ -45,7 +46,7 @@ bot.use(async (ctx, next) => {
       ctx.state = null;
     }
 
-    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements" || ctx.state?.action === "photos" || ctx.state?.action === "checkin") {
+    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements" || ctx.state?.action === "photos" || ctx.state?.action === "checkin" || ctx.state?.action === "pause") {
       try {
         const client = await findClientByTelegramId(ctx.from.id);
         if (client) ctx.client = client;
@@ -96,6 +97,16 @@ bot.command("checkin", async (ctx) => {
   await startCheckin(ctx);
 });
 
+bot.command("pause", async (ctx) => {
+  const guard = await guardActiveClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await startPause(ctx);
+});
+
 bot.on("callback_query:data", callbackRouter);
 
 bot.on("message:photo", async (ctx) => {
@@ -134,6 +145,11 @@ bot.on("message:text", async (ctx) => {
 
   if (ctx.state?.action === "checkin") {
     await handleCheckinInput(ctx);
+    return;
+  }
+
+  if (ctx.state?.action === "pause") {
+    await handlePauseInput(ctx);
     return;
   }
 

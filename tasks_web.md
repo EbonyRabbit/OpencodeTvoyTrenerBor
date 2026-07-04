@@ -197,7 +197,7 @@ OpenCode/
 | 7.3 | Переиспользование plan-adjustment | Импорт `plan-adjustment.ts` из `web/src/lib/` для логики пауз | ✅ |
 | 7.4 | Каталог программ | `/programs` — список активных программ из Supabase `programs` | ✅ |
 | 7.5 | Покупка программы | Выбор программы → переход на страницу оплаты (будущее) | pending |
-| 7.6 | Свободный чат | Пересылка сообщений coach ↔ client через Supabase `messages` | pending |
+| 7.6 | Свободный чат | Пересылка сообщений coach ↔ client через Supabase `messages` | ✅ |
 | 7.7 | Админ-команды | `/debug_today`, `recalcSchedule`, `generateCodes` — для тренера | pending |
 
 ---

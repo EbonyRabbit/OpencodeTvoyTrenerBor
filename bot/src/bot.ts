@@ -13,6 +13,7 @@ import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
+import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
 import { findClientByTelegramId, type Client } from "./lib/clients.js";
@@ -121,11 +122,19 @@ bot.command("resume", async (ctx) => {
 
 bot.command("programs", programsHandler);
 
+bot.command("chat", startCoachChat);
+bot.command("chat_end", endCoachChat);
+
 bot.on("callback_query:data", async (ctx, next) => {
   const data = ctx.callbackQuery?.data;
   if (data?.startsWith("program_request:")) {
     const programId = data.slice("program_request:".length);
     await handleProgramRequestCallback(ctx, programId);
+    return;
+  }
+  if (data?.startsWith("chat_select:")) {
+    const clientId = data.slice("chat_select:".length);
+    await handleChatSelectCallback(ctx, clientId);
     return;
   }
   await next();
@@ -141,6 +150,9 @@ bot.on("message:photo", async (ctx) => {
 });
 
 bot.on("message:text", async (ctx) => {
+  const handled = await handleCoachIncoming(ctx);
+  if (handled) return;
+
   if (ctx.state?.action === "exercise_log") {
     const result = await handleWizardInput(ctx);
     if (result.type === "expired") {
@@ -177,11 +189,7 @@ bot.on("message:text", async (ctx) => {
     return;
   }
 
-  const preview = ctx.message.text.length > 50
-    ? ctx.message.text.slice(0, 50) + "..."
-    : ctx.message.text;
-  console.log(`Received message from ${ctx.from?.id}: ${preview}`);
-  return ctx.reply("pong");
+  await handleFreeTextMessage(ctx);
 });
 
 bot.errorBoundary((err: BotError<MyContext>) => {

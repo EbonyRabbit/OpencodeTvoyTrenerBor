@@ -42,7 +42,7 @@ export default async function ClientProfilePage({
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, morning_time, measurement_time, measurement_day, access_start_date, access_end_date, created_at, updated_at, program:programs(id, title, active, template_file_url, parsed_content)")
+    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, morning_time, measurement_time, measurement_day, access_start_date, access_end_date, purchase_date, purchased_program_id, created_at, updated_at, program:programs(id, title, active, template_file_url, parsed_content)")
     .eq("id", id)
     .single();
 
@@ -55,6 +55,15 @@ export default async function ClientProfilePage({
     program: Database["public"]["Tables"]["programs"]["Row"] | null;
   };
   const typedClient = client as unknown as ClientWithProgram;
+
+  let purchasedProgramName: string | null = null;
+  if (typedClient.purchased_program_id) {
+    const ppResult = await safeFetch(
+      supabase.from("programs").select("title").eq("id", typedClient.purchased_program_id).maybeSingle<{ title: string }>(),
+      null,
+    );
+    purchasedProgramName = ppResult.data?.title ?? null;
+  }
 
   const [
     latestCheckinResult,
@@ -123,6 +132,7 @@ export default async function ClientProfilePage({
         latestPhotos={latestPhotosResult.data ?? []}
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
+        purchasedProgramName={purchasedProgramName}
       />
     </div>
   );

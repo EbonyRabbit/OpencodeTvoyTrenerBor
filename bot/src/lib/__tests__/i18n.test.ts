@@ -1,0 +1,70 @@
+import { describe, it, expect } from "vitest";
+import { resolveLanguage, t, applyClientLanguage } from "../../i18n/index.js";
+
+describe("resolveLanguage", () => {
+  it("returns 'en' for English language codes", () => {
+    expect(resolveLanguage("en")).toBe("en");
+    expect(resolveLanguage("en-US")).toBe("en");
+    expect(resolveLanguage("en-GB")).toBe("en");
+    expect(resolveLanguage("EN")).toBe("en");
+  });
+
+  it("returns 'ru' for Russian language codes", () => {
+    expect(resolveLanguage("ru")).toBe("ru");
+    expect(resolveLanguage("ru-RU")).toBe("ru");
+  });
+
+  it("returns 'ru' for undefined/unknown codes", () => {
+    expect(resolveLanguage(undefined)).toBe("ru");
+    expect(resolveLanguage("de")).toBe("ru");
+    expect(resolveLanguage("fr")).toBe("ru");
+    expect(resolveLanguage("")).toBe("ru");
+  });
+});
+
+describe("t", () => {
+  it("returns Russian translation by default", () => {
+    const result = t("greeting.hello", undefined, { name: "Test" });
+    expect(result).toContain("Test");
+  });
+
+  it("returns English translation when specified", () => {
+    const result = t("greeting.hello", "en", { name: "Test" });
+    expect(result).toContain("Test");
+  });
+
+  it("returns key for missing translation", () => {
+    const result = t("nonexistent.key");
+    expect(result).toBe("nonexistent.key");
+  });
+});
+
+describe("applyClientLanguage", () => {
+  it("sets language to 'ru' for Russian client", () => {
+    const ctx = { language: "en" as const };
+    applyClientLanguage(ctx, "ru");
+    expect(ctx.language).toBe("ru");
+  });
+
+  it("sets language to 'en' for English client", () => {
+    const ctx = { language: "ru" as const };
+    applyClientLanguage(ctx, "en");
+    expect(ctx.language).toBe("en");
+  });
+
+  it("does not change language for null/undefined", () => {
+    const ctx = { language: "ru" as const };
+    applyClientLanguage(ctx, null);
+    expect(ctx.language).toBe("ru");
+
+    const ctx2 = { language: "ru" as const };
+    applyClientLanguage(ctx2, undefined);
+    expect(ctx2.language).toBe("ru");
+  });
+
+  it("does not change language for unknown language codes", () => {
+    const ctx = { language: "ru" as const };
+    applyClientLanguage(ctx, "de");
+    expect(ctx.language).toBe("ru");
+  });
+});

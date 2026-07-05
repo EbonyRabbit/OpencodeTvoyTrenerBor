@@ -22,6 +22,7 @@ import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
 import { MiniLineChart } from "./mini-line-chart";
 import { getDriveThumbnailUrl, PHOTO_TYPE_LABELS } from "@/lib/photos";
+import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 
@@ -436,6 +437,8 @@ export function ClientProfile({
         </div>
       </SectionCard>
 
+      <PauseSection clientId={client.id} />
+
       {(checkinHistory.length > 0 || measurementHistory.length > 0) && (
         <Card>
           <CardHeader>
@@ -534,7 +537,7 @@ export function ClientProfile({
         clientId={client.id}
         currentCode={client.connect_code}
         currentStatus={client.status}
-        currentPaymentStatus={client.payment_status}
+        currentProgramId={client.program_id}
       />
 
       <div className="flex justify-end gap-2">

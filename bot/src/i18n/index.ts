@@ -23,6 +23,7 @@ const resources = {
         payment_pending: "Ожидается подтверждение оплаты.",
         no_program: "Программа ещё не назначена.\nОжидайте — тренер скоро свяжется с вами.",
         program_not_found: "Программа не найдена в системе.\nСвяжитесь с тренером для уточнения.",
+        purchased: "Оплачено: {{title}}",
       },
       menu: {
         title: "Доступные команды:",
@@ -305,6 +306,7 @@ const resources = {
         payment_pending: "Payment confirmation pending.",
         no_program: "Program not yet assigned.\nPlease wait — your coach will contact you soon.",
         program_not_found: "Program not found in the system.\nPlease contact your coach for details.",
+        purchased: "Purchased: {{title}}",
       },
       menu: {
         title: "Available commands:",

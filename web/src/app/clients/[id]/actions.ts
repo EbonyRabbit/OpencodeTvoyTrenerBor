@@ -1,21 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase-server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifySession } from "@/lib/dal";
+import { generateSchedule } from "@/lib/plan-adjustment";
 import type { Database, PaymentStatus } from "@/types/supabase";
 import type { ActivityEvent } from "./activity-types";
 import { ACTIVITY_PAGE_SIZE } from "./activity-types";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!supabaseUrl || !serviceKey) {
-  throw new Error("Missing Supabase service role credentials");
-}
-const sb = createSupabaseClient<Database>(supabaseUrl, serviceKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
 
 type RawWorkout = { id: string; created_at: string; exercise: string; sets: number | null; reps: string | null; weight: number | null };
 type RawCheckin = { id: string; created_at: string; wellbeing: number | null; sleep: number | null; stress: number | null };
@@ -91,7 +83,7 @@ export async function getActivePrograms() {
   if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
     return [];
   }
-  const { data } = await sb
+  const { data } = await supabaseAdmin
     .from("programs")
     .select("id, title, active")
     .eq("active", true)
@@ -109,18 +101,23 @@ export async function activateProgram(
       return { error: "Нет прав" };
     }
 
-    const { data: program } = await sb
+    const { data: program } = await supabaseAdmin
       .from("programs")
       .select("id")
       .eq("id", programId)
       .maybeSingle();
     if (!program) return { error: "Программа не найдена" };
 
-    const { error } = await sb
+    const { error } = await supabaseAdmin
       .from("clients")
       .update({ program_id: programId, status: "active" })
       .eq("id", clientId);
     if (error) return { error: error.message };
+
+    const scheduleError = await generateSchedule(clientId, programId);
+    if (scheduleError.error) {
+      return { error: `Программа назначена, но не удалось создать расписание: ${scheduleError.error}` };
+    }
 
     revalidatePath(`/clients/${clientId}`);
     return {};
@@ -140,7 +137,7 @@ export async function generateConnectCode(
 
     for (let i = 0; i < 5; i++) {
       const code = crypto.randomUUID().slice(0, 8).toUpperCase();
-      const { error } = await sb
+      const { error } = await supabaseAdmin
         .from("clients")
         .update({ connect_code: code })
         .eq("id", clientId);
@@ -166,7 +163,7 @@ export async function disableClient(
       return { error: "Нет прав" };
     }
 
-    const { data: client } = await sb
+    const { data: client } = await supabaseAdmin
       .from("clients")
       .select("status")
       .eq("id", clientId)
@@ -176,7 +173,7 @@ export async function disableClient(
       return { error: "Клиент уже отключён" };
     }
 
-    const { error } = await sb
+    const { error } = await supabaseAdmin
       .from("clients")
       .update({ status: "inactive" })
       .eq("id", clientId);
@@ -201,7 +198,7 @@ export async function togglePayment(
 
     const nextStatus: PaymentStatus = currentStatus === "paid" ? "pending" : "paid";
 
-    const { error } = await sb
+    const { error } = await supabaseAdmin
       .from("clients")
       .update({ payment_status: nextStatus })
       .eq("id", clientId);
@@ -209,6 +206,94 @@ export async function togglePayment(
 
     revalidatePath(`/clients/${clientId}`);
     return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function markPurchased(
+  clientId: string,
+  programId: string,
+): Promise<{ error?: string; connectCode?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("program_id, telegram_id, name")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+    if (client.program_id) {
+      return { error: "У клиента уже есть активная программа. Сначала отключите текущую." };
+    }
+
+    const { data: program } = await supabaseAdmin
+      .from("programs")
+      .select("id, duration_weeks, title")
+      .eq("id", programId)
+      .maybeSingle();
+    if (!program) return { error: "Программа не найдена" };
+    if (program.duration_weeks <= 0) return { error: "Некорректная длительность программы" };
+
+    const now = new Date();
+    const endDate = new Date(now.getTime() + program.duration_weeks * 7 * 24 * 60 * 60 * 1000);
+
+    const { error: updateError } = await supabaseAdmin
+      .from("clients")
+      .update({
+        program_id: programId,
+        purchased_program_id: programId,
+        status: "active",
+        payment_status: "paid",
+        purchase_date: now.toISOString(),
+        access_start_date: now.toISOString(),
+        access_end_date: endDate.toISOString(),
+      })
+      .eq("id", clientId);
+    if (updateError) return { error: updateError.message };
+
+    let connectCode: string | undefined;
+    if (!client.telegram_id) {
+      for (let i = 0; i < 5; i++) {
+        const code = crypto.randomUUID().slice(0, 8).toUpperCase();
+        const { error: codeError } = await supabaseAdmin
+          .from("clients")
+          .update({ connect_code: code })
+          .eq("id", clientId);
+        if (!codeError) {
+          connectCode = code;
+          break;
+        }
+        if (codeError.code !== "23505") break;
+      }
+    }
+
+    const scheduleError = await generateSchedule(clientId, programId);
+    if (scheduleError.error) {
+      revalidatePath(`/clients/${clientId}`);
+      return { error: `Программа назначена, но не удалось создать расписание: ${scheduleError.error}` };
+    }
+
+    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    if (BOT_TOKEN && client.telegram_id) {
+      const text = `Покупка подтверждена!\n\nПрограмма: ${program.title}\nДоступ до: ${endDate.toLocaleDateString("ru-RU")}\n\nНапишите /menu для начала тренировок.`;
+      try {
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: client.telegram_id, text }),
+        });
+      } catch {
+        // Telegram notification is best-effort
+      }
+    }
+
+    revalidatePath(`/clients/${clientId}`);
+    return { connectCode };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }

@@ -219,8 +219,8 @@ OpenCode/
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **9.1** | Миграция БД: purchase поля | Добавить в `clients`: `purchase_date TIMESTAMPTZ`, `purchased_program_id UUID REFERENCES programs(id)` | pending |
-| **9.2** | Обновить типы | В `web/src/types/supabase.ts` добавить `purchase_date`, `purchased_program_id` в тип `clients.Row` | pending |
+| **9.1** | Миграция БД: purchase поля | Добавить в `clients`: `purchase_date TIMESTAMPTZ`, `purchased_program_id UUID REFERENCES programs(id)` | ✅ |
+| **9.2** | Обновить типы | В `web/src/types/supabase.ts` добавить `purchase_date`, `purchased_program_id` в тип `clients.Row` | ✅ |
 | **9.3** | Action `markPurchased` | В `web/src/app/clients/[id]/actions.ts`: валидация (нет программы → ок, есть → блок), установка `program_id`, `status: "active"`, `payment_status: "paid"`, `purchase_date: now()`, `purchased_program_id`, `access_start_date: now()`, `access_end_date: now() + duration_weeks`, генерация `connect_code` если нет `telegram_id`, уведомление клиенту в Telegram | pending |
 | **9.4** | Модалка "Подтвердить покупку" | В `client-actions.tsx`: заменить кнопку "Отметить оплаченным" на "Подтвердить покупку", dropdown с выбором программы, валидация (если программа уже назначена → ошибка), после подтверждения → показать код подключения или уведомление | pending |
 | **9.5** | Обновить профиль клиента | В `client-profile.tsx`: показать `purchase_date`, `purchased_program_id` (название программы) в секции "Доступ и программа" | pending |

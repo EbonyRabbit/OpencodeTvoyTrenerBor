@@ -36,6 +36,8 @@ export interface Database {
           access_start_date: string | null;
           access_end_date: string | null;
           legacy_id: string | null;
+          purchase_date: string | null;
+          purchased_program_id: string | null;
           created_at: string;
           updated_at: string;
         };

@@ -5,6 +5,7 @@ import { config } from "../config.js";
 import { InlineKeyboard } from "grammy";
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
+const TELEGRAM_BUTTON_MAX_BYTES = 64;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Program {
@@ -14,6 +15,23 @@ interface Program {
   description: string | null;
   duration_weeks: number | null;
   price: number | null;
+}
+
+function truncateButtonLabel(label: string, maxBytes = TELEGRAM_BUTTON_MAX_BYTES): string {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(label);
+  if (bytes.length <= maxBytes) return label;
+
+  const ELLIPSIS = "…";
+  const ELLIPSIS_BYTES = 3;
+
+  for (let i = label.length - 1; i >= 0; i--) {
+    const candidate = label.slice(0, i);
+    if (encoder.encode(candidate).length + ELLIPSIS_BYTES <= maxBytes) {
+      return candidate + ELLIPSIS;
+    }
+  }
+  return ELLIPSIS;
 }
 
 function formatProgram(index: number, program: Program, lang: Language): string {
@@ -68,10 +86,19 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
     programs.forEach((program, i) => {
       lines.push(formatProgram(i + 1, program, lang));
       lines.push("");
-      keyboard.row().text(
+      const requestLabel = truncateButtonLabel(
         `${t("programs.request_button", lang)} — ${program.title}`,
-        `program_request:${program.id}`,
       );
+      if (config.paymentBaseUrl) {
+        const buyLabel = truncateButtonLabel(
+          `${t("programs.buy_button", lang)} — ${program.title}`,
+        );
+        keyboard.row()
+          .url(buyLabel, `${config.paymentBaseUrl}/programs/${program.id}/buy`)
+          .text(requestLabel, `program_request:${program.id}`);
+      } else {
+        keyboard.row().text(requestLabel, `program_request:${program.id}`);
+      }
     });
 
     const message = lines.join("\n");

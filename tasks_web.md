@@ -207,11 +207,11 @@ OpenCode/
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | 8.1 | Тестирование | Полное тестирование бота на отдельном токене | ✅ |
-| 8.2 | Переключение webhook | Изменение `setWebhook` URL: Cloudflare Worker → Railway | pending |
-| 8.3 | Мониторинг | Наблюдение за работой 24-48 часов | pending |
-| 8.4 | Отключение GAS | Удаление триггера `sendDueMessages` в GAS | pending |
-| 8.5 | Деактивация Worker | Остановка Cloudflare Worker | pending |
-| 8.6 | Очистка | Удаление/архив GAS бота | pending |
+| 8.2 | Переключение webhook | Изменение `setWebhook` URL: Cloudflare Worker → Railway | ⏭️ skipped |
+| 8.3 | Мониторинг | Наблюдение за работой 24-48 часов | ⏭️ skipped |
+| 8.4 | Отключение GAS | Удаление триггера `sendDueMessages` в GAS | ⏭️ skipped |
+| 8.5 | Деактивация Worker | Остановка Cloudflare Worker | ⏭️ skipped |
+| 8.6 | Очистка | Удаление/архив GAS бота | ⏭️ skipped |
 
 ---
 

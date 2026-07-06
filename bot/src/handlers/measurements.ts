@@ -3,7 +3,7 @@ import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { parseMeasurement } from "../lib/wizard-validators.js";
-import { getTodayDateStr } from "../lib/workout-utils.js";
+import { getTodayDateStr, truncateMessage } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { type Client } from "../lib/clients.js";
 
@@ -250,5 +250,135 @@ async function completeMeasurements(
     } catch (err) {
       console.error(`[MEASURE] clearState failed:`, err);
     }
+  }
+}
+
+interface HistoryRow {
+  date: string;
+  weight: number | null;
+  waist: number | null;
+  abdomen: number | null;
+  chest: number | null;
+  hips: number | null;
+  body_fat: number | null;
+}
+
+const HISTORY_FIELDS: [keyof HistoryRow, string][] = [
+  ["weight", "measure.step_weight"],
+  ["waist", "measure.step_waist"],
+  ["abdomen", "measure.step_abdomen"],
+  ["chest", "measure.step_chest"],
+  ["hips", "measure.step_hips"],
+  ["body_fat", "measure.step_body_fat"],
+];
+
+function daysBetween(a: string, b: string): number {
+  const dA = new Date(a);
+  const dB = new Date(b);
+  if (isNaN(dA.getTime()) || isNaN(dB.getTime())) return 0;
+  return Math.round((dB.getTime() - dA.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function formatHistoryEntry(
+  current: HistoryRow,
+  previous: HistoryRow | null,
+  lang: Language,
+): string {
+  const lines: string[] = [];
+  lines.push(t("measure.history_date", lang, { date: current.date }));
+
+  if (previous) {
+    const days = daysBetween(previous.date, current.date);
+    if (days > 0) {
+      lines.push(t("measure.history_days_ago", lang, { days: String(days) }));
+    }
+  }
+
+  for (const [key, labelKey] of HISTORY_FIELDS) {
+    const curr = current[key] as number | null;
+    if (curr == null) continue;
+
+    const label = t(labelKey, lang);
+
+    if (!previous) {
+      lines.push(t("measure.history_value", lang, { label, curr: String(curr) }));
+      continue;
+    }
+
+    const prev = previous[key] as number | null;
+    if (prev == null) {
+      lines.push(t("measure.history_value", lang, { label, curr: String(curr) }));
+      continue;
+    }
+
+    const delta = curr - prev;
+    if (delta === 0) {
+      lines.push(t("measure.history_no_change", lang, { label, curr: String(curr) }));
+    } else {
+      const sign = delta > 0 ? "+" : "";
+      lines.push(t("measure.history_delta", lang, {
+        label,
+        prev: String(prev),
+        curr: String(curr),
+        sign,
+        delta: String(delta),
+      }));
+    }
+  }
+
+  return lines.join("\n");
+}
+
+export async function showMeasurementHistory(ctx: MyContext): Promise<void> {
+  const client = ctx.client;
+  if (!client) {
+    await ctx.reply(t("error.user_not_identified", ctx.language));
+    return;
+  }
+
+  const lang = (client.language || "ru") as Language;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("measurements")
+      .select("date, weight, waist, abdomen, chest, hips, body_fat")
+      .eq("client_id", client.id)
+      .order("date", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error(`[MEASURE] Failed to fetch history for ${client.id}:`, error);
+      await ctx.reply(t("error.service_unavailable", lang));
+      return;
+    }
+
+    const rows = (data ?? []) as HistoryRow[];
+
+    if (rows.length === 0) {
+      await ctx.reply(t("measure.history_empty", lang));
+      return;
+    }
+
+    const entries: string[] = [];
+
+    if (rows.length === 1) {
+      entries.push(t("measure.history_single", lang));
+      entries.push("");
+      entries.push(formatHistoryEntry(rows[0], null, lang));
+    } else {
+      entries.push(t("measure.history_title", lang, { count: String(rows.length) }));
+      entries.push("");
+      for (let i = 0; i < rows.length; i++) {
+        const prev = i < rows.length - 1 ? rows[i + 1] : null;
+        entries.push(formatHistoryEntry(rows[i], prev, lang));
+        if (i < rows.length - 1) entries.push("");
+      }
+    }
+
+    const message = truncateMessage(entries.join("\n"), `\n…`);
+    await ctx.reply(message);
+  } catch (err) {
+    console.error(`[MEASURE] showMeasurementHistory error for ${client.id}:`, err);
+    await ctx.reply(t("error.service_unavailable", lang));
   }
 }

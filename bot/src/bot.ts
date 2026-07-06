@@ -7,7 +7,7 @@ import { todayHandler } from "./handlers/today.js";
 import { callbackRouter, handleSkipReason } from "./handlers/callbacks.js";
 import { guardActiveClient } from "./handlers/guards.js";
 import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
-import { startMeasurements, handleMeasurementsInput } from "./handlers/measurements.js";
+import { startMeasurements, handleMeasurementsInput, showMeasurementHistory } from "./handlers/measurements.js";
 import { startPhotos, handlePhotoMessage } from "./handlers/photos.js";
 import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
@@ -79,6 +79,16 @@ bot.command("measure", async (ctx) => {
   }
   ctx.client = guard.client;
   await startMeasurements(ctx);
+});
+
+bot.command("measurements", async (ctx) => {
+  const guard = await guardActiveClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await showMeasurementHistory(ctx);
 });
 
 bot.command("photos", async (ctx) => {

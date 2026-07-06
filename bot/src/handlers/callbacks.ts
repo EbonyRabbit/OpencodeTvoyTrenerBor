@@ -11,6 +11,7 @@ import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
 import { handleEveningYes, handleEveningNo, handleEveningPostpone } from "./evening-poll.js";
 import { startMeasurements, showMeasurementHistory } from "./measurements.js";
 import { handleResumeCallback } from "./resume.js";
+import { showPhotoHistory } from "./photos.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
@@ -98,6 +99,7 @@ registerCallback("evening_no", async (ctx) => { await handleEveningNo(ctx); });
 registerCallback("evening_postpone", async (ctx) => { await handleEveningPostpone(ctx); });
 registerCallback("measurements_start", async (ctx) => { await startMeasurements(ctx); });
 registerCallback("measurements_history", async (ctx) => { await showMeasurementHistory(ctx); });
+registerCallback("photo_history", async (ctx) => { await ctx.answerCallbackQuery().catch(() => {}); await showPhotoHistory(ctx); });
 registerCallback("resume", async (ctx, strategy) => { await handleResumeCallback(ctx, strategy); });
 
 function buildExerciseKeyboard(

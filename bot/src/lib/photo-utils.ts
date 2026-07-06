@@ -81,3 +81,38 @@ export async function getPhotoDownloadUrl(storagePath: string): Promise<string> 
   if (error) throw error;
   return data.signedUrl;
 }
+
+export interface PhotoSet {
+  date: string;
+  photos: { type: string; storage_path: string | null; drive_url: string | null }[];
+}
+
+export async function getLatestPhotoSets(
+  clientId: string,
+  limit = 5,
+): Promise<PhotoSet[]> {
+  const { data, error } = await supabaseAdmin
+    .from("photos")
+    .select("date, type, storage_path, drive_url")
+    .eq("client_id", clientId)
+    .order("date", { ascending: false })
+    .limit(limit * 3 + 3);
+
+  if (error) {
+    console.error(`[PHOTOS] Failed to fetch photo sets for ${clientId}:`, error);
+    return [];
+  }
+  if (!data) return [];
+
+  const grouped = new Map<string, PhotoSet>();
+  for (const row of data) {
+    const existing = grouped.get(row.date);
+    if (existing) {
+      existing.photos.push(row);
+    } else if (grouped.size < limit) {
+      grouped.set(row.date, { date: row.date, photos: [row] });
+    }
+  }
+
+  return Array.from(grouped.values());
+}

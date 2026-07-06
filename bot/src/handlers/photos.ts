@@ -2,7 +2,7 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { type Client } from "../lib/clients.js";
-import { getTelegramFile, downloadTelegramFile, uploadPhotoToStorage, savePhotoRecord } from "../lib/photo-utils.js";
+import { getTelegramFile, downloadTelegramFile, uploadPhotoToStorage, savePhotoRecord, getLatestPhotoSets, getPhotoDownloadUrl } from "../lib/photo-utils.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
@@ -159,4 +159,60 @@ async function getCurrentWeek(client: Client): Promise<number | null> {
     .single();
 
   return data?.week_number ?? null;
+}
+
+const PHOTO_TYPE_LABELS: Record<string, string> = {
+  front: "photo.history_front",
+  side: "photo.history_side",
+  back: "photo.history_back",
+};
+
+function daysBetweenDates(a: string, b: string): number {
+  const dA = new Date(a);
+  const dB = new Date(b);
+  if (isNaN(dA.getTime()) || isNaN(dB.getTime())) return 0;
+  return Math.round((dB.getTime() - dA.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export async function showPhotoHistory(ctx: MyContext): Promise<void> {
+  const client = ctx.client;
+  if (!client) {
+    await ctx.reply(t("error.user_not_identified", ctx.language));
+    return;
+  }
+
+  const lang = (client.language || "ru") as Language;
+
+  try {
+    const photoSets = await getLatestPhotoSets(client.id, 5);
+
+    if (photoSets.length === 0) {
+      await ctx.reply(t("photo.history_empty", lang));
+      return;
+    }
+
+    const now = new Date().toISOString().slice(0, 10);
+
+    for (const set of photoSets) {
+      const days = daysBetweenDates(set.date, now);
+      const daysLabel = days > 0 ? ` ${t("photo.history_days_ago", lang, { days: String(days) })}` : "";
+      await ctx.reply(`${t("photo.history_date", lang, { date: set.date })}${daysLabel}`);
+
+      for (const photo of set.photos) {
+        const path = photo.storage_path;
+        if (!path) continue;
+
+        try {
+          const signedUrl = await getPhotoDownloadUrl(path);
+          const typeLabel = t((PHOTO_TYPE_LABELS[photo.type] ?? "photo.history_front") as "photo.history_front", lang);
+          await ctx.replyWithPhoto(signedUrl, { caption: typeLabel });
+        } catch (err) {
+          console.warn(`[PHOTOS] Failed to send photo ${photo.type} for ${client.id}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[PHOTOS] showPhotoHistory error for ${client.id}:`, err);
+    await ctx.reply(t("photo.history_error", lang));
+  }
 }

@@ -23,7 +23,7 @@ function buildQuery(
   let query = supabase
     .from("clients")
     .select(
-      "id, name, telegram_id, status, payment_status, language, timezone, access_start_date, access_end_date, created_at, program_id, program:programs(title)",
+      "id, name, telegram_id, status, payment_status, language, timezone, access_start_date, access_end_date, created_at, program_id, program:programs!clients_program_id_fkey(title)",
       { count: "exact" },
     );
 

@@ -44,7 +44,7 @@ export default async function ClientProfilePage({
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, morning_time, measurement_time, measurement_day, access_start_date, access_end_date, purchase_date, purchased_program_id, created_at, updated_at, program:programs(id, title, active, template_file_url, parsed_content)")
+    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, morning_time, measurement_time, measurement_day, access_start_date, access_end_date, purchase_date, purchased_program_id, created_at, updated_at, program:programs!clients_program_id_fkey(id, title, active, template_file_url, parsed_content)")
     .eq("id", id)
     .single();
 

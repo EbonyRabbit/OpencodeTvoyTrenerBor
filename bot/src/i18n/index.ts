@@ -197,6 +197,16 @@ const resources = {
         history_back: "Фото сзади",
         history_error: "Не удалось загрузить фото. Попробуйте позже.",
       },
+      mystats: {
+        title: "📊 Статистика за месяц",
+        month_label: "Период: {{month}}",
+        completed: "✅ Выполнено тренировок: {{count}}",
+        skipped: "⏭ Пропущено тренировок: {{count}}",
+        total_days: "📅 Тренировочных дней: {{count}}",
+        avg_rpe: "📈 Средний RPE: {{rpe}}",
+        avg_rpe_none: "📈 Средний RPE: —",
+        no_data: "Нет данных за текущий месяц. Начните тренировки через /today",
+      },
       checkin: {
         title: "📋 Еженедельный чек-ин",
         step_wellbeing: "Как самочувствие? (1-10)",
@@ -494,6 +504,16 @@ const resources = {
         history_side: "Side photo",
         history_back: "Back photo",
         history_error: "Failed to load photos. Try again later.",
+      },
+      mystats: {
+        title: "📊 Monthly Stats",
+        month_label: "Period: {{month}}",
+        completed: "✅ Workouts completed: {{count}}",
+        skipped: "⏭ Workouts skipped: {{count}}",
+        total_days: "📅 Training days: {{count}}",
+        avg_rpe: "📈 Average RPE: {{rpe}}",
+        avg_rpe_none: "📈 Average RPE: —",
+        no_data: "No data for this month. Start training via /today",
       },
       checkin: {
         title: "📋 Weekly Check-in",

@@ -13,6 +13,7 @@ import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
+import { myStatsHandler } from "./handlers/my-stats.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
@@ -142,6 +143,16 @@ bot.command("resume", async (ctx) => {
 });
 
 bot.command("programs", programsHandler);
+
+bot.command("mystats", async (ctx) => {
+  const guard = await guardActiveClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await myStatsHandler(ctx);
+});
 
 bot.command("chat", startCoachChat);
 bot.command("chat_end", endCoachChat);

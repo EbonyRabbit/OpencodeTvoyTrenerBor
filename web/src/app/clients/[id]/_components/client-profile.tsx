@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -21,7 +22,7 @@ import {
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
 import { MiniLineChart } from "./mini-line-chart";
-import { getDriveThumbnailUrl, PHOTO_TYPE_LABELS } from "@/lib/photos";
+import { PHOTO_TYPE_LABELS } from "@/lib/photos";
 import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
@@ -32,7 +33,7 @@ type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], 
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
 type CheckinHistoryRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress">;
 type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
-type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url">;
+type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url"> & { resolvedUrl: string | null };
 
 const MEASUREMENT_DAY_LABELS: Record<number, string> = {
   1: "Понедельник",
@@ -181,6 +182,7 @@ export function ClientProfile({
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -399,13 +401,14 @@ export function ClientProfile({
                   className="group relative aspect-[3/4] w-full overflow-hidden rounded-md border bg-muted"
                   aria-label={`${PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}`}
                 >
-                  {photo.drive_url ? (
+                  {photo.resolvedUrl && !failedImages.has(photo.id) ? (
                     <Image
-                      src={getDriveThumbnailUrl(photo.drive_url)}
+                      src={photo.resolvedUrl}
                       alt={PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}
                       fill
                       className="object-cover transition-transform group-hover:scale-105"
                       sizes="(max-width: 640px) 33vw, 15vw"
+                      onError={() => setFailedImages((prev) => new Set(prev).add(photo.id))}
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">

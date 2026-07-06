@@ -2,7 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { verifySession } from "@/lib/dal";
 import { createClient } from "@/lib/supabase-server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { safeFetch, safeCount } from "@/lib/safe-fetch";
+import { resolvePhotoUrls } from "@/lib/photos";
 import { PhotoGallery } from "./_components/photo-gallery";
 
 const PAGE_SIZE = 15;
@@ -80,13 +82,15 @@ export default async function PhotosPage({
     redirect(`/clients/${id}/photos?page=${clampedPage}`);
   }
 
+  const resolvedPhotos = await resolvePhotoUrls(photos ?? [], supabaseAdmin);
+
   return (
     <div className="p-6">
       <div className="mx-auto max-w-5xl space-y-6">
         <PhotoGallery
           clientId={client.id}
           clientName={client.name}
-          photos={photos ?? []}
+          photos={resolvedPhotos}
           currentPage={currentPage}
           totalPages={totalPages}
         />

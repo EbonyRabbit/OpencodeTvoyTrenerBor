@@ -21,10 +21,10 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { buildPageUrl, getPageNumbers } from "@/lib/pagination";
-import { getDriveThumbnailUrl, getDriveImageUrl, PHOTO_TYPE_LABELS, PHOTO_TYPE_ORDER } from "@/lib/photos";
+import { PHOTO_TYPE_LABELS, PHOTO_TYPE_ORDER } from "@/lib/photos";
 import type { Database } from "@/types/supabase";
 
-type PhotoRow = Database["public"]["Tables"]["photos"]["Row"];
+type PhotoRow = Database["public"]["Tables"]["photos"]["Row"] & { resolvedUrl: string | null };
 
 function formatDate(date: string | null): string {
   if (!date) return "—";
@@ -109,18 +109,19 @@ export function PhotoGallery({
   const [lightboxPhoto, setLightboxPhoto] = useState<PhotoRow | null>(null);
   const [lightboxGroup, setLightboxGroup] = useState<PhotoRow[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const lightboxRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
 
   const openLightbox = useCallback(
     (photo: PhotoRow, group: PhotoRow[]) => {
-      if (!photo.drive_url) return;
+      if (!photo.resolvedUrl || failedImages.has(photo.id)) return;
       const idx = group.findIndex((p) => p.id === photo.id);
       setLightboxPhoto(photo);
       setLightboxGroup(group);
       setCurrentIndex(idx);
     },
-    [],
+    [failedImages],
   );
 
   const closeLightbox = useCallback(() => {
@@ -235,13 +236,14 @@ export function PhotoGallery({
                         onClick={() => openLightbox(photo, group)}
                         aria-label={`${PHOTO_TYPE_LABELS[photo.type] ?? "Фото"} от ${formatDate(photo.date)}`}
                       >
-                        {photo.drive_url ? (
+                        {photo.resolvedUrl && !failedImages.has(photo.id) ? (
                           <Image
-                            src={getDriveThumbnailUrl(photo.drive_url)}
+                            src={photo.resolvedUrl}
                             alt={PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}
                             fill
                             className="object-cover transition-transform group-hover:scale-105"
                             sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+                            onError={() => setFailedImages((prev) => new Set(prev).add(photo.id))}
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center">
@@ -322,14 +324,15 @@ export function PhotoGallery({
             className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            {lightboxPhoto.drive_url ? (
+            {lightboxPhoto.resolvedUrl && !failedImages.has(lightboxPhoto.id) ? (
               <Image
-                src={getDriveImageUrl(lightboxPhoto.drive_url)}
+                src={lightboxPhoto.resolvedUrl}
                 alt={PHOTO_TYPE_LABELS[lightboxPhoto.type] ?? "Фото"}
                 width={800}
                 height={1067}
                 className="h-auto max-h-[85vh] w-auto rounded-lg object-contain"
                 priority
+                onError={() => setFailedImages((prev) => new Set(prev).add(lightboxPhoto.id))}
               />
             ) : (
               <div className="flex h-64 w-80 items-center justify-center rounded-lg bg-muted">

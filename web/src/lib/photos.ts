@@ -39,3 +39,32 @@ export const PHOTO_TYPE_ORDER: Record<string, number> = {
   side: 1,
   back: 2,
 };
+
+const STORAGE_BUCKET = "client-photos";
+const SIGNED_URL_TTL = 3600;
+
+export async function resolvePhotoUrls<T extends { id: string; drive_url: string | null; storage_path: string | null }>(
+  photos: T[],
+  supabase: { storage: { from: (bucket: string) => { createSignedUrl: (path: string, ttl: number) => Promise<{ data: { signedUrl: string } | null; error: unknown }> } } },
+): Promise<(T & { resolvedUrl: string | null })[]> {
+  return Promise.all(
+    photos.map(async (photo) => {
+      if (photo.storage_path) {
+        try {
+          const { data, error } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .createSignedUrl(photo.storage_path, SIGNED_URL_TTL);
+          if (!error && data?.signedUrl) {
+            return { ...photo, resolvedUrl: data.signedUrl };
+          }
+        } catch (err) {
+          console.warn(`[resolvePhotoUrls] Failed for photo ${photo.id}:`, err);
+        }
+      }
+      if (photo.drive_url) {
+        return { ...photo, resolvedUrl: getDriveThumbnailUrl(photo.drive_url) };
+      }
+      return { ...photo, resolvedUrl: null };
+    }),
+  );
+}

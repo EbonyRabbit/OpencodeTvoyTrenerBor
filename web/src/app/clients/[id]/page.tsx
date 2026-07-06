@@ -2,8 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { verifySession } from "@/lib/dal";
 import { createClient } from "@/lib/supabase-server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent } from "@/lib/program-utils";
 import { safeFetch, safeCount } from "@/lib/safe-fetch";
+import { resolvePhotoUrls } from "@/lib/photos";
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
 import { getClientActivity, loadMoreActivity } from "./actions";
@@ -101,7 +103,7 @@ export default async function ClientProfilePage({
       [],
     ),
     safeFetch(
-      supabase.from("photos").select("id, date, type, drive_url").eq("client_id", id).order("date", { ascending: false }).limit(6),
+      supabase.from("photos").select("id, date, type, drive_url, storage_path").eq("client_id", id).order("date", { ascending: false }).limit(6),
       [],
     ),
   ]);
@@ -116,6 +118,9 @@ export default async function ClientProfilePage({
 
   const { events: initialActivityEvents } = await getClientActivity(id);
 
+  const rawPhotos = latestPhotosResult.data ?? [];
+  const latestPhotos = await resolvePhotoUrls(rawPhotos, supabaseAdmin);
+
   return (
     <div className="p-6">
       <ClientProfile
@@ -129,7 +134,7 @@ export default async function ClientProfilePage({
         parsedContent={parsedContent}
         checkinHistory={checkinHistory}
         measurementHistory={measurementHistory}
-        latestPhotos={latestPhotosResult.data ?? []}
+        latestPhotos={latestPhotos}
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
         purchasedProgramName={purchasedProgramName}

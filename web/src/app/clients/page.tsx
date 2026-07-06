@@ -10,6 +10,7 @@ import {
 } from "@/lib/clients";
 import { ClientsTable } from "./_components/clients-table";
 import { ClientFilters } from "./_components/client-filters";
+import { CreateClientDialog } from "./_components/create-client-dialog";
 
 const PAGE_SIZE = 10;
 
@@ -102,6 +103,7 @@ export default async function ClientsPage({
             Управление клиентами
           </p>
         </div>
+        <CreateClientDialog />
       </div>
 
       <ClientFilters currentStatus={status} currentPayment={payment} currentSearch={search} />

@@ -63,6 +63,7 @@ export async function createPause(
   pauseStart: string,
   reason: PauseReason,
   plannedResumeDate?: string | null,
+  pauseEnd?: string | null,
 ): Promise<{ error?: string }> {
   const existing = await getActivePause(clientId);
   if (existing) {
@@ -74,6 +75,7 @@ export async function createPause(
     .insert({
       client_id: clientId,
       pause_start: pauseStart,
+      pause_end: pauseEnd ?? null,
       reason,
       status: "active",
       planned_resume_date: plannedResumeDate ?? null,

@@ -27,7 +27,7 @@ import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 
-type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "access_start_date" | "access_end_date" | "purchase_date" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; template_file_url: string | null } | null };
+type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "access_start_date" | "access_end_date" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; template_file_url: string | null } | null };
 type CheckinRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress" | "nutrition_adherence" | "missed_workouts" | "complaints">;
 type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
@@ -287,12 +287,6 @@ export function ClientProfile({
             <InfoRow
               label="Статус программы"
               value={STATUS_LABELS[programStatus]}
-            />
-          )}
-          {client.purchase_date && (
-            <InfoRow
-              label="Дата покупки"
-              value={formatDate(client.purchase_date)}
             />
           )}
           {purchasedProgramName && (

@@ -6,7 +6,6 @@ import { verifySession } from "@/lib/dal";
 import type { Database, PaymentStatus } from "@/types/supabase";
 
 type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
-type ClientInsertSafe = Omit<ClientInsert, "purchase_date" | "purchased_program_id">;
 
 const TIMEZONE_REGEX = /^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/;
 const MAX_NAME_LENGTH = 100;
@@ -36,7 +35,7 @@ export async function createClient(formData: {
     const payment_status: PaymentStatus =
       formData.payment_status === "paid" ? "paid" : "pending";
 
-    const insertData: ClientInsertSafe = {
+    const insertData: ClientInsert = {
       name,
       language,
       timezone,
@@ -52,6 +51,8 @@ export async function createClient(formData: {
       access_start_date: null,
       access_end_date: null,
       legacy_id: null,
+      purchase_date: null,
+      purchased_program_id: null,
     };
 
     if (formData.telegram_id && formData.telegram_id > 0) {
@@ -60,22 +61,20 @@ export async function createClient(formData: {
 
     const { data, error } = await supabaseAdmin
       .from("clients")
-      .insert(insertData as ClientInsert)
+      .insert(insertData)
       .select("id")
       .single();
 
     if (error) {
-      console.error("createClient DB error:", error.code, error.message);
       if (error.code === "23505") {
         return { error: "Клиент с таким Telegram ID уже существует" };
       }
-      return { error: `Ошибка: ${error.message} (${error.code})` };
+      return { error: "Не удалось создать клиента" };
     }
 
     revalidatePath("/clients");
     return { id: data.id };
-  } catch (e) {
-    console.error("createClient error:", e);
-    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  } catch {
+    return { error: "Произошла ошибка" };
   }
 }

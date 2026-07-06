@@ -246,8 +246,10 @@ export async function markPurchased(
       .from("clients")
       .update({
         program_id: programId,
+        purchased_program_id: programId,
         status: "active",
         payment_status: "paid",
+        purchase_date: now.toISOString(),
         access_start_date: now.toISOString(),
         access_end_date: endDate.toISOString(),
       })

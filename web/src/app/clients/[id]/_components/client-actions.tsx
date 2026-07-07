@@ -9,7 +9,9 @@ import {
   disableClient,
   markPurchased,
   togglePayment,
+  updateClient,
 } from "../actions";
+import { TIMEZONE_LIST, MEASUREMENT_DAY_OPTIONS, LANGUAGE_LABELS } from "@/lib/clients";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 type Program = { id: string; title: string };
 
 export function ClientActions({
@@ -35,12 +38,24 @@ export function ClientActions({
   currentStatus,
   currentProgramId,
   currentPaymentStatus,
+  clientName,
+  clientLanguage,
+  clientTimezone,
+  clientMorningTime,
+  clientMeasurementTime,
+  clientMeasurementDay,
 }: {
   clientId: string;
   currentCode: string | null;
   currentStatus: string;
   currentProgramId?: string | null;
   currentPaymentStatus?: string;
+  clientName: string;
+  clientLanguage: string;
+  clientTimezone: string | null;
+  clientMorningTime: string | null;
+  clientMeasurementTime: string | null;
+  clientMeasurementDay: number | null;
 }) {
   const router = useRouter();
   const [activating, setActivating] = useState(false);
@@ -59,6 +74,25 @@ export function ClientActions({
   const [purchaseSuccess, setPurchaseSuccess] = useState<{
     connectCode?: string;
   } | null>(null);
+
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    language: string;
+    timezone: string;
+    morning_time: string;
+    measurement_time: string;
+    measurement_day: string;
+  }>({
+    name: "",
+    language: "ru",
+    timezone: "",
+    morning_time: "",
+    measurement_time: "",
+    measurement_day: "",
+  });
 
   const loadPrograms = useCallback(async () => {
     setError(null);
@@ -191,10 +225,56 @@ export function ClientActions({
     }
   }, [clientId, selectedProgram, router]);
 
+  const openEditDialog = useCallback(() => {
+    setEditError(null);
+    setEditForm({
+      name: clientName,
+      language: clientLanguage,
+      timezone: clientTimezone ?? "",
+      morning_time: clientMorningTime ?? "",
+      measurement_time: clientMeasurementTime ?? "",
+      measurement_day: clientMeasurementDay != null ? String(clientMeasurementDay) : "",
+    });
+    setShowEditDialog(true);
+  }, [clientName, clientLanguage, clientTimezone, clientMorningTime, clientMeasurementTime, clientMeasurementDay]);
+
+  const handleSaveEdit = useCallback(async () => {
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      const payload: {
+        name: string;
+        language: string;
+        timezone: string | null;
+        morning_time: string | null;
+        measurement_time: string | null;
+        measurement_day: number | null;
+      } = {
+        name: editForm.name,
+        language: editForm.language,
+        timezone: editForm.timezone || null,
+        morning_time: editForm.morning_time || null,
+        measurement_time: editForm.measurement_time || null,
+        measurement_day: editForm.measurement_day ? Number(editForm.measurement_day) : null,
+      };
+      const result = await updateClient(clientId, payload);
+      if (result.error) {
+        setEditError(result.error);
+        return;
+      }
+      setShowEditDialog(false);
+      router.refresh();
+    } catch {
+      setEditError("Произошла ошибка");
+    } finally {
+      setEditLoading(false);
+    }
+  }, [clientId, editForm, router]);
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-3">
-        <Button type="button" variant="outline" disabled>
+        <Button type="button" variant="outline" onClick={openEditDialog}>
           Редактировать
         </Button>
 
@@ -411,6 +491,122 @@ export function ClientActions({
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showEditDialog}
+        onOpenChange={(open) => {
+          setShowEditDialog(open);
+          if (!open) {
+            setEditError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактировать клиента</DialogTitle>
+            <DialogDescription>
+              Измените данные клиента и нажмите «Сохранить».
+            </DialogDescription>
+          </DialogHeader>
+          {editError && (
+            <p className="text-sm text-destructive" role="alert">{editError}</p>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveEdit();
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <label htmlFor="edit-name" className="text-sm font-medium">Имя</label>
+              <Input
+                id="edit-name"
+                type="text"
+                maxLength={200}
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-language" className="text-sm font-medium">Язык</label>
+              <Select
+                value={editForm.language}
+                onValueChange={(v) => v && setEditForm((f) => ({ ...f, language: v }))}
+              >
+                <SelectTrigger id="edit-language" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
+                    <SelectItem key={code} value={code}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-timezone" className="text-sm font-medium">Часовой пояс</label>
+              <Select
+                value={editForm.timezone}
+                onValueChange={(v) => setEditForm((f) => ({ ...f, timezone: v ?? "" }))}
+              >
+                <SelectTrigger id="edit-timezone" className="w-full">
+                  <SelectValue placeholder="Не задан" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Не задан</SelectItem>
+                  {TIMEZONE_LIST.map((tz) => (
+                    <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-morning" className="text-sm font-medium">Утро (напоминание, HH:MM)</label>
+              <Input
+                id="edit-morning"
+                type="time"
+                value={editForm.morning_time}
+                onChange={(e) => setEditForm((f) => ({ ...f, morning_time: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-meas-day" className="text-sm font-medium">День замеров</label>
+              <Select
+                value={editForm.measurement_day}
+                onValueChange={(v) => setEditForm((f) => ({ ...f, measurement_day: v ?? "" }))}
+              >
+                <SelectTrigger id="edit-meas-day" className="w-full">
+                  <SelectValue placeholder="Не задан" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Не задан</SelectItem>
+                  {MEASUREMENT_DAY_OPTIONS.map(({ value, label }) => (
+                    <SelectItem key={value} value={String(value)}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-meas-time" className="text-sm font-medium">Время замеров (HH:MM)</label>
+              <Input
+                id="edit-meas-time"
+                type="time"
+                value={editForm.measurement_time}
+                onChange={(e) => setEditForm((f) => ({ ...f, measurement_time: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <DialogClose render={<Button variant="outline" type="button" />}>
+                Отмена
+              </DialogClose>
+              <Button type="submit" disabled={editLoading || !editForm.name.trim()}>
+                {editLoading ? "Сохранение..." : "Сохранить"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

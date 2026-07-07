@@ -58,3 +58,32 @@ export const LANGUAGE_LABELS: Record<string, string> = {
 export function escapeSearch(value: string): string {
   return value.replace(/[%_]/g, "\\$&");
 }
+
+export const TIMEZONE_LIST = [
+  "Europe/Moscow",
+  "Europe/Kiev",
+  "Europe/Minsk",
+  "Asia/Almaty",
+  "Asia/Tashkent",
+  "Asia/Astana",
+  "Asia/Dubai",
+  "Asia/Bangkok",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Paris",
+  "America/New_York",
+  "America/Los_Angeles",
+  "America/Chicago",
+] as const;
+
+export const MEASUREMENT_DAY_OPTIONS = [
+  { value: 1, label: "Понедельник" },
+  { value: 2, label: "Вторник" },
+  { value: 3, label: "Среда" },
+  { value: 4, label: "Четверг" },
+  { value: 5, label: "Пятница" },
+  { value: 6, label: "Суббота" },
+  { value: 7, label: "Воскресенье" },
+] as const;

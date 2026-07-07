@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifySession } from "@/lib/dal";
 import { generateSchedule } from "@/lib/plan-adjustment";
 import type { Database, PaymentStatus } from "@/types/supabase";
+import { TIMEZONE_LIST, LANGUAGE_LABELS } from "@/lib/clients";
 import type { ActivityEvent } from "./activity-types";
 import { ACTIVITY_PAGE_SIZE } from "./activity-types";
 
@@ -297,6 +298,108 @@ export async function markPurchased(
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/clients");
     return { connectCode };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function updateClient(
+  clientId: string,
+  data: {
+    name?: string;
+    language?: string;
+    timezone?: string | null;
+    morning_time?: string | null;
+    measurement_time?: string | null;
+    measurement_day?: number | null;
+  },
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    const update: Database["public"]["Tables"]["clients"]["Update"] = {};
+
+    if (data.name !== undefined) {
+      const trimmed = data.name.trim();
+      if (!trimmed) return { error: "Имя не может быть пустым" };
+      if (trimmed.length > 200) return { error: "Имя слишком длинное" };
+      update.name = trimmed;
+    }
+
+    if (data.language !== undefined) {
+      if (!(Object.keys(LANGUAGE_LABELS) as string[]).includes(data.language)) {
+        return { error: "Некорректный язык" };
+      }
+      update.language = data.language;
+    }
+
+    if (data.timezone !== undefined) {
+      if (data.timezone !== null && data.timezone !== "") {
+        if (!(TIMEZONE_LIST as readonly string[]).includes(data.timezone)) {
+          return { error: "Некорректный часовой пояс" };
+        }
+        update.timezone = data.timezone;
+      } else {
+        update.timezone = null;
+      }
+    }
+
+    if (data.morning_time !== undefined) {
+      if (data.morning_time !== null && data.morning_time !== "") {
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.morning_time)) {
+          return { error: "Некорректное время утреннего напоминания" };
+        }
+        update.morning_time = data.morning_time;
+      } else {
+        update.morning_time = null;
+      }
+    }
+
+    if (data.measurement_time !== undefined) {
+      if (data.measurement_time !== null && data.measurement_time !== "") {
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.measurement_time)) {
+          return { error: "Некорректное время напоминания замеров" };
+        }
+        update.measurement_time = data.measurement_time;
+      } else {
+        update.measurement_time = null;
+      }
+    }
+
+    if (data.measurement_day !== undefined) {
+      if (data.measurement_day !== null) {
+        if (!Number.isInteger(data.measurement_day) || data.measurement_day < 1 || data.measurement_day > 7) {
+          return { error: "День замеров должен быть от 1 до 7" };
+        }
+        update.measurement_day = data.measurement_day;
+      } else {
+        update.measurement_day = null;
+      }
+    }
+
+    if (Object.keys(update).length === 0) {
+      return { error: "Нет данных для обновления" };
+    }
+
+    const { data: existing } = await supabaseAdmin
+      .from("clients")
+      .select("id")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!existing) return { error: "Клиент не найден" };
+
+    const { error } = await supabaseAdmin
+      .from("clients")
+      .update(update)
+      .eq("id", clientId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
+    return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }

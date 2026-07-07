@@ -18,6 +18,7 @@ import {
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_VARIANTS,
   LANGUAGE_LABELS,
+  MEASUREMENT_DAY_OPTIONS,
 } from "@/lib/clients";
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
@@ -35,15 +36,9 @@ type CheckinHistoryRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "
 type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url"> & { resolvedUrl: string | null };
 
-const MEASUREMENT_DAY_LABELS: Record<number, string> = {
-  1: "Понедельник",
-  2: "Вторник",
-  3: "Среда",
-  4: "Четверг",
-  5: "Пятница",
-  6: "Суббота",
-  7: "Воскресенье",
-};
+const MEASUREMENT_DAY_LABELS: Record<number, string> = Object.fromEntries(
+  MEASUREMENT_DAY_OPTIONS.map((o) => [o.value, o.label])
+) as Record<number, string>;
 
 function formatDate(date: string | null): string {
   if (!date) return "—";
@@ -556,6 +551,12 @@ export function ClientProfile({
         currentStatus={client.status}
         currentProgramId={client.program_id}
         currentPaymentStatus={client.payment_status}
+        clientName={client.name}
+        clientLanguage={client.language}
+        clientTimezone={client.timezone}
+        clientMorningTime={client.morning_time}
+        clientMeasurementTime={client.measurement_time}
+        clientMeasurementDay={client.measurement_day}
       />
 
       <div className="flex justify-end gap-2">

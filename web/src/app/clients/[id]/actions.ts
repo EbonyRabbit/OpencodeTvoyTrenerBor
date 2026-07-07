@@ -175,11 +175,12 @@ export async function disableClient(
 
     const { error } = await supabaseAdmin
       .from("clients")
-      .update({ status: "inactive" })
+      .update({ status: "inactive", program_id: null })
       .eq("id", clientId);
     if (error) return { error: error.message };
 
     revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
@@ -205,6 +206,7 @@ export async function togglePayment(
     if (error) return { error: error.message };
 
     revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
@@ -293,6 +295,7 @@ export async function markPurchased(
     }
 
     revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
     return { connectCode };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };

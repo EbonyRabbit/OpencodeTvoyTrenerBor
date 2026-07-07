@@ -555,6 +555,7 @@ export function ClientProfile({
         currentCode={client.connect_code}
         currentStatus={client.status}
         currentProgramId={client.program_id}
+        currentPaymentStatus={client.payment_status}
       />
 
       <div className="flex justify-end gap-2">

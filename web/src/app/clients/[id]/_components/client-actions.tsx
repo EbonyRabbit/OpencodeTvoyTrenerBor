@@ -8,6 +8,7 @@ import {
   generateConnectCode,
   disableClient,
   markPurchased,
+  togglePayment,
 } from "../actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,16 +34,19 @@ export function ClientActions({
   currentCode,
   currentStatus,
   currentProgramId,
+  currentPaymentStatus,
 }: {
   clientId: string;
   currentCode: string | null;
   currentStatus: string;
   currentProgramId?: string | null;
+  currentPaymentStatus?: string;
 }) {
   const router = useRouter();
   const [activating, setActivating] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [disabling, setDisabling] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -126,6 +130,27 @@ export function ClientActions({
       setDisabling(false);
     }
   }, [clientId, router]);
+
+  const handleTogglePayment = useCallback(async () => {
+    if (!currentPaymentStatus) return;
+    setToggling(true);
+    setError(null);
+    try {
+      const result = await togglePayment(
+        clientId,
+        currentPaymentStatus as "paid" | "pending",
+      );
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Произошла ошибка");
+    } finally {
+      setToggling(false);
+    }
+  }, [clientId, currentPaymentStatus, router]);
 
   const openPurchaseDialog = useCallback(async () => {
     setError(null);
@@ -247,6 +272,21 @@ export function ClientActions({
             disabled={disabling}
           >
             {disabling ? "Отключение..." : "Отключить клиента"}
+          </Button>
+        )}
+
+        {currentPaymentStatus && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleTogglePayment}
+            disabled={toggling}
+          >
+            {toggling
+              ? "Смена..."
+              : currentPaymentStatus === "paid"
+                ? "Снять оплату"
+                : "Отметить оплаченным"}
           </Button>
         )}
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/dal";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { generateSchedule } from "@/lib/plan-adjustment";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,7 +23,7 @@ export async function toggleProgramStatus(
 
     const { data: program, error: fetchError } = await supabaseAdmin
       .from("programs")
-      .select("id, active, template_file_url, title")
+      .select("id, active, parsed_content, title")
       .eq("id", programId)
       .maybeSingle();
 
@@ -33,8 +34,8 @@ export async function toggleProgramStatus(
       return {};
     }
 
-    if (newActive && !program.template_file_url) {
-      return { error: "Нельзя опубликовать программу без шаблона" };
+    if (newActive && !program.parsed_content) {
+      return { error: "Нельзя опубликовать программу без содержимого" };
     }
 
     const { data: updated, error: updateError } = await supabaseAdmin
@@ -128,6 +129,11 @@ export async function assignToClient(
     if (updateError) return { error: updateError.message };
     if (!updated || updated.length === 0) {
       return { error: `У клиента "${client.name}" уже есть программа. Сначала отключите текущую.` };
+    }
+
+    const scheduleError = await generateSchedule(clientId, programId);
+    if (scheduleError.error) {
+      return { error: `Программа назначена, но не удалось создать расписание: ${scheduleError.error}` };
     }
 
     revalidatePath(`/clients/${clientId}`);

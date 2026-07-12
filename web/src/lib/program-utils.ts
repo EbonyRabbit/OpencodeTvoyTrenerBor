@@ -57,8 +57,8 @@ export function getParsedContent(program: ProgramRow): ParsedContent | null {
   return null;
 }
 
-export function hasTemplate(program: ProgramRow): boolean {
-  return program.template_file_url !== null;
+export function hasContent(program: ProgramRow): boolean {
+  return program.parsed_content !== null;
 }
 
 export function getColumns(parsed: ParsedContent): string[] {

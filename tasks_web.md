@@ -441,7 +441,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.1** | Миграция БД: тип программы | `ALTER TABLE programs ADD COLUMN type TEXT DEFAULT 'template'` + `client_id UUID REFERENCES clients(id)` + индексы | ✅ |
 | **10.2** | Миграция БД: токены клиентов | Таблица `client_tokens` (client_id, token, expires_at) | ✅ |
 | **10.3** | Обновить типы Supabase | Добавить `type`, `client_id` в `programs.Row` | ✅ |
-| **10.4** | Разблокировка публикации | `toggleProgramStatus`: убрать requirement `template_file_url`, проверять `parsed_content` | pending |
+| **10.4** | Разблокировка публикации | `toggleProgramStatus`: убрать requirement `template_file_url`, проверять `parsed_content` | ✅ |
 | **10.5** | Разблокировка назначения | `assignToClient`: убрать requirement `template_file_url` | pending |
 | **10.6** | Страница редактора | `/programs/[id]/edit` — server component, загрузка программы | pending |
 | **10.7** | Server action: сохранение | `updateProgramContent(programId, content)` — валидация + запись в Supabase | pending |

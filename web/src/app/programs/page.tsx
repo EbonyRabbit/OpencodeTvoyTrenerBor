@@ -13,14 +13,14 @@ function buildQuery(
 ) {
   let query = supabase
     .from("programs")
-    .select("id, title, description, equipment, price, template_id, active, type, language, duration_weeks, template_file_url, created_at", { count: "exact" });
+    .select("id, title, description, equipment, price, template_id, active, type, language, duration_weeks, parsed_content, created_at", { count: "exact" });
 
   if (status === "draft") {
-    query = query.eq("active", false).is("template_file_url", null);
+    query = query.eq("active", false).is("parsed_content", null);
   } else if (status === "active") {
     query = query.eq("active", true);
   } else if (status === "archived") {
-    query = query.eq("active", false).not("template_file_url", "is", null);
+    query = query.eq("active", false).not("parsed_content", "is", null);
   }
 
   return query;

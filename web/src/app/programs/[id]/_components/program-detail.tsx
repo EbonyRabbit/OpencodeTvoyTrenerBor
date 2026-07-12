@@ -15,7 +15,7 @@ import {
 } from "@/lib/programs";
 import {
   getParsedContent,
-  hasTemplate,
+  hasContent,
   type ProgramRow,
 } from "@/lib/program-utils";
 import { ProgramWeekPreview } from "./program-week-preview";
@@ -58,7 +58,7 @@ export function ProgramDetail({
 }) {
   const status = getProgramStatus(program);
   const parsed = getParsedContent(program);
-  const hasExcel = hasTemplate(program);
+  const hasProgramContent = hasContent(program);
 
   const [toggling, setToggling] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
@@ -163,11 +163,11 @@ export function ProgramDetail({
         </Badge>
       </div>
 
-      {!hasExcel && (
+      {!hasProgramContent && (
         <Alert role="alert" variant={status === "active" ? "destructive" : "default"}>
-          <AlertTitle>Шаблон не загружен</AlertTitle>
+          <AlertTitle>Содержимое не загружено</AlertTitle>
           <AlertDescription>
-            Назначить программу клиенту нельзя — требуется загрузить шаблон .xlsx
+            Назначить программу клиенту нельзя — добавьте содержимое программы
           </AlertDescription>
         </Alert>
       )}
@@ -224,8 +224,8 @@ export function ProgramDetail({
             <InfoRow label="Создана" value={formatDate(program.created_at)} />
             <InfoRow label="Обновлена" value={formatDate(program.updated_at)} />
             <InfoRow
-              label="Шаблон"
-              value={hasExcel ? "Загружен" : "Не загружен"}
+              label="Содержимое"
+              value={hasProgramContent ? "Загружено" : "Не загружено"}
             />
           </CardContent>
         </Card>
@@ -255,8 +255,8 @@ export function ProgramDetail({
             type="button"
             variant="default"
             onClick={handleToggle}
-            disabled={toggling || !hasExcel}
-            title={!hasExcel ? "Загрузите шаблон перед публикацией" : undefined}
+            disabled={toggling || !hasProgramContent}
+            title={!hasProgramContent ? "Добавьте содержимое перед публикацией" : undefined}
           >
             {toggling ? "Публикация..." : "Опубликовать"}
           </Button>
@@ -266,10 +266,10 @@ export function ProgramDetail({
           <Button
             type="button"
             variant="outline"
-            disabled={loadingClients || !hasExcel || !program.active}
+            disabled={loadingClients || !hasProgramContent || !program.active}
             title={
-              !hasExcel
-                ? "Загрузите шаблон перед назначением"
+              !hasProgramContent
+                ? "Добавьте содержимое перед назначением"
                 : !program.active
                   ? "Опубликуйте программу перед назначением"
                   : undefined

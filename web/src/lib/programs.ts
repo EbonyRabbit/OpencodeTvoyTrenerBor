@@ -7,10 +7,10 @@ export const VALID_STATUSES = ["all", "draft", "active", "archived"] as const;
 export type ProgramFilter = (typeof VALID_STATUSES)[number];
 
 export function getProgramStatus(
-  program: Pick<ProgramRow, "active" | "template_file_url">,
+  program: Pick<ProgramRow, "active" | "parsed_content">,
 ): ProgramStatus {
   if (program.active) return "active";
-  if (program.template_file_url) return "archived";
+  if (program.parsed_content !== null) return "archived";
   return "draft";
 }
 

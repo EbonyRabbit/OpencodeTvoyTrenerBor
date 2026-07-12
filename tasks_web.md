@@ -443,7 +443,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.3** | Обновить типы Supabase | Добавить `type`, `client_id` в `programs.Row` | ✅ |
 | **10.4** | Разблокировка публикации | `toggleProgramStatus`: убрать requirement `template_file_url`, проверять `parsed_content` | ✅ |
 | **10.5** | Разблокировка назначения | `assignToClient`: убрать requirement `template_file_url` | ✅ |
-| **10.6** | Страница редактора | `/programs/[id]/edit` — server component, загрузка программы | pending |
+| **10.6** | Страница редактора | `/programs/[id]/edit` — server component, загрузка программы | ✅ |
 | **10.7** | Server action: сохранение | `updateProgramContent(programId, content)` — валидация + запись в Supabase | pending |
 | **10.8** | Компонент ProgramEditor | Табличный редактор: accordion по неделям → дни → таблица упражнений | pending |
 | **10.9** | Автокомплит упражнений | Поиск из `exercises` + ручной ввод, debounced | pending |

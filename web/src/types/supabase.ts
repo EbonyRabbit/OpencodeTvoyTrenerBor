@@ -242,6 +242,22 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["notification_log"]["Row"]>;
         Relationships: [];
       };
+      client_tokens: {
+        Row: {
+          id: string;
+          client_id: string;
+          token: string;
+          expires_at: string;
+          last_used_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["client_tokens"]["Row"], "id" | "created_at" | "updated_at"> & {
+          id?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["client_tokens"]["Row"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;

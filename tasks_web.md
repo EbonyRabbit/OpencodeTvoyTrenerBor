@@ -445,7 +445,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.5** | Разблокировка назначения | `assignToClient`: убрать requirement `template_file_url` | ✅ |
 | **10.6** | Страница редактора | `/programs/[id]/edit` — server component, загрузка программы | ✅ |
 | **10.7** | Server action: сохранение | `updateProgramContent(programId, content)` — валидация + запись в Supabase | ✅ |
-| **10.8** | Компонент ProgramEditor | Табличный редактор: accordion по неделям → дни → таблица упражнений | pending |
+| **10.8** | Компонент ProgramEditor | Табличный редактор: accordion по неделям → дни → таблица упражнений | ✅ |
 | **10.9** | Автокомплит упражнений | Поиск из `exercises` + ручной ввод, debounced | pending |
 | **10.10** | Типы редактора | `EditableParsedContent`, `EditableWeek`, `EditableDay`, `EditableExercise` | pending |
 | **10.11** | Обновить program-detail | Убрать алерт «Шаблон не загружен», показать тип программы | pending |

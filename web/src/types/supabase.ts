@@ -14,6 +14,7 @@ export type NotificationType =
 export type PauseReason = "sick" | "vacation" | "injury" | "personal" | "other";
 export type ResumeStrategy = "skip" | "shift" | "deload" | "rollback";
 export type PauseStatus = "active" | "resuming" | "completed";
+export type ProgramType = "template" | "personal";
 
 export interface Database {
   public: {
@@ -56,7 +57,8 @@ export interface Database {
           price: number | null;
           template_id: string | null;
           active: boolean;
-          type: string | null;
+          type: ProgramType;
+          client_id: string | null;
           language: string;
           duration_weeks: number;
           template_file_url: string | null;
@@ -64,8 +66,13 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["programs"]["Row"], "id" | "created_at" | "updated_at"> & {
+        Insert: Omit<Database["public"]["Tables"]["programs"]["Row"], "id" | "created_at" | "updated_at" | "type" | "active" | "language" | "duration_weeks" | "client_id"> & {
           id?: string;
+          type?: ProgramType;
+          active?: boolean;
+          language?: string;
+          duration_weeks?: number;
+          client_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["programs"]["Row"]>;
         Relationships: [];

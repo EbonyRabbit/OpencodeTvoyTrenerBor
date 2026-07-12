@@ -400,3 +400,89 @@ Dev:        ngrok http 3001  (для тестирования локально)
 ---
 
 *Сгенерировано на основе анализа Code.gs (2344 строки), web/src/, и TASKS.md.*
+
+---
+
+## Фаза 10: Система тренировок на веб-платформе
+
+### Контекст
+
+Текущее состояние:
+- Программы хранятся в Supabase (`programs.parsed_content` JSON)
+- Веб-панель: read-only просмотр программ (accordion по неделям)
+- Кнопка «Редактировать» → `/programs/[id]/edit` — **страницы нет**
+- Публикация/назначение требуют `template_file_url` (.xlsx)
+- Клиенты работают через Telegram бота
+- Нет клиентского веб-портала
+
+Цель:
+- Тренер создаёт программу через промпт → AI генерирует JSON → заливает в Supabase
+- Тренер проверяет и редактирует на вебе
+- Клиент видит программу на вебе + Telegram
+- Клиент логирует тренировки на вебе и в Telegram (общая база)
+
+### Архитектурные решения
+
+| Решение | Выбор |
+|---------|-------|
+| Хранение | Supabase как единый источник правды |
+| Публикация | Без .xlsx, по `parsed_content` |
+| Программы | Шаблоны + персональные — всё в `programs` |
+| Редактор | Табличный, 3 уровня: Неделя → День → Упражнение |
+| Клиентский портал | `/client/[token]`, магическая ссылка |
+| Логирование (веб) | Карточки упражнений, детальное (подходы/повторы/вес/RPE) |
+| Синхронизация | Общая база Supabase, Telegram ↔ Веб |
+| База упражнений | Автокомплит + ручной ввод |
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **10.1** | Миграция БД: тип программы | `ALTER TABLE programs ADD COLUMN type TEXT DEFAULT 'template'` + `client_id UUID REFERENCES clients(id)` + индексы | ✅ |
+| **10.2** | Миграция БД: токены клиентов | Таблица `client_tokens` (client_id, token, expires_at) | pending |
+| **10.3** | Обновить типы Supabase | Добавить `type`, `client_id` в `programs.Row` | ✅ |
+| **10.4** | Разблокировка публикации | `toggleProgramStatus`: убрать requirement `template_file_url`, проверять `parsed_content` | pending |
+| **10.5** | Разблокировка назначения | `assignToClient`: убрать requirement `template_file_url` | pending |
+| **10.6** | Страница редактора | `/programs/[id]/edit` — server component, загрузка программы | pending |
+| **10.7** | Server action: сохранение | `updateProgramContent(programId, content)` — валидация + запись в Supabase | pending |
+| **10.8** | Компонент ProgramEditor | Табличный редактор: accordion по неделям → дни → таблица упражнений | pending |
+| **10.9** | Автокомплит упражнений | Поиск из `exercises` + ручной ввод, debounced | pending |
+| **10.10** | Типы редактора | `EditableParsedContent`, `EditableWeek`, `EditableDay`, `EditableExercise` | pending |
+| **10.11** | Обновить program-detail | Убрать алерт «Шаблон не загружен», показать тип программы | pending |
+| **10.12** | Server action: генерация токена | `generateClientToken(clientId)` — 6-символьный токен, сохранение в `client_tokens` | pending |
+| **10.13** | Middleware: проверка токена | Маршруты `/client/[token]/*`, проверка валидности, редирект | pending |
+| **10.14** | Layout клиентского портала | `/client/[token]/layout.tsx` — навигация, мини-дашборд | pending |
+| **10.15** | Главная страница клиента | `/client/[token]/page.tsx` — приветствие, текущая неделя, навигация | pending |
+| **10.16** | Просмотр программы | `/client/[token]/program/page.tsx` — недели, дни, упражнения | pending |
+| **10.17** | Логирование тренировки | Карточки упражнений: подходы/повторы/вес/RPE, кнопка «Завершить» | pending |
+| **10.18** | Server action: логирование | `logWorkoutFromWeb(clientId, date, exercises[])` — запись в `workout_logs` | pending |
+| **10.19** | Замеры тела | `/client/[token]/measurements/page.tsx` — форма + история + графики | pending |
+| **10.20** | Фото прогресса | `/client/[token]/photos/page.tsx` — загрузка + галерея | pending |
+| **10.21** | Чек-ин | `/client/[token]/checkin/page.tsx` — форма (wellbeing, sleep, stress, adherence) | pending |
+| **10.22** | Кнопка «Ссылка для клиента» | В `client-profile.tsx`: генерация токена + отображение ссылки | pending |
+| **10.23** | Бот: команда `/myweb` | Показ ссылки на клиентский портал | pending |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/..._add_program_type.sql` | Новый |
+| `supabase/migrations/..._create_client_tokens.sql` | Новый |
+| `web/src/types/supabase.ts` | Изменение (type, client_id) |
+| `web/src/app/programs/[id]/actions.ts` | Изменение (убрать .xlsx check) |
+| `web/src/app/programs/[id]/edit/page.tsx` | Новый |
+| `web/src/app/programs/[id]/edit/actions.ts` | Новый |
+| `web/src/app/programs/[id]/edit/_components/program-editor.tsx` | Новый |
+| `web/src/app/programs/[id]/edit/_components/exercise-autocomplete.tsx` | Новый |
+| `web/src/app/programs/[id]/_components/program-detail.tsx` | Изменение |
+| `web/src/app/clients/[id]/actions.ts` | Изменение (generateClientToken) |
+| `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (кнопка ссылки) |
+| `web/src/middleware.ts` | Изменение (client routes) |
+| `web/src/app/client/[token]/layout.tsx` | Новый |
+| `web/src/app/client/[token]/page.tsx` | Новый |
+| `web/src/app/client/[token]/program/page.tsx` | Новый |
+| `web/src/app/client/[token]/measurements/page.tsx` | Новый |
+| `web/src/app/client/[token]/photos/page.tsx` | Новый |
+| `web/src/app/client/[token]/checkin/page.tsx` | Новый |
+| `web/src/lib/program-editor-types.ts` | Новый |
+| `bot/src/handlers/menu.ts` | Изменение (/myweb) |

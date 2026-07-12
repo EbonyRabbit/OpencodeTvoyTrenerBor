@@ -45,7 +45,69 @@ function isValidParsedContent(value: unknown): value is ParsedContent {
   if (obj.generated_at !== undefined && typeof obj.generated_at !== "string") return false;
   if (obj.columns !== undefined && (!Array.isArray(obj.columns) || !obj.columns.every((c) => typeof c === "string"))) return false;
   if (obj.notes !== undefined && (!Array.isArray(obj.notes) || !obj.notes.every((n) => typeof n === "string"))) return false;
+  if (obj.weeks !== undefined) {
+    if (!Array.isArray(obj.weeks)) return false;
+    for (const w of obj.weeks) {
+      if (!isValidWeek(w)) return false;
+    }
+  }
   return true;
+}
+
+function isValidWeek(value: unknown): value is ParsedWeek {
+  if (value === null || typeof value !== "object") return false;
+  const w = value as Record<string, unknown>;
+  if (typeof w.week_number !== "number" || !Number.isFinite(w.week_number)) return false;
+  if (w.week_label !== undefined && typeof w.week_label !== "string") return false;
+  if (w.is_deload !== undefined && typeof w.is_deload !== "boolean") return false;
+  if (w.days !== undefined) {
+    if (!Array.isArray(w.days)) return false;
+    for (const d of w.days) {
+      if (!isValidDay(d)) return false;
+    }
+  }
+  return true;
+}
+
+function isValidDay(value: unknown): value is ParsedDay {
+  if (value === null || typeof value !== "object") return false;
+  const d = value as Record<string, unknown>;
+  if (typeof d.day_name !== "string") return false;
+  if (typeof d.day_order !== "number" || !Number.isFinite(d.day_order)) return false;
+  if (d.exercises !== undefined) {
+    if (!Array.isArray(d.exercises)) return false;
+    for (const e of d.exercises) {
+      if (!isValidExercise(e)) return false;
+    }
+  }
+  return true;
+}
+
+function isValidExercise(value: unknown): value is ParsedExercise {
+  if (value === null || typeof value !== "object") return false;
+  const e = value as Record<string, unknown>;
+  if (typeof e.name !== "string" || e.name.trim() === "") return false;
+  if (e.block !== undefined && typeof e.block !== "string") return false;
+  if (e.sets !== undefined && typeof e.sets !== "string") return false;
+  if (e.reps !== undefined && typeof e.reps !== "string") return false;
+  if (e.weight !== undefined && typeof e.weight !== "string") return false;
+  if (e.rpe !== undefined && typeof e.rpe !== "string") return false;
+  if (e.rest !== undefined && typeof e.rest !== "string") return false;
+  if (e.notes !== undefined && typeof e.notes !== "string") return false;
+  return true;
+}
+
+const MAX_CONTENT_BYTES = 512 * 1024; // 512 KB
+
+export function validateProgramContent(content: unknown): { valid: boolean; error?: string } {
+  if (!isValidParsedContent(content)) {
+    return { valid: false, error: "Невалидная структура программы" };
+  }
+  const bytes = new TextEncoder().encode(JSON.stringify(content)).byteLength;
+  if (bytes > MAX_CONTENT_BYTES) {
+    return { valid: false, error: "Слишком большой объём данных (макс. 512 КБ)" };
+  }
+  return { valid: true };
 }
 
 export function getParsedContent(program: ProgramRow): ParsedContent | null {

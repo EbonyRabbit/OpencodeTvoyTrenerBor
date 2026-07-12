@@ -439,7 +439,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | **10.1** | Миграция БД: тип программы | `ALTER TABLE programs ADD COLUMN type TEXT DEFAULT 'template'` + `client_id UUID REFERENCES clients(id)` + индексы | ✅ |
-| **10.2** | Миграция БД: токены клиентов | Таблица `client_tokens` (client_id, token, expires_at) | pending |
+| **10.2** | Миграция БД: токены клиентов | Таблица `client_tokens` (client_id, token, expires_at) | ✅ |
 | **10.3** | Обновить типы Supabase | Добавить `type`, `client_id` в `programs.Row` | ✅ |
 | **10.4** | Разблокировка публикации | `toggleProgramStatus`: убрать requirement `template_file_url`, проверять `parsed_content` | pending |
 | **10.5** | Разблокировка назначения | `assignToClient`: убрать requirement `template_file_url` | pending |

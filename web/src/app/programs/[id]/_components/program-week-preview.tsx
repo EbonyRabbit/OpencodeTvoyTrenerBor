@@ -37,12 +37,10 @@ function WeekItem({
   week,
   columns,
   defaultOpen,
-  index,
 }: {
   week: ParsedWeek;
   columns: string[];
   defaultOpen: boolean;
-  index: number;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const id = useId();
@@ -131,14 +129,7 @@ export function ProgramWeekPreview({
   parsed: ParsedContent | null;
 }) {
   if (!parsed) {
-    return (
-      <div>
-        <h2 className="mb-4 text-lg font-semibold">Содержание программы</h2>
-        <p className="text-sm text-muted-foreground">
-          Шаблон не загружен. Содержимое недоступно для предпросмотра.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   const weeks = parsed.weeks ?? [];
@@ -177,7 +168,6 @@ export function ProgramWeekPreview({
             week={week}
             columns={columns}
             defaultOpen={i === 0}
-            index={i}
           />
         ))}
       </div>

@@ -40,6 +40,11 @@ const LANGUAGE_LABELS: Record<string, string> = {
   en: "English",
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  template: "Шаблон",
+  personal: "Персональная",
+};
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between py-1.5 text-sm">
@@ -208,7 +213,7 @@ export function ProgramDetail({
                 value={LANGUAGE_LABELS[program.language] ?? program.language}
               />
             )}
-            {program.type && <InfoRow label="Тип" value={program.type} />}
+            {program.type && <InfoRow label="Тип" value={TYPE_LABELS[program.type] ?? program.type} />}
             {program.equipment && <InfoRow label="Инвентарь" value={program.equipment} />}
           </CardContent>
         </Card>

@@ -155,6 +155,51 @@ export async function generateConnectCode(
   }
 }
 
+const TOKEN_EXPIRY_DAYS = 30;
+const TOKEN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+function generateToken(length: number): string {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => TOKEN_CHARS[b % TOKEN_CHARS.length]).join("");
+}
+
+export async function generateClientToken(
+  clientId: string,
+): Promise<{ error?: string; token?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    for (let i = 0; i < 5; i++) {
+      const token = generateToken(6);
+      const { error } = await supabaseAdmin
+        .from("client_tokens")
+        .insert({ client_id: clientId, token, expires_at: expiresAt, last_used_at: null });
+      if (!error) {
+        revalidatePath(`/clients/${clientId}`);
+        return { token };
+      }
+      if (error.code !== "23505") return { error: error.message };
+    }
+
+    return { error: "Не удалось сгенерировать уникальный токен" };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
 export async function disableClient(
   clientId: string,
 ): Promise<{ error?: string }> {

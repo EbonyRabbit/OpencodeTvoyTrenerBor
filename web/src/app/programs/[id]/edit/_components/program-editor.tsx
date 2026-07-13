@@ -22,6 +22,7 @@ import {
 } from "@/lib/program-utils";
 import { updateProgramContent } from "../../actions";
 import { Plus, Trash2, Loader2 } from "lucide-react";
+import { ExerciseAutocomplete } from "./exercise-autocomplete";
 
 type EditorAction =
   | { type: "SET_CONTENT"; payload: ParsedContent }
@@ -190,9 +191,9 @@ function ExerciseRow({
   return (
     <tr className="border-b last:border-b-0">
       <td className="py-1 px-1">
-        <Input
+        <ExerciseAutocomplete
           value={exercise.name}
-          onChange={(e) => onUpdate({ name: e.target.value })}
+          onChange={(val) => onUpdate({ name: val })}
           placeholder="Упражнение"
           className="h-8 text-xs"
         />

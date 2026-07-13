@@ -13,30 +13,30 @@ import {
   AccordionTrigger,
   AccordionPanel,
 } from "@/components/ui/accordion";
+import { type ProgramRow } from "@/lib/program-utils";
 import {
-  type ProgramRow,
-  type ParsedContent,
-  type ParsedWeek,
-  type ParsedDay,
-  type ParsedExercise,
-} from "@/lib/program-utils";
+  type EditableParsedContent,
+  type EditableWeek,
+  type EditableDay,
+  type EditableExercise,
+} from "@/lib/program-editor-types";
 import { updateProgramContent } from "../../actions";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { ExerciseAutocomplete } from "./exercise-autocomplete";
 
 type EditorAction =
-  | { type: "SET_CONTENT"; payload: ParsedContent }
+  | { type: "SET_CONTENT"; payload: EditableParsedContent }
   | { type: "ADD_WEEK" }
   | { type: "DELETE_WEEK"; weekIndex: number }
-  | { type: "UPDATE_WEEK"; weekIndex: number; payload: Partial<ParsedWeek> }
+  | { type: "UPDATE_WEEK"; weekIndex: number; payload: Partial<EditableWeek> }
   | { type: "ADD_DAY"; weekIndex: number }
   | { type: "DELETE_DAY"; weekIndex: number; dayIndex: number }
-  | { type: "UPDATE_DAY"; weekIndex: number; dayIndex: number; payload: Partial<ParsedDay> }
+  | { type: "UPDATE_DAY"; weekIndex: number; dayIndex: number; payload: Partial<EditableDay> }
   | { type: "ADD_EXERCISE"; weekIndex: number; dayIndex: number }
   | { type: "DELETE_EXERCISE"; weekIndex: number; dayIndex: number; exerciseIndex: number }
-  | { type: "UPDATE_EXERCISE"; weekIndex: number; dayIndex: number; exerciseIndex: number; payload: Partial<ParsedExercise> };
+  | { type: "UPDATE_EXERCISE"; weekIndex: number; dayIndex: number; exerciseIndex: number; payload: Partial<EditableExercise> };
 
-function editorReducer(state: ParsedContent, action: EditorAction): ParsedContent {
+function editorReducer(state: EditableParsedContent, action: EditorAction): EditableParsedContent {
   switch (action.type) {
     case "SET_CONTENT":
       return action.payload;
@@ -161,7 +161,7 @@ function editorReducer(state: ParsedContent, action: EditorAction): ParsedConten
   }
 }
 
-function createEmptyContent(): ParsedContent {
+function createEmptyContent(): EditableParsedContent {
   return {
     weeks: [
       {
@@ -184,8 +184,8 @@ function ExerciseRow({
   onUpdate,
   onDelete,
 }: {
-  exercise: ParsedExercise;
-  onUpdate: (payload: Partial<ParsedExercise>) => void;
+  exercise: EditableExercise;
+  onUpdate: (payload: Partial<EditableExercise>) => void;
   onDelete: () => void;
 }) {
   return (
@@ -276,7 +276,7 @@ function DaySection({
   dayIndex,
   dispatch,
 }: {
-  day: ParsedDay;
+  day: EditableDay;
   weekIndex: number;
   dayIndex: number;
   dispatch: React.Dispatch<EditorAction>;
@@ -376,7 +376,7 @@ export function ProgramEditor({
   parsedContent,
 }: {
   program: ProgramRow;
-  parsedContent: ParsedContent | null;
+  parsedContent: EditableParsedContent | null;
 }) {
   const [state, dispatch] = useReducer(editorReducer, parsedContent, (arg) =>
     arg ?? createEmptyContent()

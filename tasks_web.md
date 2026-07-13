@@ -448,7 +448,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.8** | Компонент ProgramEditor | Табличный редактор: accordion по неделям → дни → таблица упражнений | ✅ |
 | **10.9** | Автокомплит упражнений | Поиск из `exercises` + ручной ввод, debounced | ✅ |
 | **10.10** | Типы редактора | `EditableParsedContent`, `EditableWeek`, `EditableDay`, `EditableExercise` | ✅ |
-| **10.11** | Обновить program-detail | Убрать алерт «Шаблон не загружен», показать тип программы | pending |
+| **10.11** | Обновить program-detail | Убрать алерт «Шаблон не загружен», показать тип программы | ✅ |
 | **10.12** | Server action: генерация токена | `generateClientToken(clientId)` — 6-символьный токен, сохранение в `client_tokens` | pending |
 | **10.13** | Middleware: проверка токена | Маршруты `/client/[token]/*`, проверка валидности, редирект | pending |
 | **10.14** | Layout клиентского портала | `/client/[token]/layout.tsx` — навигация, мини-дашборд | pending |

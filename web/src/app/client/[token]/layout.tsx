@@ -32,6 +32,7 @@ async function getClientData(clientId: string): Promise<(ClientRow & { program_t
 const NAV_ITEMS = [
   { href: "", label: "Главная" },
   { href: "/program", label: "Программа" },
+  { href: "/workout", label: "Тренировка" },
   { href: "/measurements", label: "Замеры" },
   { href: "/photos", label: "Фото" },
   { href: "/checkin", label: "Чек-ин" },

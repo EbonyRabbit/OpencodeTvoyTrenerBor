@@ -46,3 +46,48 @@ export async function logWorkoutFromWeb(
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
 }
+
+type MeasurementInput = {
+  weight: number | null;
+  chest: number | null;
+  waist: number | null;
+  hips: number | null;
+  left_arm: number | null;
+  right_arm: number | null;
+  comment: string | null;
+};
+
+export async function saveMeasurements(
+  date: string,
+  data: MeasurementInput,
+): Promise<{ error?: string }> {
+  try {
+    const h = await headers();
+    const clientId = h.get("x-client-id");
+    if (!clientId) return { error: "Не авторизован" };
+
+    const { error } = await supabaseAdmin.from("measurements").insert({
+      client_id: clientId,
+      date,
+      weight: data.weight,
+      chest: data.chest,
+      waist: data.waist,
+      hips: data.hips,
+      left_arm: data.left_arm,
+      right_arm: data.right_arm,
+      comment: data.comment,
+      abdomen: null,
+      glutes: null,
+      left_thigh: null,
+      right_thigh: null,
+      body_fat: null,
+      muscle_mass: null,
+      visceral_fat: null,
+    });
+    if (error) return { error: error.message };
+
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}

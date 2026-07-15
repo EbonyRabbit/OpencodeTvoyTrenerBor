@@ -2,6 +2,8 @@
 
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getTodayDateStr } from "@/lib/photos";
+import { type PhotoType } from "@/types/supabase";
 
 type ExerciseLog = {
   exercise: string;
@@ -97,6 +99,107 @@ export async function saveMeasurements(
     if (error) return { error: error.message };
 
     return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+const PHOTO_STORAGE_BUCKET = "client-photos";
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const VALID_PHOTO_TYPES: PhotoType[] = ["front", "side", "back"];
+
+const EXT_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export async function uploadPhoto(
+  photoType: PhotoType,
+  formData: FormData,
+): Promise<{ error?: string; storagePath?: string }> {
+  try {
+    const h = await headers();
+    const clientId = h.get("x-client-id");
+    if (!clientId) return { error: "Не авторизован" };
+
+    if (!VALID_PHOTO_TYPES.includes(photoType)) {
+      return { error: "Неверный тип фото" };
+    }
+
+    const file = formData.get("file") as File | null;
+    if (!file || file.size === 0) {
+      return { error: "Файл не выбран" };
+    }
+
+    if (!ALLOWED_TYPES.includes(file.type as (typeof ALLOWED_TYPES)[number])) {
+      return { error: "Допустимые форматы: JPEG, PNG, WebP" };
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return { error: "Максимальный размер файла — 10 МБ" };
+    }
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id, program_id, timezone")
+      .eq("id", clientId)
+      .maybeSingle<{ id: string; program_id: string | null; timezone: string | null }>();
+
+    if (!client) return { error: "Клиент не найден" };
+
+    const tz = client.timezone || "Europe/Moscow";
+    const today = getTodayDateStr(tz);
+
+    let weekNumber: number | null = null;
+    if (client.program_id) {
+      const { data: schedule } = await supabaseAdmin
+        .from("program_schedule")
+        .select("week_number, start_date, end_date")
+        .eq("client_id", clientId)
+        .order("week_number", { ascending: true });
+
+      for (const week of schedule ?? []) {
+        if (!week.start_date || !week.end_date) continue;
+        if (today >= week.start_date && today <= week.end_date) {
+          weekNumber = week.week_number;
+          break;
+        }
+      }
+    }
+
+    const ext = EXT_BY_MIME[file.type] ?? "jpg";
+    const weekPart = weekNumber != null ? `week${weekNumber}` : "noweek";
+    const storagePath = `clients/${clientId}/${weekPart}_${today}/${photoType}.${ext}`;
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(PHOTO_STORAGE_BUCKET)
+      .upload(storagePath, buffer, {
+        contentType: file.type,
+        upsert: true,
+      });
+
+    if (uploadError) return { error: uploadError.message };
+
+    const { error: dbError } = await supabaseAdmin.from("photos").upsert(
+      {
+        client_id: clientId,
+        date: today,
+        week: weekNumber,
+        type: photoType,
+        storage_path: storagePath,
+        drive_url: null,
+        folder_url: null,
+      },
+      { onConflict: "client_id,date,type" },
+    );
+
+    if (dbError) return { error: dbError.message };
+
+    return { storagePath };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }

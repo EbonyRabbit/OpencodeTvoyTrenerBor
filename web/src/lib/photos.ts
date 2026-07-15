@@ -40,6 +40,10 @@ export const PHOTO_TYPE_ORDER: Record<string, number> = {
   back: 2,
 };
 
+export function getTodayDateStr(tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+}
+
 const STORAGE_BUCKET = "client-photos";
 const SIGNED_URL_TTL = 3600;
 

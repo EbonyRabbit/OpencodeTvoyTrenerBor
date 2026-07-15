@@ -47,13 +47,20 @@ export async function logWorkoutFromWeb(
   }
 }
 
-type MeasurementInput = {
+export type MeasurementInput = {
   weight: number | null;
-  chest: number | null;
   waist: number | null;
+  abdomen: number | null;
+  chest: number | null;
   hips: number | null;
+  glutes: number | null;
+  left_thigh: number | null;
+  right_thigh: number | null;
   left_arm: number | null;
   right_arm: number | null;
+  body_fat: number | null;
+  muscle_mass: number | null;
+  visceral_fat: number | null;
   comment: string | null;
 };
 
@@ -66,24 +73,27 @@ export async function saveMeasurements(
     const clientId = h.get("x-client-id");
     if (!clientId) return { error: "Не авторизован" };
 
-    const { error } = await supabaseAdmin.from("measurements").insert({
-      client_id: clientId,
-      date,
-      weight: data.weight,
-      chest: data.chest,
-      waist: data.waist,
-      hips: data.hips,
-      left_arm: data.left_arm,
-      right_arm: data.right_arm,
-      comment: data.comment,
-      abdomen: null,
-      glutes: null,
-      left_thigh: null,
-      right_thigh: null,
-      body_fat: null,
-      muscle_mass: null,
-      visceral_fat: null,
-    });
+    const { error } = await supabaseAdmin.from("measurements").upsert(
+      {
+        client_id: clientId,
+        date,
+        weight: data.weight,
+        waist: data.waist,
+        abdomen: data.abdomen,
+        chest: data.chest,
+        hips: data.hips,
+        glutes: data.glutes,
+        left_thigh: data.left_thigh,
+        right_thigh: data.right_thigh,
+        left_arm: data.left_arm,
+        right_arm: data.right_arm,
+        body_fat: data.body_fat,
+        muscle_mass: data.muscle_mass,
+        visceral_fat: data.visceral_fat,
+        comment: data.comment,
+      },
+      { onConflict: "client_id,date" },
+    );
     if (error) return { error: error.message };
 
     return {};

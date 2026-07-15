@@ -458,7 +458,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.18** | Server action: логирование | `logWorkoutFromWeb(clientId, date, exercises[])` — запись в `workout_logs` | ✅ |
 | **10.19** | Замеры тела | `/client/[token]/measurements/page.tsx` — форма + история + графики | ✅ |
 | **10.20** | Фото прогресса | `/client/[token]/photos/page.tsx` — загрузка + галерея | ✅ |
-| **10.21** | Чек-ин | `/client/[token]/checkin/page.tsx` — форма (wellbeing, sleep, stress, adherence) | pending |
+| **10.21** | Чек-ин | `/client/[token]/checkin/page.tsx` — форма (wellbeing, sleep, stress, adherence) | ✅ |
 | **10.22** | Кнопка «Ссылка для клиента» | В `client-profile.tsx`: генерация токена + отображение ссылки | pending |
 | **10.23** | Бот: команда `/myweb` | Показ ссылки на клиентский портал | pending |
 

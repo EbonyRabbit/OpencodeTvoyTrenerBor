@@ -204,3 +204,97 @@ export async function uploadPhoto(
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
 }
+
+export type CheckinInput = {
+  wellbeing: number;
+  sleep: number;
+  stress: number;
+  nutrition_adherence: number;
+  missed_workouts: number;
+  complaints: string | null;
+  comment: string | null;
+};
+
+const MAX_TEXT_LENGTH = 2000;
+
+export async function saveCheckin(
+  data: CheckinInput,
+): Promise<{ error?: string }> {
+  try {
+    const h = await headers();
+    const clientId = h.get("x-client-id");
+    if (!clientId) return { error: "Не авторизован" };
+
+    const wellbeing = Number(data.wellbeing);
+    const sleep = Number(data.sleep);
+    const stress = Number(data.stress);
+    const nutrition_adherence = Number(data.nutrition_adherence);
+    const missed_workouts = Number(data.missed_workouts);
+
+    if (!Number.isFinite(wellbeing) || wellbeing < 1 || wellbeing > 10) {
+      return { error: "Самочувствие должно быть от 1 до 10" };
+    }
+    if (!Number.isFinite(sleep) || sleep < 0 || sleep > 24) {
+      return { error: "Часы сна должны быть от 0 до 24" };
+    }
+    if (!Number.isFinite(stress) || stress < 1 || stress > 10) {
+      return { error: "Стресс должен быть от 1 до 10" };
+    }
+    if (!Number.isFinite(nutrition_adherence) || nutrition_adherence < 0 || nutrition_adherence > 100) {
+      return { error: "Придержание питания должно быть от 0 до 100" };
+    }
+    if (!Number.isFinite(missed_workouts) || !Number.isInteger(missed_workouts) || missed_workouts < 0 || missed_workouts > 30) {
+      return { error: "Пропущенные тренировки: целое число от 0 до 30" };
+    }
+
+    const complaints = data.complaints?.trim().slice(0, MAX_TEXT_LENGTH) || null;
+    const comment = data.comment?.trim().slice(0, MAX_TEXT_LENGTH) || null;
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id, program_id, timezone")
+      .eq("id", clientId)
+      .maybeSingle<{ id: string; program_id: string | null; timezone: string | null }>();
+
+    if (!client) return { error: "Клиент не найден" };
+
+    const tz = client.timezone || "Europe/Moscow";
+    const today = getTodayDateStr(tz);
+
+    let weekNumber: number | null = null;
+    if (client.program_id) {
+      const { data: schedule } = await supabaseAdmin
+        .from("program_schedule")
+        .select("week_number, start_date, end_date")
+        .eq("client_id", clientId)
+        .order("week_number", { ascending: true });
+
+      for (const week of schedule ?? []) {
+        if (!week.start_date || !week.end_date) continue;
+        if (today >= week.start_date && today <= week.end_date) {
+          weekNumber = week.week_number;
+          break;
+        }
+      }
+    }
+
+    const { error } = await supabaseAdmin.from("checkins").insert({
+      client_id: clientId,
+      date: today,
+      week: weekNumber,
+      wellbeing,
+      sleep,
+      stress,
+      nutrition_adherence,
+      missed_workouts,
+      complaints,
+      comment,
+    });
+
+    if (error) return { error: "Не удалось сохранить чек-ин" };
+
+    return {};
+  } catch {
+    return { error: "Произошла ошибка" };
+  }
+}

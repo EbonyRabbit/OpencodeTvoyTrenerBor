@@ -156,12 +156,18 @@ export async function generateConnectCode(
 }
 
 const TOKEN_EXPIRY_DAYS = 30;
+const TOKEN_LENGTH = 16;
 const TOKEN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 function generateToken(length: number): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => TOKEN_CHARS[b % TOKEN_CHARS.length]).join("");
+  let token = "";
+  while (token.length < length) {
+    const byte = crypto.getRandomValues(new Uint8Array(1))[0];
+    if (byte < 252) {
+      token += TOKEN_CHARS[byte % TOKEN_CHARS.length];
+    }
+  }
+  return token;
 }
 
 export async function generateClientToken(
@@ -180,10 +186,15 @@ export async function generateClientToken(
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
 
+    await supabaseAdmin
+      .from("client_tokens")
+      .delete()
+      .eq("client_id", clientId);
+
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
     for (let i = 0; i < 5; i++) {
-      const token = generateToken(6);
+      const token = generateToken(TOKEN_LENGTH);
       const { error } = await supabaseAdmin
         .from("client_tokens")
         .insert({ client_id: clientId, token, expires_at: expiresAt, last_used_at: null });

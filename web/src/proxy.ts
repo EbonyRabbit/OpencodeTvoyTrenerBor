@@ -8,6 +8,30 @@ const authRoutes = ["/login"];
 
 const CLIENT_ROUTE_EXCLUSIONS = ["/client/expired"];
 
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 30;
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, RATE_LIMIT_WINDOW_MS);
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT_MAX;
+}
+
 function extractClientToken(pathname: string): string | null {
   if (CLIENT_ROUTE_EXCLUSIONS.some((ex) => pathname.startsWith(ex))) {
     return null;
@@ -20,13 +44,27 @@ async function validateClientToken(token: string): Promise<{ clientId: string } 
   try {
     const { data } = await supabaseAdmin
       .from("client_tokens")
-      .select("client_id")
+      .select("client_id, clients!inner(status)")
       .eq("token", token)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
-    return data ? { clientId: data.client_id } : null;
+    if (!data) return null;
+    const row = data as { client_id: string; clients: { status: string } };
+    if (row.clients?.status !== "active") return null;
+    return { clientId: row.client_id };
   } catch {
     return null;
+  }
+}
+
+async function updateLastUsedAt(token: string): Promise<void> {
+  try {
+    await supabaseAdmin
+      .from("client_tokens")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("token", token);
+  } catch {
+    // best-effort audit update
   }
 }
 
@@ -35,13 +73,17 @@ export async function proxy(request: NextRequest) {
 
   const clientToken = extractClientToken(pathname);
   if (clientToken) {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    if (isRateLimited(ip)) {
+      return new NextResponse("Too Many Requests", { status: 429 });
+    }
     const valid = await validateClientToken(clientToken);
     if (!valid) {
       return NextResponse.redirect(new URL("/client/expired", request.url));
     }
+    updateLastUsedAt(clientToken);
     const response = NextResponse.next();
     response.headers.set("x-client-id", valid.clientId);
-    response.headers.set("x-client-token", clientToken);
     return response;
   }
 

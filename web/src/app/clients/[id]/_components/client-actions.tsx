@@ -6,6 +6,7 @@ import {
   getActivePrograms,
   activateProgram,
   generateConnectCode,
+  generateClientToken,
   disableClient,
   markPurchased,
   togglePayment,
@@ -68,6 +69,9 @@ export function ClientActions({
   const [showProgramSelect, setShowProgramSelect] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<string>("");
   const [newCode, setNewCode] = useState<string | null>(null);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [portalLink, setPortalLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -146,6 +150,27 @@ export function ClientActions({
       setGenerating(false);
     }
   }, [clientId, currentCode]);
+
+  const handleGeneratePortalLink = useCallback(async () => {
+    if (portalLink && !confirm("Сгенерировать новую ссылку? Старая перестанет работать.")) return;
+    setGeneratingToken(true);
+    setError(null);
+    try {
+      const result = await generateClientToken(clientId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (result.token) {
+        const url = `${window.location.origin}/client/${result.token}`;
+        setPortalLink(url);
+      }
+    } catch {
+      setError("Произошла ошибка");
+    } finally {
+      setGeneratingToken(false);
+    }
+  }, [clientId, portalLink]);
 
   const handleDisable = useCallback(async () => {
     if (!confirm("Отключить клиента? Доступ будет заблокирован.")) return;
@@ -344,6 +369,15 @@ export function ClientActions({
           {generating ? "Генерация..." : "Код подключения"}
         </Button>
 
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleGeneratePortalLink}
+          disabled={generatingToken}
+        >
+          {generatingToken ? "Генерация..." : "Ссылка для клиента"}
+        </Button>
+
         {currentStatus !== "inactive" && currentStatus !== "access_expired" && (
           <Button
             type="button"
@@ -393,6 +427,31 @@ export function ClientActions({
           <span className="font-mono font-medium text-foreground">
             {newCode}
           </span>
+        </p>
+      )}
+      {portalLink && (
+        <p className="text-sm text-muted-foreground">
+          Ссылка для клиента:{" "}
+          <span className="font-mono font-medium text-foreground break-all">
+            {portalLink}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-2 h-6 px-2"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(portalLink);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch {
+                window.prompt("Скопируйте ссылку вручную:", portalLink);
+              }
+            }}
+          >
+            {copied ? "✓ Скопировано" : "Копировать"}
+          </Button>
         </p>
       )}
 

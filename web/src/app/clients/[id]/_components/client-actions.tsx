@@ -256,8 +256,8 @@ export function ClientActions({
       name: clientName,
       language: clientLanguage,
       timezone: clientTimezone ?? "",
-      morning_time: clientMorningTime ?? "",
-      measurement_time: clientMeasurementTime ?? "",
+      morning_time: (clientMorningTime ?? "").slice(0, 5),
+      measurement_time: (clientMeasurementTime ?? "").slice(0, 5),
       measurement_day: clientMeasurementDay != null ? String(clientMeasurementDay) : "",
     });
     setShowEditDialog(true);

@@ -21,7 +21,7 @@ setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW_MS);
 
-function isRateLimited(ip: string): boolean {
+function isRateLimited(ip: string, limit: number = RATE_LIMIT_MAX): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
   if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
@@ -29,7 +29,7 @@ function isRateLimited(ip: string): boolean {
     return false;
   }
   entry.count++;
-  return entry.count > RATE_LIMIT_MAX;
+  return entry.count > limit;
 }
 
 function extractClientToken(pathname: string): string | null {
@@ -74,7 +74,7 @@ export async function proxy(request: NextRequest) {
   const clientToken = extractClientToken(pathname);
   if (clientToken) {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-    if (isRateLimited(ip)) {
+    if (isRateLimited(ip, 100)) {
       return new NextResponse("Too Many Requests", { status: 429 });
     }
     const valid = await validateClientToken(clientToken);
@@ -82,9 +82,9 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/client/expired", request.url));
     }
     updateLastUsedAt(clientToken);
-    const response = NextResponse.next();
-    response.headers.set("x-client-id", valid.clientId);
-    return response;
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-client-id", valid.clientId);
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   const { supabase, supabaseResponse } = createClient(request);

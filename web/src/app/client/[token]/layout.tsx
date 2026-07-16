@@ -62,8 +62,8 @@ export default async function ClientPortalLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b px-6 py-4">
-        <div className="flex items-center justify-between">
+      <header className="border-b px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-lg font-semibold">{client.name}</h1>
             {programTitle && (
@@ -81,7 +81,7 @@ export default async function ClientPortalLayout({
             )}
           </div>
         </div>
-        <nav className="mt-3 flex gap-4 text-sm">
+        <nav className="mt-3 flex flex-wrap gap-3 text-sm">
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
@@ -93,7 +93,7 @@ export default async function ClientPortalLayout({
           ))}
         </nav>
       </header>
-      <main className="flex-1 px-6 py-6">{children}</main>
+      <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
     </div>
   );
 }

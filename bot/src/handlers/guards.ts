@@ -7,7 +7,7 @@ export interface GuardResult {
   client: Client;
 }
 
-export async function guardActiveClient(ctx: MyContext): Promise<GuardResult | string> {
+async function baseGuard(ctx: MyContext, requireProgram: boolean): Promise<GuardResult | string> {
   const telegramId = ctx.from?.id;
   if (!telegramId) {
     return t("error.user_not_identified", ctx.language);
@@ -32,9 +32,17 @@ export async function guardActiveClient(ctx: MyContext): Promise<GuardResult | s
     return t("client.payment_pending", ctx.language);
   }
 
-  if (!client.program_id) {
+  if (requireProgram && !client.program_id) {
     return t("client.no_program", ctx.language);
   }
 
   return { client };
+}
+
+export async function guardActiveClient(ctx: MyContext): Promise<GuardResult | string> {
+  return baseGuard(ctx, true);
+}
+
+export async function guardAuthenticatedClient(ctx: MyContext): Promise<GuardResult | string> {
+  return baseGuard(ctx, false);
 }

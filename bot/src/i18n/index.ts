@@ -34,6 +34,7 @@ const resources = {
         pause: "/pause — пауза в тренировках",
         resume: "/resume — возобновить тренировки",
         settings: "/settings — настройки",
+        myweb: "/myweb — мой веб-портал",
       },
       program: {
         title_label: "Программа: {{title}}",
@@ -307,6 +308,11 @@ const resources = {
         client_not_found: "Клиент не найден.",
         coach_only: "Эта команда доступна только тренеру.",
       },
+      myweb: {
+        link: "🔗 Вот ссылка на ваш личный кабинет:\n\n{{url}}\n\nСсылка действительна 30 дней.",
+        error: "Не удалось создать ссылку. Попробуйте позже.",
+        no_portal_url: "Личный кабинет временно недоступен. Обратитесь к тренеру.",
+      },
     },
   },
   en: {
@@ -342,6 +348,7 @@ const resources = {
         pause: "/pause — training pause",
         resume: "/resume — resume training",
         settings: "/settings — settings",
+        myweb: "/myweb — my web portal",
       },
       program: {
         title_label: "Program: {{title}}",
@@ -614,6 +621,11 @@ const resources = {
         client_no_telegram: "Client has no Telegram ID. Message saved in chat.",
         client_not_found: "Client not found.",
         coach_only: "This command is only available to the coach.",
+      },
+      myweb: {
+        link: "🔗 Here's your personal portal link:\n\n{{url}}\n\nLink valid for 30 days.",
+        error: "Failed to create link. Please try again later.",
+        no_portal_url: "Web portal is temporarily unavailable. Please contact your coach.",
       },
     },
   },

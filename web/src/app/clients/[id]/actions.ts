@@ -155,6 +155,8 @@ export async function generateConnectCode(
   }
 }
 
+// ⚠️ MUST stay in sync with bot/src/handlers/my-web.ts
+// TODO: Extract to shared lib when monorepo tooling is available
 const TOKEN_EXPIRY_DAYS = 30;
 const TOKEN_LENGTH = 16;
 const TOKEN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

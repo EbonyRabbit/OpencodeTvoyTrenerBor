@@ -5,7 +5,7 @@ import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
 import { todayHandler } from "./handlers/today.js";
 import { callbackRouter, handleSkipReason } from "./handlers/callbacks.js";
-import { guardActiveClient } from "./handlers/guards.js";
+import { guardActiveClient, guardAuthenticatedClient } from "./handlers/guards.js";
 import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
 import { startMeasurements, handleMeasurementsInput, showMeasurementHistory } from "./handlers/measurements.js";
 import { startPhotos, handlePhotoMessage, showPhotoHistory } from "./handlers/photos.js";
@@ -14,6 +14,7 @@ import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
+import { myWebHandler } from "./handlers/my-web.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
@@ -143,6 +144,16 @@ bot.command("resume", async (ctx) => {
 });
 
 bot.command("programs", programsHandler);
+
+bot.command("myweb", async (ctx) => {
+  const guard = await guardAuthenticatedClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await myWebHandler(ctx);
+});
 
 bot.command("mystats", async (ctx) => {
   const guard = await guardActiveClient(ctx);

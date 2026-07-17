@@ -39,6 +39,8 @@ export interface Database {
           legacy_id: string | null;
           purchase_date: string | null;
           purchased_program_id: string | null;
+          consent_given: boolean;
+          consent_given_at: string | null;
           created_at: string;
           updated_at: string;
         };

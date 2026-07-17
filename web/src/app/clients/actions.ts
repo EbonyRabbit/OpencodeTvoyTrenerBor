@@ -16,6 +16,7 @@ export async function createClient(formData: {
   language: string;
   timezone: string;
   payment_status: string;
+  consent_given?: boolean;
 }): Promise<{ error?: string; id?: string }> {
   try {
     const { profile } = await verifySession();
@@ -27,6 +28,10 @@ export async function createClient(formData: {
     if (!name) return { error: "Имя обязательно" };
     if (name.length > MAX_NAME_LENGTH) {
       return { error: `Имя не должно превышать ${MAX_NAME_LENGTH} символов` };
+    }
+
+    if (!formData.consent_given) {
+      return { error: "Необходимо согласие клиента на обработку персональных данных" };
     }
 
     const language = formData.language === "en" ? "en" : "ru";
@@ -53,6 +58,8 @@ export async function createClient(formData: {
       legacy_id: null,
       purchase_date: null,
       purchased_program_id: null,
+      consent_given: true,
+      consent_given_at: new Date().toISOString(),
     };
 
     if (formData.telegram_id && formData.telegram_id > 0) {

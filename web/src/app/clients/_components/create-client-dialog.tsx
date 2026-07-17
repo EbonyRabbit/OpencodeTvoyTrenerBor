@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "../actions";
 import { LANGUAGE_LABELS } from "@/lib/clients";
 import { Button } from "@/components/ui/button";
@@ -50,10 +51,11 @@ export function CreateClientDialog() {
   const [language, setLanguage] = useState("ru");
   const [timezone, setTimezone] = useState("Europe/Moscow");
   const [paymentStatus, setPaymentStatus] = useState("pending");
+  const [consentGiven, setConsentGiven] = useState(false);
 
   const canSubmit = useMemo(
-    () => !loading && name.trim().length > 0,
-    [loading, name],
+    () => !loading && name.trim().length > 0 && consentGiven,
+    [loading, name, consentGiven],
   );
 
   const reset = useCallback(() => {
@@ -62,6 +64,7 @@ export function CreateClientDialog() {
     setLanguage("ru");
     setTimezone("Europe/Moscow");
     setPaymentStatus("pending");
+    setConsentGiven(false);
     setError(null);
   }, []);
 
@@ -71,6 +74,11 @@ export function CreateClientDialog() {
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError("Введите имя клиента");
+      return;
+    }
+
+    if (!consentGiven) {
+      setError("Необходимо подтверждение согласия клиента на обработку персональных данных");
       return;
     }
 
@@ -93,6 +101,7 @@ export function CreateClientDialog() {
         language,
         timezone,
         payment_status: paymentStatus,
+        consent_given: consentGiven,
       });
 
       if (result.error) {
@@ -108,7 +117,7 @@ export function CreateClientDialog() {
     } finally {
       setLoading(false);
     }
-  }, [name, telegramId, language, timezone, paymentStatus, reset, router]);
+  }, [name, telegramId, language, timezone, paymentStatus, consentGiven, reset, router]);
 
   return (
     <Dialog
@@ -240,6 +249,28 @@ export function CreateClientDialog() {
                   <SelectItem value="paid">Оплачено</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-start gap-2 rounded-md border p-3">
+              <input
+                type="checkbox"
+                id="consent"
+                checked={consentGiven}
+                onChange={(e) => setConsentGiven(e.target.checked)}
+                disabled={loading}
+                className="mt-0.5"
+              />
+              <label htmlFor="consent" className="text-sm text-muted-foreground">
+                Клиент ознакомлен и дал согласие на обработку персональных
+                данных в соответствии с{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  Политикой конфиденциальности
+                </Link>
+              </label>
             </div>
           </div>
 

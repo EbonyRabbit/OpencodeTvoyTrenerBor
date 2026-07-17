@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { login } from "@/lib/auth-actions";
 
@@ -54,6 +55,13 @@ export default function LoginPage() {
             {pending ? "Вход..." : "Войти"}
           </button>
         </form>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Продолжая, вы соглашаетесь с{" "}
+          <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+            Политикой конфиденциальности
+          </Link>
+        </p>
       </div>
     </div>
   );

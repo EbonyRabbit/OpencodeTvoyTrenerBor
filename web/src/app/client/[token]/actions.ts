@@ -298,3 +298,33 @@ export async function saveCheckin(
     return { error: "Произошла ошибка" };
   }
 }
+
+const PRIVACY_POLICY_VERSION = "2026-07-16";
+
+export async function acceptConsent(): Promise<{ error?: string }> {
+  try {
+    const h = await headers();
+    const clientId = h.get("x-client-id");
+    if (!clientId) return { error: "Не авторизован" };
+
+    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    const userAgent = h.get("user-agent") ?? null;
+
+    const { error } = await supabaseAdmin
+      .from("clients")
+      .update({
+        client_consent_given: true,
+        client_consent_given_at: new Date().toISOString(),
+        client_consent_ip: ip,
+        client_consent_user_agent: userAgent,
+        client_consent_version: PRIVACY_POLICY_VERSION,
+      })
+      .eq("id", clientId);
+
+    if (error) return { error: error.message };
+
+    return {};
+  } catch {
+    return { error: "Произошла ошибка" };
+  }
+}

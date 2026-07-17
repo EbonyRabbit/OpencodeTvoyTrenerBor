@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CLIENT_STATUS_LABELS, type ClientRow } from "@/lib/clients";
+import { ConsentScreen } from "./_components/consent-screen";
 
 async function getClientData(clientId: string): Promise<(ClientRow & { program_title: string | null }) | null> {
   const { data: client, error } = await supabaseAdmin
@@ -38,6 +39,8 @@ const NAV_ITEMS = [
   { href: "/checkin", label: "Чек-ин" },
 ] as const;
 
+const PRIVACY_POLICY_VERSION = "2026-07-16";
+
 export default async function ClientPortalLayout({
   children,
   params,
@@ -56,6 +59,16 @@ export default async function ClientPortalLayout({
   const client = await getClientData(clientId);
   if (!client) {
     notFound();
+  }
+
+  if (!client.client_consent_given) {
+    return (
+      <ConsentScreen
+        token={token}
+        clientName={client.name}
+        privacyPolicyVersion={PRIVACY_POLICY_VERSION}
+      />
+    );
   }
 
   const programTitle = client.program_title;

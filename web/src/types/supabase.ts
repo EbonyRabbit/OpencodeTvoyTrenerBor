@@ -41,6 +41,11 @@ export interface Database {
           purchased_program_id: string | null;
           consent_given: boolean;
           consent_given_at: string | null;
+          client_consent_given: boolean;
+          client_consent_given_at: string | null;
+          client_consent_ip: string | null;
+          client_consent_user_agent: string | null;
+          client_consent_version: string | null;
           created_at: string;
           updated_at: string;
         };

@@ -299,6 +299,37 @@ export function ClientProfile({
         </SectionCard>
       </div>
 
+      <SectionCard title="Согласие на обработку ПДн">
+        <div className="flex justify-between py-1.5 text-sm">
+          <span className="text-muted-foreground">Клиент дал согласие</span>
+          <span>
+            {client.client_consent_given ? (
+              <span className="text-green-600 font-medium">Да</span>
+            ) : (
+              <span className="text-muted-foreground">Нет</span>
+            )}
+          </span>
+        </div>
+        {client.client_consent_given_at && (
+          <InfoRow
+            label="Дата согласия"
+            value={new Date(client.client_consent_given_at).toLocaleString("ru-RU")}
+          />
+        )}
+        {client.client_consent_version && (
+          <InfoRow
+            label="Версия политики"
+            value={client.client_consent_version}
+          />
+        )}
+        {client.consent_given && (
+          <InfoRow
+            label="Отметка тренера"
+            value="Подтверждено"
+          />
+        )}
+      </SectionCard>
+
       <div className="grid gap-6 sm:grid-cols-3">
         <SectionCard title="Статистика">
           <InfoRow label="Тренировок" value={String(workoutCount)} />

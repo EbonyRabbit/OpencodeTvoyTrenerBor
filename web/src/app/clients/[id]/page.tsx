@@ -2,10 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { verifySession } from "@/lib/dal";
 import { createClient } from "@/lib/supabase-server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+// import { supabaseAdmin } from "@/lib/supabase-admin"; // DISABLED: photo storage removed
 import { getParsedContent } from "@/lib/program-utils";
 import { safeFetch, safeCount } from "@/lib/safe-fetch";
-import { resolvePhotoUrls } from "@/lib/photos";
+// import { resolvePhotoUrls } from "@/lib/photos"; // DISABLED: photo storage removed
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
 import { getClientActivity, loadMoreActivity } from "./actions";
@@ -75,7 +75,7 @@ export default async function ClientProfilePage({
     scheduleResult,
     checkinHistoryResult,
     measurementHistoryResult,
-    latestPhotosResult,
+    // latestPhotosResult, // DISABLED: photo storage removed
   ] = await Promise.all([
     safeFetch(
       supabase.from("checkins").select("date, wellbeing, sleep, stress, nutrition_adherence, missed_workouts, complaints").eq("client_id", id).order("date", { ascending: false }).limit(1).maybeSingle(),
@@ -102,10 +102,10 @@ export default async function ClientProfilePage({
       supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: false }).limit(20),
       [],
     ),
-    safeFetch(
-      supabase.from("photos").select("id, date, type, drive_url, storage_path").eq("client_id", id).order("date", { ascending: false }).limit(6),
-      [],
-    ),
+    // safeFetch( // DISABLED: photo storage removed
+    //   supabase.from("photos").select("id, date, type, drive_url, storage_path").eq("client_id", id).order("date", { ascending: false }).limit(6),
+    //   [],
+    // ),
   ]);
 
   const parsedContent = typedClient.program ? getParsedContent(typedClient.program) : null;
@@ -118,8 +118,9 @@ export default async function ClientProfilePage({
 
   const { events: initialActivityEvents } = await getClientActivity(id);
 
-  const rawPhotos = latestPhotosResult.data ?? [];
-  const latestPhotos = await resolvePhotoUrls(rawPhotos, supabaseAdmin);
+  // DISABLED: photo storage removed
+  // const rawPhotos = latestPhotosResult.data ?? [];
+  // const latestPhotos = await resolvePhotoUrls(rawPhotos, supabaseAdmin);
 
   return (
     <div className="p-6">
@@ -134,7 +135,7 @@ export default async function ClientProfilePage({
         parsedContent={parsedContent}
         checkinHistory={checkinHistory}
         measurementHistory={measurementHistory}
-        latestPhotos={latestPhotos}
+        // latestPhotos={latestPhotos} // DISABLED: photo storage removed
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
         purchasedProgramName={purchasedProgramName}

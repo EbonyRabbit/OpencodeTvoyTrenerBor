@@ -25,7 +25,7 @@ const TYPE_LABELS: Record<ActivityEvent["event_type"], string> = {
   workout: "Тренировка",
   checkin: "Чек-ин",
   measurement: "Замеры",
-  photo: "Фото",
+  // photo: "Фото", // DISABLED: photo storage removed
   message: "Сообщение",
   notification: "Уведомление",
 };
@@ -34,7 +34,7 @@ const TYPE_ICONS: Record<ActivityEvent["event_type"], string> = {
   workout: "\uD83C\uDFCB",
   checkin: "\uD83D\uDCCB",
   measurement: "\uD83D\uDCCF",
-  photo: "\uD83D\uDCF8",
+  // photo: "\uD83D\uDCF8", // DISABLED: photo storage removed
   message: "\uD83D\uDCAC",
   notification: "\uD83D\uDD14",
 };
@@ -67,10 +67,10 @@ function EventContent({ event }: { event: ActivityEvent }) {
       if (d.chest != null) parts.push(`Грудь: ${String(d.chest)} см`);
       return <span>{parts.join(", ") || "Замеры"}</span>;
     }
-    case "photo": {
-      const labels: Record<string, string> = { front: "Фронтальное", side: "Боковое", back: "Заднее" };
-      return <span>{labels[String(d.type ?? "")] ?? "Фото"}</span>;
-    }
+    // case "photo": { // DISABLED: photo storage removed
+    //   const labels: Record<string, string> = { front: "Фронтальное", side: "Боковое", back: "Заднее" };
+    //   return <span>{labels[String(d.type ?? "")] ?? "Фото"}</span>;
+    // }
     case "message": {
       const dir = d.direction === "to_client" ? "\u2192" : "\u2190";
       const preview = String(d.preview ?? "").slice(0, 80);

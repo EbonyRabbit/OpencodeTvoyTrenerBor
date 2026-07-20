@@ -1,3 +1,7 @@
+// DISABLED: photo storage removed — photos are saved by clients on their own devices
+// Original file preserved for reference in case photo storage is re-enabled later
+
+/*
 import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
@@ -216,3 +220,4 @@ export async function showPhotoHistory(ctx: MyContext): Promise<void> {
     await ctx.reply(t("photo.history_error", lang));
   }
 }
+*/

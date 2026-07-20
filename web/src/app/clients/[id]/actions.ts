@@ -13,7 +13,7 @@ import { ACTIVITY_PAGE_SIZE } from "./activity-types";
 type RawWorkout = { id: string; created_at: string; exercise: string; sets: number | null; reps: string | null; weight: number | null };
 type RawCheckin = { id: string; created_at: string; wellbeing: number | null; sleep: number | null; stress: number | null };
 type RawMeasurement = { id: string; created_at: string; weight: number | null; waist: number | null; chest: number | null; hips: number | null };
-type RawPhoto = { id: string; created_at: string; type: string };
+// type RawPhoto = { id: string; created_at: string; type: string }; // DISABLED: photo storage removed
 type RawMessage = { id: string; created_at: string; direction: string; text: string };
 type RawNotification = { id: string; created_at: string; type: string; status: string };
 
@@ -27,11 +27,11 @@ async function fetchPage(
   const from = offset;
   const to = offset + PER_TABLE_SIZE - 1;
 
-  const [workouts, checkins, measurements, photos, messages, notifications] = await Promise.all([
+  const [workouts, checkins, measurements, messages, notifications] = await Promise.all([
     supabase.from("workout_logs").select("id, created_at, exercise, sets, reps, weight").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to),
     supabase.from("checkins").select("id, created_at, wellbeing, sleep, stress").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to),
     supabase.from("measurements").select("id, created_at, weight, waist, chest, hips").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to),
-    supabase.from("photos").select("id, created_at, type").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to),
+    // supabase.from("photos").select("id, created_at, type").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to), // DISABLED: photo storage removed
     supabase.from("messages").select("id, created_at, direction, text").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to),
     supabase.from("notification_log").select("id, created_at, type, status").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to),
   ]);
@@ -47,9 +47,10 @@ async function fetchPage(
   for (const m of (measurements.data ?? []) as RawMeasurement[]) {
     all.push({ id: m.id, date: m.created_at, event_type: "measurement", details: { weight: m.weight, waist: m.waist, chest: m.chest, hips: m.hips } });
   }
-  for (const p of (photos.data ?? []) as RawPhoto[]) {
-    all.push({ id: p.id, date: p.created_at, event_type: "photo", details: { type: p.type } });
-  }
+  // DISABLED: photo storage removed
+  // for (const p of (photos.data ?? []) as RawPhoto[]) {
+  //   all.push({ id: p.id, date: p.created_at, event_type: "photo", details: { type: p.type } });
+  // }
   for (const msg of (messages.data ?? []) as RawMessage[]) {
     all.push({ id: msg.id, date: msg.created_at, event_type: "message", details: { direction: msg.direction, preview: msg.text } });
   }

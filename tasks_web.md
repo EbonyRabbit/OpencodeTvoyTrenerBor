@@ -486,3 +486,74 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | `web/src/app/client/[token]/checkin/page.tsx` | Новый |
 | `web/src/lib/program-editor-types.ts` | Новый |
 | `bot/src/handlers/menu.ts` | Изменение (/myweb) |
+
+---
+
+## Фаза 11: Миграция фотохранилища на Cloudflare R2
+
+### Контекст
+
+Текущее состояние:
+- Фото хранятся в Supabase Storage (`client-photos` bucket)
+- Путь: `clients/{clientId}/week{N}_{date}/{type}.{ext}`
+- Upload: бот (Telegram → Supabase Storage) + веб (file upload → Supabase Storage)
+- Download: signed URLs через `supabase.storage.from("client-photos").createSignedUrl()`
+- Legacy: `drive_url` (Google Drive) — не используется, fallback только для старых данных
+- Лимиты Supabase Storage: 1 GB free, далее платно
+
+Проблема:
+- Supabase Storage free-план ограничен (1 GB)
+- Progress-фото весят ~500KB-2MB каждое, ~3-4 фото/клиент/неделю
+- При масштабировании (>50 клиентов) Supabase Storage станет узким местом
+
+Цель:
+- Миграция на Cloudflare R2 (10 GB бесплатно, без egress fees)
+- S3-совместимый API — минимальные изменения в коде
+- Сохранить текущую логику signed URLs
+- Миграция существующих фото без потерь
+
+### Архитектурные решения
+
+| Решение | Выбор |
+|---------|-------|
+| Хранилище | Cloudflare R2 |
+| SDK | `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` |
+| Bucket | `client-photos` (тот же name, другой провайдер) |
+| Путь | `clients/{clientId}/week{N}_{date}/{type}.{ext}` (без изменений) |
+| Signed URLs | `getSignedUrl()` из `@aws-sdk/s3-request-presigner` |
+| Migrate script | Скрипт миграции: download from Supabase → upload to R2 |
+| Env vars | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` |
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **11.1** | Установка SDK | `npm install @aws-sdk/client-s2 @aws-sdk/s3-request-presigner` в `web/` и `bot/` | |
+| **11.2** | Утилита R2-клиента | Создать `lib/r2.ts` — функция `getR2Client()` и `getR2SignedUrl(key, expiresIn)` | |
+| **11.3** | Обновить env vars | Добавить `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` в `.env.local` и `.env.example` | |
+| **11.4** | Обновить bot upload | В `bot/src/lib/photo-utils.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | |
+| **11.5** | Обновить bot download | В `bot/src/lib/photo-utils.ts`: заменить `createSignedUrl()` → R2 `getSignedUrl()` | |
+| **11.6** | Обновить web upload | В `web/src/app/client/[token]/actions.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | |
+| **11.7** | Обновить resolvePhotoUrls | В `web/src/lib/photos.ts`: заменить `supabase.storage.createSignedUrl()` → R2 `getSignedUrl()` | |
+| **11.8** | Обновить admin photo pages | В `web/src/app/clients/[id]/photos/page.tsx` и `_components/photo-gallery.tsx`: использовать R2 signed URLs | |
+| **11.9** | Скрипт миграции | Создать `scripts/migrate-photos.ts` — скачать все фото из Supabase Storage → загрузить в R2, обновить `storage_path` если нужно | |
+| **11.10** | Удалить Supabase Storage код | Убрать все обращения к `supabase.storage.from("client-photos")` | |
+| **11.11** | Тест загрузки | Проверить загрузку фото через бот и веб | |
+| **11.12** | Тест показа | Проверить показ фото в боте, на веб-админке, в клиентском портале | |
+
+### Файлы для изменения
+
+| Файл | Действие |
+|------|----------|
+| `web/package.json` | Изменение (новые зависимости) |
+| `bot/package.json` | Изменение (новые зависимости) |
+| `web/src/lib/r2.ts` | Новый |
+| `bot/src/lib/r2.ts` | Новый (копия) |
+| `web/src/lib/photos.ts` | Изменение (resolvePhotoUrls → R2) |
+| `web/src/app/client/[token]/actions.ts` | Изменение (uploadPhoto → R2) |
+| `web/src/app/clients/[id]/photos/page.tsx` | Изменение (если нужен прямой доступ к URL) |
+| `web/src/app/clients/[id]/photos/_components/photo-gallery.tsx` | Изменение (если нужен прямой доступ к URL) |
+| `bot/src/lib/photo-utils.ts` | Изменение (upload + download → R2) |
+| `scripts/migrate-photos.ts` | Новый |
+| `.env.local` | Изменение (R2 env vars) |
+| `.env.example` | Изменение (R2 env vars) |

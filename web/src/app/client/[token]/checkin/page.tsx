@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { safeFetch } from "@/lib/safe-fetch";
-import { getTodayDateStr } from "@/lib/photos";
+import { getTodayDateStr } from "@/lib/date-utils";
 import type { Database } from "@/types/supabase";
 import { CheckinForm } from "./checkin-form";
 import { CheckinHistory } from "./checkin-history";

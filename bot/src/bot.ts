@@ -8,7 +8,7 @@ import { callbackRouter, handleSkipReason } from "./handlers/callbacks.js";
 import { guardActiveClient, guardAuthenticatedClient } from "./handlers/guards.js";
 import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
 import { startMeasurements, handleMeasurementsInput, showMeasurementHistory } from "./handlers/measurements.js";
-import { startPhotos, handlePhotoMessage, showPhotoHistory } from "./handlers/photos.js";
+// import { startPhotos, handlePhotoMessage, showPhotoHistory } from "./handlers/photos.js"; // DISABLED: photo storage removed
 import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
@@ -52,7 +52,7 @@ bot.use(async (ctx, next) => {
       ctx.state = null;
     }
 
-    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements" || ctx.state?.action === "photos" || ctx.state?.action === "checkin" || ctx.state?.action === "pause" || ctx.state?.action === "resume") {
+    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements" /* || ctx.state?.action === "photos" */ || ctx.state?.action === "checkin" || ctx.state?.action === "pause" || ctx.state?.action === "resume") {
       try {
         const client = await findClientByTelegramId(ctx.from.id);
         if (client) ctx.client = client;
@@ -93,25 +93,26 @@ bot.command("measurements", async (ctx) => {
   await showMeasurementHistory(ctx);
 });
 
-bot.command("photos", async (ctx) => {
-  const guard = await guardActiveClient(ctx);
-  if (typeof guard === "string") {
-    await ctx.reply(guard);
-    return;
-  }
-  ctx.client = guard.client;
-  await startPhotos(ctx);
-});
+// DISABLED: photo storage removed
+// bot.command("photos", async (ctx) => {
+//   const guard = await guardActiveClient(ctx);
+//   if (typeof guard === "string") {
+//     await ctx.reply(guard);
+//     return;
+//   }
+//   ctx.client = guard.client;
+//   await startPhotos(ctx);
+// });
 
-bot.command("photos_history", async (ctx) => {
-  const guard = await guardActiveClient(ctx);
-  if (typeof guard === "string") {
-    await ctx.reply(guard);
-    return;
-  }
-  ctx.client = guard.client;
-  await showPhotoHistory(ctx);
-});
+// bot.command("photos_history", async (ctx) => {
+//   const guard = await guardActiveClient(ctx);
+//   if (typeof guard === "string") {
+//     await ctx.reply(guard);
+//     return;
+//   }
+//   ctx.client = guard.client;
+//   await showPhotoHistory(ctx);
+// });
 
 bot.command("checkin", async (ctx) => {
   const guard = await guardActiveClient(ctx);
@@ -188,12 +189,13 @@ bot.on("callback_query:data", async (ctx, next) => {
 
 bot.on("callback_query:data", callbackRouter);
 
-bot.on("message:photo", async (ctx) => {
-  if (ctx.state?.action === "photos") {
-    await handlePhotoMessage(ctx);
-    return;
-  }
-});
+// DISABLED: photo storage removed
+// bot.on("message:photo", async (ctx) => {
+//   if (ctx.state?.action === "photos") {
+//     await handlePhotoMessage(ctx);
+//     return;
+//   }
+// });
 
 bot.on("message:text", async (ctx) => {
   const handled = await handleCoachIncoming(ctx);

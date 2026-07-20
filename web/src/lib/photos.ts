@@ -1,3 +1,10 @@
+/**
+ * @deprecated Photo storage is disabled. This file is kept for reference.
+ * TODO: Remove when photo storage is permanently retired or migrated to R2.
+ *
+ * NOTE: getTodayDateStr is also defined in @/lib/date-utils.ts (used by non-photo code).
+ */
+
 export function getGoogleDriveFileId(url: string): string | null {
   if (!url) return null;
   try {

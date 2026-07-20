@@ -240,7 +240,8 @@ async function completeMeasurements(
     }
 
     const summary = buildSummary(data, lang);
-    await ctx.reply(`${t("measure.saved", lang)}\n\n${t("measure.summary", lang, { data: summary })}`);
+    const photoReminder = t("measure.photo_reminder", lang);
+    await ctx.reply(`${t("measure.saved", lang)}\n\n${t("measure.summary", lang, { data: summary })}\n\n${photoReminder}`);
   } catch (err) {
     console.error(`[MEASURE] Error completing measurements for ${client.id}:`, err);
     await ctx.reply(t("error.service_unavailable", lang));

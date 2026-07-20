@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { useState } from "react";
+// import Image from "next/image"; // DISABLED: photo storage removed
+// import { useState } from "react"; // DISABLED: photo storage removed (was used for failedImages state)
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -23,7 +23,7 @@ import {
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
 import { MiniLineChart } from "./mini-line-chart";
-import { PHOTO_TYPE_LABELS } from "@/lib/photos";
+// import { PHOTO_TYPE_LABELS } from "@/lib/photos"; // DISABLED: photo storage removed
 import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database, Json } from "@/types/supabase";
@@ -34,7 +34,7 @@ type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], 
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
 type CheckinHistoryRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress">;
 type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
-type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url"> & { resolvedUrl: string | null };
+// type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url"> & { resolvedUrl: string | null }; // DISABLED: photo storage removed
 
 const MEASUREMENT_DAY_LABELS: Record<number, string> = Object.fromEntries(
   MEASUREMENT_DAY_OPTIONS.map((o) => [o.value, o.label])
@@ -157,7 +157,7 @@ export function ClientProfile({
   measurementHistory,
   initialActivityEvents,
   loadMoreActivity,
-  latestPhotos,
+  // latestPhotos, // DISABLED: photo storage removed
   purchasedProgramName,
 }: {
   client: ClientRow;
@@ -172,12 +172,12 @@ export function ClientProfile({
   measurementHistory: MeasurementHistoryRow[];
   initialActivityEvents: ActivityEvent[];
   loadMoreActivity: (offset: number) => Promise<ActivityEvent[]>;
-  latestPhotos: PhotoRow[];
+  // latestPhotos: PhotoRow[]; // DISABLED: photo storage removed
   purchasedProgramName: string | null;
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  // const [failedImages, setFailedImages] = useState<Set<string>>(new Set()); // DISABLED: photo storage removed
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -416,6 +416,7 @@ export function ClientProfile({
         </SectionCard>
       </div>
 
+      {/* DISABLED: photo storage removed — clients save photos on their own devices
       <SectionCard title="Последние фото">
         {latestPhotos.length > 0 ? (
           <>
@@ -465,6 +466,7 @@ export function ClientProfile({
           </Link>
         </div>
       </SectionCard>
+      */}
 
       <SectionCard title="Дисциплина">
         <p className="text-sm text-muted-foreground">

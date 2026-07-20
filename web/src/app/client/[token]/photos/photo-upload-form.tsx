@@ -1,3 +1,7 @@
+// DISABLED: photo storage removed — clients save photos on their own devices
+// Original component preserved in git history
+
+/*
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -196,3 +200,4 @@ export function PhotoUploadForm({
     </Card>
   );
 }
+*/

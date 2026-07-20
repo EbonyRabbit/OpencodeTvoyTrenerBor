@@ -1,3 +1,7 @@
+// DISABLED: photo storage removed — photos are saved by clients on their own devices
+// Original file preserved for reference in case photo storage is re-enabled later
+
+/*
 import { config } from "../config.js";
 import { supabaseAdmin } from "./supabase-admin.js";
 import { getTodayDateStr } from "./workout-utils.js";
@@ -116,3 +120,4 @@ export async function getLatestPhotoSets(
 
   return Array.from(grouped.values());
 }
+*/

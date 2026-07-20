@@ -76,7 +76,7 @@ const resources = {
         btn_skip_exercise: "⏭ Пропустить",
         btn_prev: "← Назад",
         btn_next: "Далее →",
-        measurements_button: "📏 Замеры / фото",
+        measurements_button: "📏 Замеры",
       },
       wizard: {
         step_sets: "📊 Сколько подходов выполнил?",
@@ -159,6 +159,7 @@ const resources = {
         hint_comment: "Любой текст",
         invalid_number: "Введите число (например: 75.5 или 80)",
         saved: "✅ Замеры сохранены!",
+        photo_reminder: "📸 Не забудьте сделать 3 фото (фронт, бок, зад) и сохраните у себя на телефоне для отслеживания прогресса!",
         summary: "📊 Ваши замеры:\n{{data}}",
         cancelled: "⏭ Замеры отменены.",
         trends_title: "📈 Динамика замеров",
@@ -177,7 +178,7 @@ const resources = {
         history_value: "{{label}}: {{curr}}",
         reminder: {
           greeting: "Доброе утро, {{name}}! 💪",
-          body: "Сегодня день замеров! 📏\n\nЗапишите свои показатели, чтобы отслеживать прогресс:",
+          body: "Сегодня день замеров! 📏\n\nЗапишите свои показатели и не забудьте сделать 3 фото (фронт, бок, зад) — сохраните у себя на телефоне!",
           button: "📏 Начать замеры",
         },
       },
@@ -390,7 +391,7 @@ const resources = {
         btn_skip_exercise: "⏭ Skip",
         btn_prev: "← Back",
         btn_next: "Next →",
-        measurements_button: "📏 Measurements / photos",
+        measurements_button: "📏 Measurements",
       },
       wizard: {
         step_sets: "📊 How many sets did you do?",
@@ -473,6 +474,7 @@ const resources = {
         hint_comment: "Any text",
         invalid_number: "Enter a number (e.g.: 75.5 or 80)",
         saved: "✅ Measurements saved!",
+        photo_reminder: "📸 Don't forget to take 3 photos (front, side, back) and save them on your phone to track progress!",
         summary: "📊 Your measurements:\n{{data}}",
         cancelled: "⏭ Measurements cancelled.",
         trends_title: "📈 Measurement Trends",
@@ -491,7 +493,7 @@ const resources = {
         history_value: "{{label}}: {{curr}}",
         reminder: {
           greeting: "Good morning, {{name}}! 💪",
-          body: "Today is measurement day! 📏\n\nLog your measurements to track progress:",
+          body: "Today is measurement day! 📏\n\nLog your measurements and don't forget to take 3 photos (front, side, back) — save them on your phone!",
           button: "📏 Start measurements",
         },
       },

@@ -1,9 +1,10 @@
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent, type ParsedDay } from "@/lib/program-utils";
 import type { ClientRow } from "@/lib/clients";
 import { WorkoutForm } from "./workout-form";
+import { Card, CardContent } from "@/components/ui/card";
+import { CalendarOff } from "lucide-react";
 
 const DEFAULT_TIMEZONE = "Europe/Moscow";
 
@@ -17,10 +18,41 @@ function getTodayDayName(tz: string): string {
     .toLowerCase();
 }
 
+function daysBetween(dateStrA: string, dateStrB: string): number {
+  const a = new Date(dateStrA + "T00:00:00Z");
+  const b = new Date(dateStrB + "T00:00:00Z");
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
+function matchDay(
+  days: ParsedDay[],
+  todayName: string,
+  startDate: string | null,
+  todayStr: string,
+): ParsedDay | undefined {
+  return days.find((d) => {
+    const normalizedName = d.day_name.toLowerCase();
+    if (normalizedName.includes(todayName)) return true;
+    if (startDate) {
+      const dayOffset = daysBetween(startDate, todayStr);
+      return d.day_order === dayOffset + 1;
+    }
+    return false;
+  });
+}
+
 export default async function WorkoutPage() {
   const h = await headers();
   const clientId = h.get("x-client-id");
-  if (!clientId) notFound();
+  if (!clientId) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">Тренировка недоступна</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const { data: client } = await supabaseAdmin
     .from("clients")
@@ -28,7 +60,15 @@ export default async function WorkoutPage() {
     .eq("id", clientId)
     .maybeSingle<Pick<ClientRow, "program_id" | "timezone">>();
 
-  if (!client?.program_id) notFound();
+  if (!client?.program_id) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">Программа не назначена</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
@@ -44,7 +84,19 @@ export default async function WorkoutPage() {
     return todayStr >= w.start_date && todayStr <= w.end_date;
   });
 
-  if (!currentWeek) notFound();
+  if (!currentWeek) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <CalendarOff className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+          <p className="text-lg font-semibold">Нет активной недели</p>
+          <p className="text-sm text-muted-foreground">
+            Тренировочная программа ещё не началась или уже завершена
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const { data: program } = await supabaseAdmin
     .from("programs")
@@ -52,19 +104,54 @@ export default async function WorkoutPage() {
     .eq("id", client.program_id)
     .maybeSingle();
 
-  if (!program) notFound();
+  if (!program) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">Программа не найдена</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const parsed = getParsedContent(program);
-  if (!parsed) notFound();
+  if (!parsed) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">Данные программы повреждены</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const weekData = parsed.weeks?.find((w) => w.week_number === currentWeek.week_number);
-  if (!weekData?.days) notFound();
+  if (!weekData?.days) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">Нет данных по неделе</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const matchedDay: ParsedDay | undefined = weekData.days.find((d) =>
-    d.day_name.toLowerCase().includes(todayName),
-  );
+  const matchedDay = matchDay(weekData.days, todayName, currentWeek.start_date, todayStr);
 
-  if (!matchedDay?.exercises?.length) notFound();
+  if (!matchedDay?.exercises?.length) {
+    const dayNames = weekData.days.map((d) => d.day_name).join(", ");
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <CalendarOff className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+          <p className="text-lg font-semibold">Сегодня отдых</p>
+          <p className="text-sm text-muted-foreground">
+            Тренировки на этой неделе: {dayNames}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div>

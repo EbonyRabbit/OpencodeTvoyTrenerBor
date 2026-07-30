@@ -103,16 +103,38 @@ export async function activateProgram(
       return { error: "Нет прав" };
     }
 
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("payment_status")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+    if (client.payment_status !== "paid") {
+      return { error: "Сначала подтвердите оплату" };
+    }
+
     const { data: program } = await supabaseAdmin
       .from("programs")
-      .select("id")
+      .select("id, duration_weeks")
       .eq("id", programId)
       .maybeSingle();
     if (!program) return { error: "Программа не найдена" };
+    if (program.duration_weeks <= 0) return { error: "Некорректная длительность программы" };
+
+    const now = new Date();
+    const endDate = program.duration_weeks
+      ? new Date(now.getTime() + program.duration_weeks * 7 * 24 * 60 * 60 * 1000)
+      : null;
 
     const { error } = await supabaseAdmin
       .from("clients")
-      .update({ program_id: programId, status: "active" })
+      .update({
+        program_id: programId,
+        purchased_program_id: programId,
+        status: "active",
+        access_start_date: now.toISOString(),
+        access_end_date: endDate?.toISOString() ?? null,
+      })
       .eq("id", clientId);
     if (error) return { error: error.message };
 
@@ -235,7 +257,14 @@ export async function disableClient(
 
     const { error } = await supabaseAdmin
       .from("clients")
-      .update({ status: "inactive", program_id: null })
+      .update({
+        status: "inactive",
+        program_id: null,
+        purchased_program_id: null,
+        purchase_date: null,
+        access_start_date: null,
+        access_end_date: null,
+      })
       .eq("id", clientId);
     if (error) return { error: error.message };
 
@@ -289,9 +318,6 @@ export async function markPurchased(
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
-    if (client.program_id) {
-      return { error: "У клиента уже есть активная программа. Сначала отключите текущую." };
-    }
 
     const { data: program } = await supabaseAdmin
       .from("programs")
@@ -307,11 +333,11 @@ export async function markPurchased(
     const { error: updateError } = await supabaseAdmin
       .from("clients")
       .update({
-        program_id: programId,
         purchased_program_id: programId,
-        status: "active",
+        program_id: programId,
         payment_status: "paid",
         purchase_date: now.toISOString(),
+        status: "active",
         access_start_date: now.toISOString(),
         access_end_date: endDate.toISOString(),
       })

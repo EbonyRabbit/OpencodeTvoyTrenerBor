@@ -120,6 +120,9 @@ export function ClientActions({
       const result = await activateProgram(clientId, selectedProgram);
       if (result.error) {
         if (result.error.includes("Программа назначена")) {
+          setShowProgramSelect(false);
+          setSelectedProgram("");
+          setPrograms([]);
           router.refresh();
         }
         setError(result.error);
@@ -217,8 +220,6 @@ export function ClientActions({
     setSelectedProgram("");
     setShowPurchaseDialog(true);
 
-    if (currentProgramId) return;
-
     setPrograms([]);
     setLoadingPrograms(true);
     try {
@@ -229,7 +230,7 @@ export function ClientActions({
     } finally {
       setLoadingPrograms(false);
     }
-  }, [currentProgramId]);
+  }, []);
 
   const handleConfirmPurchase = useCallback(async () => {
     if (!selectedProgram) return;
@@ -308,7 +309,8 @@ export function ClientActions({
             type="button"
             variant="outline"
             onClick={loadPrograms}
-            disabled={loadingPrograms}
+            disabled={currentPaymentStatus !== "paid" || loadingPrograms}
+            title={currentPaymentStatus !== "paid" ? "Сначала подтвердите оплату" : ""}
           >
             {loadingPrograms ? "Загрузка..." : "Активировать программу"}
           </Button>
@@ -455,7 +457,7 @@ export function ClientActions({
         </p>
       )}
 
-      {error && !showPurchaseDialog && (
+      {error && (
         <p className="text-sm text-destructive" role="alert">{error}</p>
       )}
 
@@ -500,46 +502,40 @@ export function ClientActions({
               <DialogHeader>
                 <DialogTitle>Подтвердить покупку</DialogTitle>
                 <DialogDescription>
-                  {currentProgramId
-                    ? "У клиента уже есть активная программа. Сначала отключите текущую."
-                    : "Выберите программу для назначения клиенту."}
+                  Выберите программу для назначения клиенту.
                 </DialogDescription>
               </DialogHeader>
               {error && (
                 <p className="text-sm text-destructive" role="alert">{error}</p>
               )}
-              {!currentProgramId && (
-                <>
-                  {loadingPrograms ? (
-                    <p className="text-sm text-muted-foreground">Загрузка...</p>
-                  ) : programs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Нет доступных программ
-                    </p>
-                  ) : (
-                    <Select
-                      value={selectedProgram}
-                      onValueChange={(v) => v && setSelectedProgram(v)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Выберите программу" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {programs.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </>
+              {loadingPrograms ? (
+                <p className="text-sm text-muted-foreground">Загрузка...</p>
+              ) : programs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Нет доступных программ
+                </p>
+              ) : (
+                <Select
+                  value={selectedProgram}
+                  onValueChange={(v) => v && setSelectedProgram(v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите программу" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
               <DialogFooter>
                 <DialogClose render={<Button variant="outline" />}>
                   Отмена
                 </DialogClose>
-                {!currentProgramId && programs.length > 0 && (
+                {programs.length > 0 && (
                   <Button
                     onClick={handleConfirmPurchase}
                     disabled={!selectedProgram || confirming}

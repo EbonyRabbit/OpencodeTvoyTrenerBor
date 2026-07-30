@@ -1,8 +1,7 @@
 # TASKS_WEB.md — План миграции Telegram-бота на Node.js
 
 > **🔴 P0 (следующие задачи):**
-> - **10.24** — Клиент: страница настроек уведомлений `/client/[token]/settings`
-> - **10.25** — Middleware: подключить `proxy.ts` как `middleware.ts`
+> — нет активных P0 задач
 
 ---
 
@@ -538,18 +537,18 @@ Dev:        ngrok http 3001  (для тестирования локально)
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **11.1** | Установка SDK | `npm install @aws-sdk/client-s2 @aws-sdk/s3-request-presigner` в `web/` и `bot/` | |
-| **11.2** | Утилита R2-клиента | Создать `lib/r2.ts` — функция `getR2Client()` и `getR2SignedUrl(key, expiresIn)` | |
-| **11.3** | Обновить env vars | Добавить `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` в `.env.local` и `.env.example` | |
-| **11.4** | Обновить bot upload | В `bot/src/lib/photo-utils.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | |
-| **11.5** | Обновить bot download | В `bot/src/lib/photo-utils.ts`: заменить `createSignedUrl()` → R2 `getSignedUrl()` | |
-| **11.6** | Обновить web upload | В `web/src/app/client/[token]/actions.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | |
-| **11.7** | Обновить resolvePhotoUrls | В `web/src/lib/photos.ts`: заменить `supabase.storage.createSignedUrl()` → R2 `getSignedUrl()` | |
-| **11.8** | Обновить admin photo pages | В `web/src/app/clients/[id]/photos/page.tsx` и `_components/photo-gallery.tsx`: использовать R2 signed URLs | |
-| **11.9** | Скрипт миграции | Создать `scripts/migrate-photos.ts` — скачать все фото из Supabase Storage → загрузить в R2, обновить `storage_path` если нужно | |
-| **11.10** | Удалить Supabase Storage код | Убрать все обращения к `supabase.storage.from("client-photos")` | |
-| **11.11** | Тест загрузки | Проверить загрузку фото через бот и веб | |
-| **11.12** | Тест показа | Проверить показ фото в боте, на веб-админке, в клиентском портале | |
+| **11.1** | Установка SDK | `npm install @aws-sdk/client-s2 @aws-sdk/s3-request-presigner` в `web/` и `bot/` | ⏭️ skipped |
+| **11.2** | Утилита R2-клиента | Создать `lib/r2.ts` — функция `getR2Client()` и `getR2SignedUrl(key, expiresIn)` | ⏭️ skipped |
+| **11.3** | Обновить env vars | Добавить `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` в `.env.local` и `.env.example` | ⏭️ skipped |
+| **11.4** | Обновить bot upload | В `bot/src/lib/photo-utils.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | ⏭️ skipped |
+| **11.5** | Обновить bot download | В `bot/src/lib/photo-utils.ts`: заменить `createSignedUrl()` → R2 `getSignedUrl()` | ⏭️ skipped |
+| **11.6** | Обновить web upload | В `web/src/app/client/[token]/actions.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | ⏭️ skipped |
+| **11.7** | Обновить resolvePhotoUrls | В `web/src/lib/photos.ts`: заменить `supabase.storage.createSignedUrl()` → R2 `getSignedUrl()` | ⏭️ skipped |
+| **11.8** | Обновить admin photo pages | В `web/src/app/clients/[id]/photos/page.tsx` и `_components/photo-gallery.tsx`: использовать R2 signed URLs | ⏭️ skipped |
+| **11.9** | Скрипт миграции | Создать `scripts/migrate-photos.ts` — скачать все фото из Supabase Storage → загрузить в R2, обновить `storage_path` если нужно | ⏭️ skipped |
+| **11.10** | Удалить Supabase Storage код | Убрать все обращения к `supabase.storage.from("client-photos")` | ⏭️ skipped |
+| **11.11** | Тест загрузки | Проверить загрузку фото через бот и веб | ⏭️ skipped |
+| **11.12** | Тест показа | Проверить показ фото в боте, на веб-админке, в клиентском портале | ⏭️ skipped |
 
 ### Файлы для изменения
 

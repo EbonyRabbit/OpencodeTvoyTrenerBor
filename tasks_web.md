@@ -467,7 +467,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.23** | Бот: команда `/myweb` | Показ ссылки на клиентский портал | ✅ |
 
 | **10.24** | **Настройки уведомлений (клиентский портал)** | `/client/[token]/settings` — клиент сам редактирует время тренировки, время замеров, день замеров, часовой пояс (как в Telegram `/settings`). Server action `updateClientSettings` в `client/[token]/actions.ts` | ✅ |
-| **10.25** | **Middleware (proxy.ts → middleware.ts)** | Переименовать `proxy.ts` → `middleware.ts`, иначе `x-client-id` не устанавливается и клиентский портал падает в `notFound()` | 🔴 **P0** |
+| **10.25** | **Middleware (proxy.ts → middleware.ts)** | Next.js 16 переименовал `middleware.ts` → `proxy.ts`. Файл уже называется `proxy.ts` с правильным экспортом, задача выполнена. | ✅ |
 
 ### Файлы для создания/изменения
 

@@ -60,6 +60,11 @@ export async function createClient(formData: {
       purchased_program_id: null,
       consent_given: true,
       consent_given_at: new Date().toISOString(),
+      client_consent_given: true,
+      client_consent_given_at: null,
+      client_consent_ip: null,
+      client_consent_user_agent: null,
+      client_consent_version: null,
     };
 
     if (formData.telegram_id && formData.telegram_id > 0) {

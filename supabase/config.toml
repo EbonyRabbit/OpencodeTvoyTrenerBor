@@ -65,7 +65,10 @@ schema_paths = []
 
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# NOTE: отключено — seed.sql содержит большие JSONB блоки, которые
+# вызывают "failed to send batch" при автоматической загрузке.
+# Загружать вручную: docker exec -i supabase_db_OpenCode psql -U postgres -d postgres < supabase/seed.sql
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]

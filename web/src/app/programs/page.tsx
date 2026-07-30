@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase-server";
 import { VALID_STATUSES, type ProgramFilter, type ProgramRow } from "@/lib/programs";
 import { ProgramsList } from "./_components/programs-list";
 import { ProgramFilters } from "./_components/program-filters";
+import { CreateProgramDialog } from "./_components/create-program-dialog";
 
 const PAGE_SIZE = 10;
 
@@ -76,6 +77,7 @@ export default async function ProgramsPage({
             Управление программами тренировок
           </p>
         </div>
+        <CreateProgramDialog />
       </div>
 
       <ProgramFilters currentStatus={status} />

@@ -25,6 +25,7 @@ import {
   type ProgramRow,
   type ProgramFilter,
 } from "@/lib/programs";
+import { CreateProgramDialog } from "./create-program-dialog";
 
 function formatPrice(price: number | null): string {
   if (price === null) return "По запросу";
@@ -48,6 +49,9 @@ function EmptyState({
         <p className="mt-1 text-sm text-muted-foreground">
           Создайте первую программу, чтобы начать работу
         </p>
+        <div className="mt-4">
+          <CreateProgramDialog />
+        </div>
       </div>
     );
   }

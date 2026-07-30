@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +20,7 @@ import {
   type ProgramRow,
 } from "@/lib/program-utils";
 import { ProgramWeekPreview } from "./program-week-preview";
-import { toggleProgramStatus, getAssignableClients, assignToClient } from "../actions";
+import { toggleProgramStatus, getAssignableClients, assignToClient, deleteProgram } from "../actions";
 import { Loader2 } from "lucide-react";
 
 function formatPrice(price: number | null): string {
@@ -61,12 +62,14 @@ export function ProgramDetail({
   program: ProgramRow;
   clientCount: number;
 }) {
+  const router = useRouter();
   const status = getProgramStatus(program);
   const parsed = getParsedContent(program);
   const hasProgramContent = hasContent(program);
 
   const [toggling, setToggling] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [showAssign, setShowAssign] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
@@ -140,6 +143,28 @@ export function ProgramDetail({
       setAssigning(false);
     }
   }, [program.id, selectedClient]);
+
+  const handleDelete = useCallback(async () => {
+    const confirmed = window.confirm(
+      `Удалить программу "${program.title}"?\n\nЭто действие необратимо.`,
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setToggleError(null);
+    try {
+      const result = await deleteProgram(program.id);
+      if (result.error) {
+        setToggleError(result.error);
+        setDeleting(false);
+      } else {
+        router.push("/programs");
+      }
+    } catch {
+      setToggleError("Произошла ошибка");
+      setDeleting(false);
+    }
+  }, [program.id, program.title, router]);
 
   useEffect(() => {
     if (!successMsg) return;
@@ -333,6 +358,15 @@ export function ProgramDetail({
             </Button>
           </div>
         )}
+
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={handleDelete}
+          disabled={deleting}
+        >
+          {deleting ? "Удаление..." : "Удалить программу"}
+        </Button>
       </div>
 
       <Separator />

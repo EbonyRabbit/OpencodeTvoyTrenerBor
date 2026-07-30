@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useReducer, useCallback } from "react";
+import { useState, useReducer, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -387,6 +387,14 @@ export function ProgramEditor({
   const [dirty, setDirty] = useState(false);
 
   const weeks = state.weeks ?? [];
+  const [openPanels, setOpenPanels] = useState<string[]>(() => weeks.map((_, i) => `week-${i}`));
+
+  useEffect(() => {
+    setOpenPanels((prev) => {
+      const next = weeks.map((_, i) => `week-${i}`);
+      return prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next;
+    });
+  }, [weeks.length]);
 
   const handleSave = useCallback(async () => {
     const exercises = (state.weeks ?? []).flatMap((w) =>
@@ -471,7 +479,7 @@ export function ProgramEditor({
         </Alert>
       )}
 
-      <Accordion multiple defaultValue={weeks.map((_, i) => `week-${i}`)}>
+      <Accordion multiple value={openPanels} onValueChange={setOpenPanels}>
         {weeks.map((week, weekIdx) => (
           <AccordionItem key={weekIdx} value={`week-${weekIdx}`}>
             <AccordionHeader>

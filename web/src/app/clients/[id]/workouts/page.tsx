@@ -6,6 +6,7 @@ import { safeFetch } from "@/lib/safe-fetch";
 import { getParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 import { calculateAdherence } from "@/lib/adherence";
+import { getActivePause } from "@/lib/plan-adjustment";
 import { WorkoutView } from "./_components/workout-view";
 
 export async function generateMetadata({
@@ -70,7 +71,7 @@ export default async function WorkoutsPage({
     safeFetch(
       supabase
         .from("program_schedule")
-        .select("week_number, start_date, end_date, focus")
+        .select("week_number, start_date, end_date, focus, status")
         .eq("client_id", id)
         .order("week_number", { ascending: true }),
       [],
@@ -85,8 +86,27 @@ export default async function WorkoutsPage({
     ),
   ]);
 
+  const activePause = await getActivePause(id);
+  const pausedWeekNumbers = new Set<number>();
+  let filteredSchedule = schedule ?? [];
+
+  if (activePause && schedule) {
+    for (const week of schedule) {
+      if (
+        week.start_date &&
+        week.start_date >= activePause.pause_start &&
+        (activePause.pause_end === null || week.start_date <= activePause.pause_end)
+      ) {
+        pausedWeekNumbers.add(week.week_number);
+      }
+    }
+    filteredSchedule = schedule.filter(
+      (w) => !pausedWeekNumbers.has(w.week_number),
+    );
+  }
+
   const { weeks, overallAdherence, totalCompleted, totalExpected } = calculateAdherence(
-    schedule ?? [],
+    filteredSchedule,
     parsedContent,
     workoutLogs ?? [],
   );
@@ -105,6 +125,7 @@ export default async function WorkoutsPage({
           hasSchedule={schedule !== null && schedule.length > 0}
           hasWorkoutLogs={workoutLogs !== null && workoutLogs.length > 0}
           hasParsedContent={parsedContent !== null}
+          pausedWeekNumbers={pausedWeekNumbers}
         />
       </div>
     </div>

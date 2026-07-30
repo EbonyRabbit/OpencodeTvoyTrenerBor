@@ -17,6 +17,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { MiniLineChart } from "../../_components/mini-line-chart";
 import { getAdherenceColor } from "@/lib/adherence";
 import type { WeekAdherence } from "@/lib/adherence";
@@ -41,6 +42,7 @@ export function WorkoutView({
   hasSchedule,
   hasWorkoutLogs,
   hasParsedContent,
+  pausedWeekNumbers,
 }: {
   clientId: string;
   clientName: string;
@@ -52,7 +54,19 @@ export function WorkoutView({
   hasSchedule: boolean;
   hasWorkoutLogs: boolean;
   hasParsedContent: boolean;
+  pausedWeekNumbers?: Set<number>;
 }) {
+  const chartData = useMemo(
+    () =>
+      weeks
+        .filter((w) => w.adherencePct !== null)
+        .map((w) => ({
+          label: w.startDate,
+          value: w.adherencePct,
+        })),
+    [weeks],
+  );
+
   if (!hasSchedule) {
     return (
       <div className="space-y-6" role="status">
@@ -160,17 +174,6 @@ export function WorkoutView({
     );
   }
 
-  const chartData = useMemo(
-    () =>
-      weeks
-        .filter((w) => w.adherencePct !== null)
-        .map((w) => ({
-          label: w.startDate,
-          value: w.adherencePct,
-        })),
-    [weeks],
-  );
-
   return (
     <div className="space-y-6">
       <Link
@@ -271,30 +274,51 @@ export function WorkoutView({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {weeks.map((week) => (
-                <TableRow key={week.weekNumber}>
-                  <TableCell className="font-medium">
-                    {week.weekLabel}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {week.focus ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {formatDate(week.startDate)}
-                    {" — "}
-                    {formatDate(week.endDate)}
-                  </TableCell>
-                  <TableCell className="text-center">{week.expected}</TableCell>
-                  <TableCell className="text-center">{week.completed}</TableCell>
-                  <TableCell className="text-center">
-                    <span
-                      className={`font-bold ${getAdherenceColor(week.adherencePct)}`}
-                    >
-                      {week.adherencePct}%
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {weeks.map((week) => {
+                const isPaused = pausedWeekNumbers?.has(week.weekNumber);
+                return (
+                  <TableRow
+                    key={week.weekNumber}
+                    className={isPaused ? "bg-muted/30" : undefined}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {week.weekLabel}
+                        {isPaused && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Пауза
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {isPaused ? "—" : week.focus ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {formatDate(week.startDate)}
+                      {" — "}
+                      {formatDate(week.endDate)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {isPaused ? "—" : week.expected}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {isPaused ? "—" : week.completed}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {isPaused ? (
+                        <span className="text-muted-foreground text-xs">Пауза</span>
+                      ) : (
+                        <span
+                          className={`font-bold ${getAdherenceColor(week.adherencePct)}`}
+                        >
+                          {week.adherencePct}%
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

@@ -592,11 +592,11 @@ Telegram → Railway (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **12.1** | Создать Supabase проект | Зарегистрироваться на supabase.com, создать проект, получить URL и service_role key | ⏳ |
-| **12.2** | Заполнить env vars (бот) | В `bot/.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `COACH_CHAT_ID` — реальные значения | ⏳ |
-| **12.3** | Заполнить env vars (веб) | В `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — реальные значения | ⏳ |
-| **12.4** | Запустить миграции | Применить все 12 миграций из `supabase/migrations/` на продакшен через Supabase Dashboard SQL Editor | ⏳ |
-| **12.5** | Исправить middleware | Переименовать `web/src/proxy.ts` → `web/src/middleware.ts` (Next.js требует это имя) | ⏳ |
+| **12.1** | Создать Supabase проект | Зарегистрироваться на supabase.com, создать проект, получить URL и service_role key | ✅ |
+| **12.2** | Заполнить env vars (бот) | В `bot/.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `COACH_CHAT_ID` — реальные значения | ✅ |
+| **12.3** | Заполнить env vars (веб) | В `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — реальные значения | ✅ |
+| **12.4** | Запустить миграции | Применить все 12 миграций из `supabase/migrations/` на продакшен через Supabase CLI `db push` | ✅ |
+| **12.5** | Исправить middleware | Next.js 16 использует `proxy.ts` (не `middleware.ts`). Файл уже корректный. | ⏭️ not needed |
 | **12.6** | Создать Railway проект | railway.new → New Project → Deploy from GitHub Repo → выбрать `bot/` как root directory | ⏳ |
 | **12.7** | Настроить Railway env vars | Добавить все переменные из 12.2 в Railway dashboard | ⏳ |
 | **12.8** | Проверить деплой бота | Убедиться что Railway собрал Dockerfile и бот стартует (check logs) | ⏳ |

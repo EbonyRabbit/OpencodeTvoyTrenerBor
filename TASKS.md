@@ -76,10 +76,10 @@
 
 | # | Задача | Статус |
 |---|--------|--------|
-| 1.5.1 | Интерфейс чата в веб-панели | pending |
-| 1.5.2 | Отправка сообщения от тренера → бот → клиент | pending |
-| 1.5.3 | Отображение ответов клиента в истории чата | pending |
-| 1.5.4 | История сообщений из Supabase | pending |
+| 1.5.1 | Интерфейс чата в веб-панели | done |
+| 1.5.2 | Отправка сообщения от тренера → бот → клиент | done |
+| 1.5.3 | Отображение ответов клиента в истории чата | done |
+| 1.5.4 | История сообщений из Supabase | done |
 
 ### 1.6 Дублирование данных из бота (GAS → Supabase)
 
@@ -91,6 +91,11 @@
 | 1.6.4 | Добавить в Code.gs вызов Supabase API при загрузке фото | pending |
 | 1.6.5 | Добавить в Code.gs вызов Supabase API при создании клиента | pending |
 | 1.6.6 | Написать скрипт миграции существующих данных из Google Sheets в Supabase | pending |
+| 1.6.7 | Utility-функция `parseReps()` + тесты (web/src/lib/parse-reps.ts) | pending |
+| 1.6.8 | Миграция БД: колонки `reps_total`, `sets_completed` в `workout_logs` | pending |
+| 1.6.9 | Автозапись `reps_total` при логировании (бот + веб-панель) | pending |
+| 1.6.10 | Исправить формулу тоннажа в Google Sheets (create_client_workbook.py) | pending |
+| 1.6.11 | Аналитика повторов в веб-панели (объём, план vs факт, тоннаж) | pending |
 
 ### 1.7 Управление программами (веб-панель)
 
@@ -98,8 +103,25 @@
 |---|--------|--------|
 | 1.7.1 | Каталог программ (список) | done |
 | 1.7.2 | Просмотр деталей программы | done |
-| 1.7.3 | Публикация/деактивация программы | pending |
-| 1.7.4 | Назначение программы клиенту | pending |
+| 1.7.3 | Публикация/деактивация программы | done |
+| 1.7.4 | Назначение программы клиенту | done |
+| 1.7.5 | Server action `createProgram` + UI диалог создания + кнопка в каталоге | done |
+
+### 1.8 Система пауз на тренировках
+
+| # | Задача | Статус |
+|---|--------|--------|
+| 1.8.1 | Миграция: таблица `plan_pauses` + колонки `original_start_date`, `original_end_date`, `is_deload` в `program_schedule` | done |
+| 1.8.2 | Сервис `plan-adjustment.ts`: createPause, resumePlan (skip/shift/deload/rollback), generateSchedule, getEffectiveSchedule | done |
+| 1.8.3 | Server actions: pauseClientPlan, resumeClientPlan, getPauseHistory, getSuggestedStrategy | done |
+| 1.8.4 | UI: PauseSection (создание/возобновление паузы, выбор стратегии, история) | done |
+| 1.8.5 | Интеграция PauseSection в client-profile.tsx | done |
+| 1.8.6 | WorkoutView: бейдж "Пауза" для замороженных недель, исключение из adherence | done |
+| 1.8.7 | Страница истории пауз `/clients/[id]/pause` | done |
+| 1.8.8 | Генерация `program_schedule` при назначении программы (assignToClient + activateProgram) | done |
+| 1.8.9 | Telegram бот: `/pause`, `/resume`, блокировка напоминаний, уведомление коучу | done |
+| 1.8.10 | Код-ревью + исправления (applyRollback, is_deload, auth, batch updates, CHECK constraints) | done |
+| 1.8.11 | Интеграция бота с Supabase (бот ↔ веб-панель) | pending |
 
 ---
 

@@ -112,6 +112,20 @@ export async function POST(
           warning: "Сообщение сохранено, но не удалось отправить в Telegram.",
         });
       }
+    } else if (!BOT_TOKEN) {
+      return NextResponse.json({
+        success: true,
+        messageId: inserted.id,
+        coachId: inserted.coach_id,
+        warning: "Telegram Bot Token не настроен. Сообщение сохранено в базе.",
+      });
+    } else if (!client.telegram_id) {
+      return NextResponse.json({
+        success: true,
+        messageId: inserted.id,
+        coachId: inserted.coach_id,
+        warning: "Клиент не подключён к Telegram. Сообщение сохранено в базе.",
+      });
     }
 
     return NextResponse.json({

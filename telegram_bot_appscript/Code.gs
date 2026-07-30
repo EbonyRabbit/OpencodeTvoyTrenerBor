@@ -272,6 +272,35 @@ function sendDueMessages() {
     const todayKey = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
     const todayWeekDay = weekDays[parseInt(Utilities.formatDate(now, tz, 'u'))];
 
+    if (isPlanPaused(client)) {
+      var resumeDate = PropertiesService.getScriptProperties().getProperty('plan_resume_' + client.client_id);
+      if (!resumeDate) return;
+      var resumeDateObj = parseDateKey(resumeDate);
+      var todayObj = parseDateKey(todayKey);
+      if (!resumeDateObj || !todayObj) return;
+      var daysUntilResume = Math.round((resumeDateObj - todayObj) / (1000 * 60 * 60 * 24));
+
+      if (daysUntilResume <= 0) {
+        PropertiesService.getScriptProperties().deleteProperty('plan_paused_' + client.client_id);
+        PropertiesService.getScriptProperties().deleteProperty('plan_paused_date_' + client.client_id);
+        PropertiesService.getScriptProperties().deleteProperty('plan_resume_' + client.client_id);
+        appendRow(CONFIG.SHEETS.LOGS, [new Date(), client.client_id, client.telegram_id, 'plan_auto_resumed', 'info', resumeDate, todayKey]);
+      } else {
+        if (daysUntilResume <= 2) {
+          var reminderKey = 'resume_reminder_' + client.client_id + '_' + todayKey;
+          if (!PropertiesService.getScriptProperties().getProperty(reminderKey) && isTimeWithinWindow(now, tz, client.morning_time || '07:00', 3)) {
+            var msg = daysUntilResume === 2
+              ? 'Через 2 дня ты возвращаешься к тренировкам! Ждём тебя ' + resumeDate + '. 💪'
+              : 'Завтра тренировка после паузы! Подготовься, ждём тебя ' + resumeDate + '. 💪';
+            sendMessage(client.telegram_id, msg);
+            PropertiesService.getScriptProperties().setProperty(reminderKey, new Date().toISOString());
+            logBot(client.client_id, client.telegram_id, 'resume_reminder_sent', 'info', daysUntilResume + 'd');
+          }
+        }
+        return;
+      }
+    }
+
     if (client.morning_time) {
       const sendKey = 'morning_sent_' + client.client_id + '_' + todayKey;
       const alreadySent = PropertiesService.getScriptProperties().getProperty(sendKey);
@@ -425,6 +454,7 @@ function showMenu(client) {
     lines.push('/programs — выбрать программу тренировок');
   }
   lines.push('/myprogram — моя программа');
+  lines.push('/pause — пауза в тренировках (болезнь, отпуск)');
   lines.push('/settings — настройки уведомлений');
   lines.push('/menu — список команд');
   lines.push('');
@@ -440,6 +470,8 @@ function setupBotCommands() {
     { command: 'today', description: 'Тренировка на сегодня' },
     { command: 'progress', description: 'Замеры тела и динамика' },
     { command: 'checkin', description: 'Еженедельный чек-ин' },
+    { command: 'pause', description: 'Поставить тренировки на паузу' },
+    { command: 'resume', description: 'Возобновить тренировки после паузы' },
     { command: 'settings', description: 'Настройки уведомлений' },
     { command: 'menu', description: 'Список команд' },
   ];
@@ -514,6 +546,13 @@ function doPost(e) {
     if (text === '/myprogram') { showMyProgram(client); return; }
     if (text === '/today') {
       if (client.payment_status !== 'paid' && !client.spreadsheet_id) { sendMessage(chatId, 'Программа ещё не активирована. Ожидайте подтверждения оплаты.'); return; }
+      if (isPlanPaused(client)) {
+        var resumeDate = PropertiesService.getScriptProperties().getProperty('plan_resume_' + client.client_id);
+        var pauseMsg = 'Тренировки на паузе.';
+        if (resumeDate) pauseMsg += ' Возвращаемся ' + resumeDate + '!';
+        sendMessage(chatId, pauseMsg);
+        return;
+      }
       sendTodayWorkout(client); return;
     }
     if (text === '/progress') {
@@ -526,6 +565,20 @@ function doPost(e) {
     }
     if (text === '/settings' && client) { startSettings(client); return; }
     if (text === '/menu' && client) { showMenu(client); return; }
+    if (text === '/pause' && client) { startPauseFlow(client); return; }
+    if (text === '/resume' && client) {
+      var isPaused = isPlanPaused(client);
+      if (!isPaused) {
+        sendMessage(chatId, 'У вас нет активной паузы. Тренировки идут по плану.');
+        return;
+      }
+      PropertiesService.getScriptProperties().deleteProperty('plan_paused_' + client.client_id);
+      PropertiesService.getScriptProperties().deleteProperty('plan_paused_date_' + client.client_id);
+      PropertiesService.getScriptProperties().deleteProperty('plan_resume_' + client.client_id);
+      appendRow(CONFIG.SHEETS.LOGS, [new Date(), client.client_id, chatId, 'plan_early_resumed', 'info', '', 'досрочное возобновление']);
+      sendMessage(chatId, '✅ Пауза снята. Добро пожаловать обратно! Напишите /today, чтобы увидеть тренировку.');
+      return;
+    }
     if (text === '/debug_today' && client) {
       if (client.payment_status !== 'paid' && !client.spreadsheet_id) { sendMessage(chatId, 'Программа ещё не активирована.'); return; }
       sendTodayDebug(client); return;
@@ -537,6 +590,9 @@ function doPost(e) {
       if (state.action === 'exercise_log') { continueExerciseLogging(client, state, text); return; }
       if (state.action === 'skip_reason') { saveWorkoutSkip(client, text); clearState(client.telegram_id); sendMessage(chatId, 'Тренировка пропущена. Причина записана. Отдыхайте!'); return; }
       if (state.action === 'photos' && msg.photo) { continuePhotoUpload(client, state, msg); return; }
+      if (state.action === 'pause_count') { completePauseCount(client, state, text); return; }
+      if (state.action === 'pause_reason') { completePauseFlow(client, state, text); return; }
+      if (state.action === 'pause_end') { completePauseResume(client, state, text); return; }
     }
 
     const settingsField = PropertiesService.getScriptProperties().getProperty('settings_chat_' + chatId);
@@ -766,6 +822,51 @@ function sendTodayWorkout(client) {
   logBot(client.client_id, client.telegram_id, 'today_workout_sent', 'success', workout.sheetName);
 }
 
+function getWorkoutDate(client, sheetName, dayTitle) {
+  var weekDays = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  var dayIdx = -1;
+  for (var d = 0; d < weekDays.length; d++) {
+    if (dayTitle.indexOf(weekDays[d]) !== -1) {
+      dayIdx = d;
+      break;
+    }
+  }
+  if (dayIdx === -1) return null;
+
+  var ss = getClientSpreadsheet(client);
+  var scheduleSheet = ss.getSheetByName(CONFIG.SHEETS.PROGRAM_SCHEDULE);
+  if (!scheduleSheet) return null;
+  var rows = getSheetObjects(scheduleSheet);
+  var week = null;
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].client_id === client.client_id && rows[i].sheet_name === sheetName) {
+      week = rows[i];
+      break;
+    }
+  }
+  if (!week) return null;
+
+  var startDate = parseDateKey(week.start_date);
+  if (!startDate) return null;
+
+  var startDayIdx = startDate.getDay();
+  var diff = dayIdx - startDayIdx;
+
+  var result = new Date(startDate);
+  result.setDate(result.getDate() + diff);
+  return result;
+}
+
+function formatDayTitle(client, sheetName, dayTitle) {
+  var workoutDate = getWorkoutDate(client, sheetName, dayTitle);
+  if (workoutDate) {
+    var tz = client.timezone || CONFIG.DEFAULT_TIMEZONE;
+    var dateStr = Utilities.formatDate(workoutDate, tz, 'dd.MM.yyyy');
+    return dateStr + ', ' + dayTitle;
+  }
+  return dayTitle;
+}
+
 function getTodayWorkout(client, allowFallback, allowRest) {
   const ss = getClientSpreadsheet(client);
   const sheetName = getActiveWeekSheetName(client);
@@ -778,8 +879,9 @@ function getTodayWorkout(client, allowFallback, allowRest) {
   const dayBlocks = parseDayBlocks(values);
   const todayBlock = dayBlocks.find((item) => item.dayTitle.indexOf(today) !== -1);
   if (todayBlock) {
-    if (todayBlock.exercises.length > 0) return { sheetName, dayTitle: todayBlock.dayTitle, goal: todayBlock.goal, exercises: todayBlock.exercises };
-    if (allowRest) return { sheetName, dayTitle: todayBlock.dayTitle, goal: '', exercises: [] };
+    var ft = formatDayTitle(client, sheetName, todayBlock.dayTitle);
+    if (todayBlock.exercises.length > 0) return { sheetName, dayTitle: ft, goal: todayBlock.goal, exercises: todayBlock.exercises };
+    if (allowRest) return { sheetName, dayTitle: ft, goal: '', exercises: [] };
   }
   if (allowFallback) {
     var todayNum = parseInt(Utilities.formatDate(new Date(), tz, 'u'));
@@ -792,12 +894,12 @@ function getTodayWorkout(client, allowFallback, allowRest) {
     Logger.log('getTodayWorkout fallback: todayNum=' + todayNum + ' dayIndices=' + JSON.stringify(dayIndices));
     for (var i = 0; i < dayBlocks.length; i++) {
       if (dayIndices[i] >= 0 && dayIndices[i] > todayNum && dayBlocks[i].exercises.length > 0) {
-        return { sheetName, dayTitle: dayBlocks[i].dayTitle, goal: dayBlocks[i].goal, exercises: dayBlocks[i].exercises };
+        return { sheetName, dayTitle: formatDayTitle(client, sheetName, dayBlocks[i].dayTitle), goal: dayBlocks[i].goal, exercises: dayBlocks[i].exercises };
       }
     }
     for (var i = 0; i < dayBlocks.length; i++) {
       if (dayBlocks[i].exercises.length > 0) {
-        return { sheetName, dayTitle: dayBlocks[i].dayTitle, goal: dayBlocks[i].goal, exercises: dayBlocks[i].exercises };
+        return { sheetName, dayTitle: formatDayTitle(client, sheetName, dayBlocks[i].dayTitle), goal: dayBlocks[i].goal, exercises: dayBlocks[i].exercises };
       }
     }
   }
@@ -874,7 +976,7 @@ function startExerciseLogging(client, index) {
 function continueExerciseLogging(client, state, text) {
   if (state.step === 'sets') {
     updateStateFields(client.telegram_id, { temp_sets: text, step: 'reps' });
-    sendMessage(client.telegram_id, 'Сколько повторений в среднем?');
+    sendMessage(client.telegram_id, 'Сколько повторений сделал по подходам? (пример: 10/10/10/10)');
   } else if (state.step === 'reps') {
     updateStateFields(client.telegram_id, { temp_reps: text, step: 'weight' });
     sendMessage(client.telegram_id, 'С каким весом работал?');
@@ -1625,6 +1727,299 @@ function saveWorkoutSkip(client, reason) {
 
   PropertiesService.getScriptProperties().setProperty('workout_skipped_' + client.client_id + '_' + todayKey, reason || 'no_reason');
   logBot(client.client_id, client.telegram_id, 'workout_skipped', 'info', reason || 'no_reason');
+}
+
+function startPauseFlow(client) {
+  var chatId = client.telegram_id;
+  var activePause = PropertiesService.getScriptProperties().getProperty('plan_paused_' + client.client_id);
+  if (activePause) {
+    sendMessage(chatId, 'У вас уже активна пауза. Если хотите возобновить тренировки, отправьте /resume.\n\nИли напишите тренеру.');
+    return;
+  }
+
+  upsertState({ telegram_id: chatId, action: 'pause_count', step: 'await_count', client_id: client.client_id });
+  sendMessage(chatId, '🛑 Сколько тренировок пропустить? (напишите число 1, 2, 3...):');
+}
+
+function completePauseCount(client, state, text) {
+  var chatId = client.telegram_id;
+  var count = parseInt(text.trim());
+  if (isNaN(count) || count < 1) {
+    sendMessage(chatId, 'Напишите число, например 1 или 3.');
+    return;
+  }
+
+  var tz = client.timezone || CONFIG.DEFAULT_TIMEZONE;
+  var todayKey = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+  if (count === 1) {
+    clearState(chatId);
+    appendRow(CONFIG.SHEETS.LOGS, [new Date(), client.client_id, chatId, 'plan_paused_1skip', 'info', '', todayKey]);
+    sendMessage(chatId, 'Хорошо, сегодня отдыхаем! 💪 Завтра продолжим.');
+    return;
+  }
+
+  upsertState({ telegram_id: chatId, action: 'pause_reason', step: 'await_reason', client_id: client.client_id, skip_count: String(count) });
+  sendMessage(chatId, 'Напишите причину паузы (например: "Заболел", "Отпуск", "Командировка"):');
+}
+
+function completePauseFlow(client, state, reason) {
+  var chatId = client.telegram_id;
+  var tz = client.timezone || CONFIG.DEFAULT_TIMEZONE;
+  var todayKey = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+  var skipCount = parseInt(state.skip_count || '0');
+
+  if (skipCount >= 2) {
+    PropertiesService.getScriptProperties().setProperty('plan_paused_' + client.client_id, todayKey + '|' + reason);
+    PropertiesService.getScriptProperties().setProperty('plan_paused_date_' + client.client_id, todayKey);
+    appendRow(CONFIG.SHEETS.LOGS, [new Date(), client.client_id, chatId, 'plan_paused', 'info', reason, todayKey + ' (skip: ' + skipCount + ')']);
+
+    upsertState({ telegram_id: chatId, action: 'pause_end', step: 'await_end_date', client_id: client.client_id });
+    sendMessage(chatId, 'Напишите дату возврата к тренировкам в формате ДД.ММ.ГГГГ\n\nИли напишите "сегодня", чтобы возобновить сегодня.');
+    return;
+  }
+
+  PropertiesService.getScriptProperties().setProperty('plan_paused_' + client.client_id, todayKey + '|' + reason);
+  PropertiesService.getScriptProperties().setProperty('plan_paused_date_' + client.client_id, todayKey);
+
+  clearState(chatId);
+  appendRow(CONFIG.SHEETS.LOGS, [new Date(), client.client_id, chatId, 'plan_paused', 'info', reason, todayKey]);
+
+  sendMessage(chatId, '✅ Пауза поставлена. Тренировки приостановлены с ' + todayKey + '.\n\nКогда будете готовы вернуться, напишите /resume.\n\nТренер уведомлён.');
+  notifyCoachAboutPause(client, todayKey, reason);
+}
+
+function notifyCoachAboutPause(client, pauseDate, reason) {
+  try {
+    var coachChatId = PropertiesService.getScriptProperties().getProperty('coach_chat_id');
+    if (coachChatId) {
+      sendMessage(coachChatId, '⏸ Пауза у клиента ' + client.name + ' с ' + pauseDate + '\nПричина: ' + reason);
+    }
+  } catch (e) {
+    Logger.log('notifyCoachAboutPause error: ' + e.message);
+  }
+}
+
+function isPlanPaused(client) {
+  var pauseData = PropertiesService.getScriptProperties().getProperty('plan_paused_' + client.client_id);
+  return pauseData !== null;
+}
+
+function findNearestTrainingDay(client, pauseStartStr, fromDateStr) {
+  var ss = getClientSpreadsheet(client);
+  var fromDate = parseDateKey(fromDateStr);
+  if (!fromDate) return fromDateStr;
+
+  var scheduleSheet = ss.getSheetByName(CONFIG.SHEETS.PROGRAM_SCHEDULE);
+  var weekSheetName = null;
+
+  if (scheduleSheet) {
+    var rows = getSheetObjects(scheduleSheet).filter(function(r) {
+      return r.client_id === client.client_id && r.status === 'active';
+    });
+
+    // 1. Ищем неделю, в которую попадает дата возврата
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var start = parseDateKey(r.start_date);
+      var end = parseDateKey(r.end_date);
+      if (start && end && fromDate >= start && fromDate <= end) {
+        weekSheetName = r.sheet_name;
+        break;
+      }
+    }
+
+    // 2. Если дата возврата вне расписания — ищем неделю паузы
+    if (!weekSheetName) {
+      var pauseStartDate = parseDateKey(pauseStartStr);
+      if (pauseStartDate) {
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          var start = parseDateKey(r.start_date);
+          var end = parseDateKey(r.end_date);
+          if (start && end && pauseStartDate >= start && pauseStartDate <= end) {
+            weekSheetName = r.sheet_name;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Если не нашли — ближайшая по дате начала
+    if (!weekSheetName && pauseStartStr) {
+      var pauseStartDate = parseDateKey(pauseStartStr);
+      var nearest = null;
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var start = parseDateKey(r.start_date);
+        if (start && (!nearest || Math.abs(start - pauseStartDate) < Math.abs(parseDateKey(nearest.start_date) - pauseStartDate))) {
+          nearest = r;
+        }
+      }
+      if (nearest) weekSheetName = nearest.sheet_name;
+    }
+  }
+
+  if (!weekSheetName) {
+    weekSheetName = getActiveWeekSheetName(client);
+  }
+
+  var sheet = ss.getSheetByName(weekSheetName);
+  if (!sheet) return fromDateStr;
+
+  var weekDays = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  var fromDayIndex = fromDate.getDay();
+
+  var values = sheet.getDataRange().getDisplayValues();
+  var dayBlocks = parseDayBlocks(values);
+
+  var trainingDayIndices = [];
+  dayBlocks.forEach(function(block) {
+    for (var d = 0; d < weekDays.length; d++) {
+      if (block.dayTitle.indexOf(weekDays[d]) !== -1) {
+        trainingDayIndices.push(d);
+        break;
+      }
+    }
+  });
+
+  if (trainingDayIndices.length === 0) return fromDateStr;
+  trainingDayIndices.sort(function(a, b) { return a - b; });
+
+  var nearestDayIndex = null;
+  for (var i = 0; i < trainingDayIndices.length; i++) {
+    if (trainingDayIndices[i] >= fromDayIndex) {
+      nearestDayIndex = trainingDayIndices[i];
+      break;
+    }
+  }
+
+  if (nearestDayIndex === null) {
+    nearestDayIndex = trainingDayIndices[0];
+    var diff = 7 - fromDayIndex + nearestDayIndex;
+    var result = new Date(fromDate);
+    result.setDate(result.getDate() + diff);
+    return fmtDate(result);
+  }
+
+  var diff = nearestDayIndex - fromDayIndex;
+  var result = new Date(fromDate);
+  result.setDate(result.getDate() + diff);
+  return fmtDate(result);
+}
+
+function shiftScheduleAfterPause(client, pauseStart, shiftDate) {
+  var ss = getClientSpreadsheet(client);
+  var sheet = ss.getSheetByName(CONFIG.SHEETS.PROGRAM_SCHEDULE);
+  if (!sheet) return 0;
+
+  var pauseStartDate = parseDateKey(pauseStart);
+  var shiftStartDate = parseDateKey(shiftDate);
+  if (!pauseStartDate || !shiftStartDate) return 0;
+
+  var data = sheet.getRange(5, 1, sheet.getLastRow() - 4, sheet.getLastColumn()).getDisplayValues();
+
+  var firstRowStart = null;
+  var firstRowIndex = -1;
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    if (row[0] !== client.client_id) continue;
+    if (row[8] !== 'active') continue;
+    var rowStart = parseDateKey(row[5]);
+    if (!rowStart) continue;
+    if (rowStart < pauseStartDate) continue;
+    if (firstRowStart === null || rowStart < firstRowStart) {
+      firstRowStart = rowStart;
+      firstRowIndex = i;
+    }
+  }
+
+  if (firstRowStart === null) return 0;
+
+  var shiftDays = Math.round((shiftStartDate - firstRowStart) / (1000 * 60 * 60 * 24));
+  if (shiftDays <= 0) return 0;
+
+  var shiftedCount = 0;
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    if (row[0] !== client.client_id) continue;
+    if (row[8] !== 'active') continue;
+    var rowStart = parseDateKey(row[5]);
+    var rowEnd = parseDateKey(row[6]);
+    if (!rowStart || !rowEnd) continue;
+    if (rowStart < pauseStartDate) continue;
+
+    var newStart = new Date(rowStart);
+    newStart.setDate(newStart.getDate() + shiftDays);
+    var newEnd = new Date(rowEnd);
+    newEnd.setDate(newEnd.getDate() + shiftDays);
+
+    var sheetRow = 5 + i;
+    sheet.getRange(sheetRow, 6).setValue(fmtDate(newStart));
+    sheet.getRange(sheetRow, 7).setValue(fmtDate(newEnd));
+    shiftedCount++;
+  }
+
+  return shiftedCount > 0 ? shiftDays : 0;
+}
+
+function completePauseResume(client, state, dateInput) {
+  var chatId = client.telegram_id;
+  var tz = client.timezone || CONFIG.DEFAULT_TIMEZONE;
+  var today = new Date();
+  var resumeDate;
+
+  if (dateInput.trim().toLowerCase() === 'сегодня') {
+    resumeDate = Utilities.formatDate(today, tz, 'yyyy-MM-dd');
+  } else {
+    try {
+      var parts = dateInput.trim().split('.');
+      if (parts.length === 3) {
+        resumeDate = parts[2] + '-' + parts[1] + '-' + parts[0];
+      } else {
+        resumeDate = Utilities.formatDate(new Date(dateInput), tz, 'yyyy-MM-dd');
+      }
+    } catch (e) {
+      sendMessage(chatId, 'Не удалось распознать дату. Попробуйте снова в формате ДД.ММ.ГГГГ\nПример: 15.07.2026');
+      return;
+    }
+  }
+
+  var pauseData = PropertiesService.getScriptProperties().getProperty('plan_paused_' + client.client_id);
+  var pauseParts = pauseData ? pauseData.split('|') : [];
+  var pauseStart = pauseParts[0] || 'неизвестно';
+  var pauseReason = pauseParts[1] || 'не указана';
+
+  var nearestTrainingDate = resumeDate;
+  var shiftDays = 0;
+  if (pauseStart !== 'неизвестно') {
+    nearestTrainingDate = findNearestTrainingDay(client, pauseStart, resumeDate);
+    shiftDays = shiftScheduleAfterPause(client, pauseStart, nearestTrainingDate);
+  }
+
+  PropertiesService.getScriptProperties().setProperty('plan_resume_' + client.client_id, nearestTrainingDate);
+  appendRow(CONFIG.SHEETS.LOGS, [new Date(), client.client_id, chatId, 'plan_paused', 'shift', 'Пауза: ' + pauseStart + ' - ' + resumeDate + ', сдвиг: ' + shiftDays + ' дн.', 'Причина: ' + pauseReason]);
+
+  clearState(chatId);
+  sendMessage(chatId, '✅ Пауза установлена. Жду тебя на тренировку ' + nearestTrainingDate + '.');
+  notifyCoachAboutResume(client, pauseStart, nearestTrainingDate, pauseReason, shiftDays);
+}
+
+function notifyCoachAboutResume(client, pauseStart, resumeDate, reason, shiftedDays) {
+  try {
+    var coachChatId = PropertiesService.getScriptProperties().getProperty('coach_chat_id');
+    shiftedDays = shiftedDays || 0;
+    if (coachChatId) {
+      var msg = '⏸ Клиент ' + client.name + ' — пауза до ' + resumeDate + '\nС ' + pauseStart + '\nПричина: ' + reason;
+      if (shiftedDays > 0) {
+        msg += '\n📅 Расписание сдвинуто на ' + shiftedDays + ' дн.';
+      }
+      sendMessage(coachChatId, msg);
+    }
+  } catch (e) {
+    Logger.log('notifyCoachAboutResume error: ' + e.message);
+  }
 }
 
 function fmtDate(date) {

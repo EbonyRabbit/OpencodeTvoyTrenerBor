@@ -22,10 +22,12 @@
     "dotenv": "^17.4.2",
     "grammy": "^1.44.0",
     "i18next": "^26.3.1",
-    "node-cron": "^4.5.0"
+    "node-cron": "^4.5.0",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/ws": "^8.18.1",
     "tsx": "^4",
     "typescript": "^5",
     "vitest": "^4.1.9"

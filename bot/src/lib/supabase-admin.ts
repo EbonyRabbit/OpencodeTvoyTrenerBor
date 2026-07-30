@@ -1,6 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types.js";
 import { config } from "../config.js";
+import WebSocket from "ws";
+
+globalThis.WebSocket = WebSocket as any;
 
 export const supabaseAdmin = createClient<Database>(
   config.supabase.url,

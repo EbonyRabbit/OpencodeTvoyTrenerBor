@@ -23,6 +23,16 @@ function optionalPort(name: string, fallback: number): number {
   return parsed;
 }
 
+const resolvedPublicUrl: string = (() => {
+  const explicit = process.env["PUBLIC_URL"];
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const railway = process.env["RAILWAY_PUBLIC_DOMAIN"];
+  if (railway) return `https://${railway}`;
+  const render = process.env["RENDER_EXTERNAL_URL"];
+  if (render) return render.replace(/\/+$/, "");
+  return "";
+})();
+
 export const config = {
   telegram: {
     botToken: requireEnv("TELEGRAM_BOT_TOKEN"),
@@ -38,4 +48,5 @@ export const config = {
   nodeEnv: optionalEnv("NODE_ENV", "development"),
   port: optionalPort("PORT", 3001),
   webhookPath: optionalEnv("WEBHOOK_PATH", "/webhook"),
+  publicUrl: resolvedPublicUrl,
 } as const;

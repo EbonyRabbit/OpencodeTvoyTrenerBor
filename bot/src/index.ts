@@ -28,12 +28,11 @@ async function main(): Promise<void> {
     });
   });
 
-  const domain = process.env.RAILWAY_PUBLIC_DOMAIN;
-  const webhookUrl = domain
-    ? `https://${domain}${config.webhookPath}`
+  const webhookUrl = config.publicUrl
+    ? `${config.publicUrl}${config.webhookPath}`
     : `http://localhost:${config.port}${config.webhookPath}`;
 
-  if (!domain) {
+  if (!config.publicUrl) {
     console.warn("Local webhook URL will not work with Telegram. Use ngrok or cloudflare tunnel.");
   }
 

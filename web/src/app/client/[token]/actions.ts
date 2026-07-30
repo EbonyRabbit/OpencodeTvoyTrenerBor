@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getTodayDateStr } from "@/lib/date-utils";
+import { TIMEZONE_LIST, LANGUAGE_LABELS } from "@/lib/clients";
 // import { type PhotoType } from "@/types/supabase"; // DISABLED: photo storage removed
 
 type ExerciseLog = {
@@ -297,6 +298,69 @@ export async function saveCheckin(
     return {};
   } catch {
     return { error: "Произошла ошибка" };
+  }
+}
+
+export type ClientSettingsInput = {
+  language: string;
+  timezone: string | null;
+  morning_time: string | null;
+  measurement_time: string | null;
+  measurement_day: number | null;
+};
+
+export async function updateClientSettings(
+  data: ClientSettingsInput,
+): Promise<{ error?: string }> {
+  try {
+    const h = await headers();
+    const clientId = h.get("x-client-id");
+    if (!clientId) return { error: "Не авторизован" };
+
+    if (!(data.language in LANGUAGE_LABELS)) {
+      return { error: "Некорректный язык" };
+    }
+
+    if (data.timezone !== null && data.timezone !== "") {
+      if (!TIMEZONE_LIST.includes(data.timezone as typeof TIMEZONE_LIST[number])) {
+        return { error: "Некорректный часовой пояс" };
+      }
+    }
+
+    if (data.morning_time !== null && data.morning_time !== "") {
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.morning_time)) {
+        return { error: "Некорректное время утреннего напоминания" };
+      }
+    }
+
+    if (data.measurement_time !== null && data.measurement_time !== "") {
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.measurement_time)) {
+        return { error: "Некорректное время напоминания замеров" };
+      }
+    }
+
+    if (data.measurement_day !== null) {
+      if (!Number.isInteger(data.measurement_day) || data.measurement_day < 1 || data.measurement_day > 7) {
+        return { error: "День замеров должен быть от 1 до 7" };
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from("clients")
+      .update({
+        language: data.language,
+        timezone: data.timezone || null,
+        morning_time: data.morning_time || null,
+        measurement_time: data.measurement_time || null,
+        measurement_day: data.measurement_day ?? null,
+      })
+      .eq("id", clientId);
+
+    if (error) return { error: error.message };
+
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
 }
 

@@ -1,5 +1,9 @@
 # TASKS_WEB.md — План миграции Telegram-бота на Node.js
 
+> **🔴 P0 (следующие задачи):**
+> - **10.24** — Клиент: страница настроек уведомлений `/client/[token]/settings`
+> - **10.25** — Middleware: подключить `proxy.ts` как `middleware.ts`
+
 ---
 
 ## Цель
@@ -462,6 +466,9 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.22** | Кнопка «Ссылка для клиента» | В `client-profile.tsx`: генерация токена + отображение ссылки | ✅ |
 | **10.23** | Бот: команда `/myweb` | Показ ссылки на клиентский портал | ✅ |
 
+| **10.24** | **Настройки уведомлений (клиентский портал)** | `/client/[token]/settings` — клиент сам редактирует время тренировки, время замеров, день замеров, часовой пояс (как в Telegram `/settings`). Server action `updateClientSettings` в `client/[token]/actions.ts` | ✅ |
+| **10.25** | **Middleware (proxy.ts → middleware.ts)** | Переименовать `proxy.ts` → `middleware.ts`, иначе `x-client-id` не устанавливается и клиентский портал падает в `notFound()` | 🔴 **P0** |
+
 ### Файлы для создания/изменения
 
 | Файл | Действие |
@@ -478,12 +485,15 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | `web/src/app/clients/[id]/actions.ts` | Изменение (generateClientToken) |
 | `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (кнопка ссылки) |
 | `web/src/middleware.ts` | Изменение (client routes) |
-| `web/src/app/client/[token]/layout.tsx` | Новый |
+| `web/src/app/client/[token]/layout.tsx` | Новый + изменение (добавить "Настройки" в NAV_ITEMS) |
 | `web/src/app/client/[token]/page.tsx` | Новый |
 | `web/src/app/client/[token]/program/page.tsx` | Новый |
 | `web/src/app/client/[token]/measurements/page.tsx` | Новый |
 | `web/src/app/client/[token]/photos/page.tsx` | Новый |
 | `web/src/app/client/[token]/checkin/page.tsx` | Новый |
+| `web/src/app/client/[token]/actions.ts` | Изменение (+ `updateClientSettings`) |
+| `web/src/app/client/[token]/settings/page.tsx` | **Новый** |
+| `web/src/app/client/[token]/settings/settings-form.tsx` | **Новый** |
 | `web/src/lib/program-editor-types.ts` | Новый |
 | `bot/src/handlers/menu.ts` | Изменение (/myweb) |
 
@@ -557,3 +567,47 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | `scripts/migrate-photos.ts` | Новый |
 | `.env.local` | Изменение (R2 env vars) |
 | `.env.example` | Изменение (R2 env vars) |
+
+---
+
+## Фаза 12: Продакшен деплой
+
+### Контекст
+
+Все фазы (1-10) завершены. Код готов, но не задеплоен:
+- Бот: Node.js/grammY, Dockerfile готов, Railway не настроен
+- Веб: Next.js 16, MVP готов, Vercel не настроен
+- Supabase: миграции готовы, продакшен проекта нет
+- Текущий production: Google Apps Script + Cloudflare Worker + Google Sheets
+- Все env vars — плейсхолдеры или localhost
+
+### Архитектура (целевая)
+
+```
+Telegram → Railway (Node.js/grammY) → Supabase DB (PostgreSQL)
+                                            ↑
+                                     Vercel (Next.js)
+```
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **12.1** | Создать Supabase проект | Зарегистрироваться на supabase.com, создать проект, получить URL и service_role key | ⏳ |
+| **12.2** | Заполнить env vars (бот) | В `bot/.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `COACH_CHAT_ID` — реальные значения | ⏳ |
+| **12.3** | Заполнить env vars (веб) | В `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — реальные значения | ⏳ |
+| **12.4** | Запустить миграции | Применить все 12 миграций из `supabase/migrations/` на продакшен через Supabase Dashboard SQL Editor | ⏳ |
+| **12.5** | Исправить middleware | Переименовать `web/src/proxy.ts` → `web/src/middleware.ts` (Next.js требует это имя) | ⏳ |
+| **12.6** | Создать Railway проект | railway.new → New Project → Deploy from GitHub Repo → выбрать `bot/` как root directory | ⏳ |
+| **12.7** | Настроить Railway env vars | Добавить все переменные из 12.2 в Railway dashboard | ⏳ |
+| **12.8** | Проверить деплой бота | Убедиться что Railway собрал Dockerfile и бот стартует (check logs) | ⏳ |
+| **12.9** | Создать Vercel проект | vercel.com → New Project → import GitHub repo → root directory = `web/` | ⏳ |
+| **12.10** | Настроить Vercel env vars | Добавить все переменные из 12.3 в Vercel dashboard | ⏳ |
+| **12.11** | Проверить деплой веба | Убедиться что Vercel собрал Next.js и сайт открывается | ⏳ |
+| **12.12** | Переключить webhook | В Telegram: `setWebhook` URL = `https://{railway-domain}/webhook` | ⏳ |
+| **12.13** | Тест бота в продакшене | Отправить /start, проверить что бот отвечает, проверить логи в Railway | ⏳ |
+| **12.14** | Тест веба в продакшене | Открыть Vercel URL, залогиниться, проверить страницы клиентов | ⏳ |
+| **12.15** | Тест end-to-end | Выполнить полный цикл: бот → веб → замеры → чек-ин | ⏳ |
+| **12.16** | Ротировать GitHub PAT | Убрать токен из git remote URL, создать новый PAT с минимальными правами | ⏳ |
+| **12.17** | Отключить GAS | Удалить триггер `sendDueMessages` в Google Apps Script | ⏳ |
+| **12.18** | Остановить Worker | Деактивировать Cloudflare Worker (не удалять сразу) | ⏳ |

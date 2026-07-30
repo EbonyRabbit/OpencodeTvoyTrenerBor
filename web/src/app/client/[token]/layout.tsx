@@ -37,6 +37,7 @@ const NAV_ITEMS = [
   { href: "/measurements", label: "Замеры" },
   { href: "/photos", label: "Фото" },
   { href: "/checkin", label: "Чек-ин" },
+  { href: "/settings", label: "Настройки" },
 ] as const;
 
 const PRIVACY_POLICY_VERSION = "2026-07-16";

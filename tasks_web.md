@@ -26,7 +26,7 @@ Telegram → Cloudflare Worker → GAS (Code.gs) → Google Sheets
 ### Целевая
 
 ```
-Telegram → Railway (Node.js/grammY) → Supabase DB
+Telegram → Render (Node.js/grammY) → Supabase DB
                                            ↑
                                     Web-панель (Next.js)
 ```
@@ -43,7 +43,7 @@ Telegram → Railway (Node.js/grammY) → Supabase DB
 | Cron | **node-cron** | Внутри процесса, достаточно для 15-минутного цикла |
 | Фото | **Supabase Storage** | Замена Google Drive |
 | Хранение состояний | **Supabase** (таблица `bot_state`) | Единый источник правды |
-| Деплой | **Railway** | Long-running process, Docker, простая настройка |
+| Деплой | **Render** | Long-running process, Docker, простая настройка |
 | Локализация | **i18next** | ru/en, уже есть паттерн `client.language` |
 
 ---
@@ -113,9 +113,9 @@ OpenCode/
 | 1.6 | Миграция БД: `bot_state` | Создать таблицу для состояний разговоров (заменяет Bot State sheet) | ✅ |
 | 1.7 | Миграция БД: `bot_logs` | Создать таблицу логов бота (заменяет Bot Logs sheet) | ✅ |
 | 1.8 | Миграция БД: `bot_schedule` | Создать таблицу отложенных напоминаний (заменяет Bot Schedule sheet) | ✅ |
-| 1.9 | .env.local | Настроить переменные окружения (BOT_TOKEN, SUPABASE_URL, SERVICE_ROLE_KEY, COACH_CHAT_ID) | ✅ |
+| 1.9 | .env.local | Настроить переменные окружения (TELEGRAM_BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, COACH_CHAT_ID) | ✅ |
 | 1.10 | Базовый entry point | Создать `bot/src/index.ts` — запуск grammY в режиме webhook | ✅ |
-| 1.11 | Dockerfile | Создать Dockerfile для деплоя на Railway | ✅ |
+| 1.11 | Dockerfile | Создать Dockerfile для деплоя бота | ✅ |
 | 1.12 | Тест запуска | Убедиться, что бот стартует и отвечает на `ping` | ✅ |
 
 ---
@@ -210,7 +210,7 @@ OpenCode/
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | 8.1 | Тестирование | Полное тестирование бота на отдельном токене | ✅ |
-| 8.2 | Переключение webhook | Изменение `setWebhook` URL: Cloudflare Worker → Railway | ⏭️ skipped |
+| 8.2 | Переключение webhook | Изменение `setWebhook` URL: Cloudflare Worker → Render | ⏭️ skipped (фактически уже на Render, см. 12.12) |
 | 8.3 | Мониторинг | Наблюдение за работой 24-48 часов | ⏭️ skipped |
 | 8.4 | Отключение GAS | Удаление триггера `sendDueMessages` в GAS | ⏭️ skipped |
 | 8.5 | Деактивация Worker | Остановка Cloudflare Worker | ⏭️ skipped |
@@ -364,24 +364,25 @@ COACH_CHAT_ID=...  # Telegram ID тренера для уведомлений
 NODE_ENV=development
 PORT=3001
 WEBHOOK_PATH=/webhook
+CLIENT_PORTAL_URL=https://your-web-domain.com  # клиентский портал (команда /myweb)
 ```
 
 ---
 
 ## Деплой
 
-### Railway
+### Render
 
-1. Создать проект на Railway
+1. Создать проект на Render (Web Service)
 2. Подключить GitHub репозиторий
-3. Настроить service из `bot/` директории
-4. Добавить env vars
-5. Railway автоматически соберёт Dockerfile и задеплоит
+3. Настроить service из `bot/` директории (Dockerfile)
+4. Добавить env vars (включая `CLIENT_PORTAL_URL`)
+5. Render автоматически соберёт Dockerfile и задеплоит
 
 ### Webhook URL
 
 ```
-Production: https://your-bot.up.railway.app/webhook
+Production: https://tvoi-trener-bot.onrender.com/webhook  (уже активен)
 Dev:        ngrok http 3001  (для тестирования локально)
 ```
 
@@ -573,17 +574,16 @@ Dev:        ngrok http 3001  (для тестирования локально)
 
 ### Контекст
 
-Все фазы (1-10) завершены. Код готов, но не задеплоен:
-- Бот: Node.js/grammY, Dockerfile готов, Railway не настроен
-- Веб: Next.js 16, MVP готов, Vercel не настроен
-- Supabase: миграции готовы, продакшен проекта нет
-- Текущий production: Google Apps Script + Cloudflare Worker + Google Sheets
-- Все env vars — плейсхолдеры или localhost
+Все фазы (1-11) завершены. Бот и веб задеплоены:
+- Бот: Node.js/grammY, Dockerfile, работает на **Render** (`tvoi-trener-bot.onrender.com`)
+- Веб: Next.js 16, работает на **Vercel** (`opencode-tvoy-trener-bor.vercel.app`)
+- Supabase: продакшен проект `jafxybtbbkmwngqhsoaa`, миграции применены
+- Осталось: ручные тесты, ротация GitHub PAT, выключение GAS и Cloudflare Worker
 
 ### Архитектура (целевая)
 
 ```
-Telegram → Railway (Node.js/grammY) → Supabase DB (PostgreSQL)
+Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
                                             ↑
                                      Vercel (Next.js)
 ```
@@ -593,20 +593,20 @@ Telegram → Railway (Node.js/grammY) → Supabase DB (PostgreSQL)
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | **12.1** | Создать Supabase проект | Зарегистрироваться на supabase.com, создать проект, получить URL и service_role key | ✅ |
-| **12.2** | Заполнить env vars (бот) | В `bot/.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `COACH_CHAT_ID` — реальные значения | ✅ |
+| **12.2** | Заполнить env vars (бот) | В `bot/.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `COACH_CHAT_ID`, `CLIENT_PORTAL_URL` — реальные значения | ✅ (CLIENT_PORTAL_URL — только локально, см. 12.7) |
 | **12.3** | Заполнить env vars (веб) | В `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — реальные значения | ✅ |
-| **12.4** | Запустить миграции | Применить все 12 миграций из `supabase/migrations/` на продакшен через Supabase CLI `db push` | ✅ |
+| **12.4** | Запустить миграции | Применить все миграции из `supabase/migrations/` (13 файлов) на продакшен через Supabase CLI `db push` | ✅ |
 | **12.5** | Исправить middleware | Next.js 16 использует `proxy.ts` (не `middleware.ts`). Файл уже корректный. | ⏭️ not needed |
-| **12.6** | Создать Railway проект | railway.new → New Project → Deploy from GitHub Repo → выбрать `bot/` как root directory | ⏳ |
-| **12.7** | Настроить Railway env vars | Добавить все переменные из 12.2 в Railway dashboard | ⏳ |
-| **12.8** | Проверить деплой бота | Убедиться что Railway собрал Dockerfile и бот стартует (check logs) | ⏳ |
-| **12.9** | Создать Vercel проект | vercel.com → New Project → import GitHub repo → root directory = `web/` | ⏳ |
-| **12.10** | Настроить Vercel env vars | Добавить все переменные из 12.3 в Vercel dashboard | ⏳ |
-| **12.11** | Проверить деплой веба | Убедиться что Vercel собрал Next.js и сайт открывается | ⏳ |
-| **12.12** | Переключить webhook | В Telegram: `setWebhook` URL = `https://{railway-domain}/webhook` | ⏳ |
-| **12.13** | Тест бота в продакшене | Отправить /start, проверить что бот отвечает, проверить логи в Railway | ⏳ |
-| **12.14** | Тест веба в продакшене | Открыть Vercel URL, залогиниться, проверить страницы клиентов | ⏳ |
-| **12.15** | Тест end-to-end | Выполнить полный цикл: бот → веб → замеры → чек-ин | ⏳ |
-| **12.16** | Ротировать GitHub PAT | Убрать токен из git remote URL, создать новый PAT с минимальными правами | ⏳ |
+| **12.6** | Деплой бота | Бот развёрнут на **Render** (не Railway): `tvoi-trener-bot.onrender.com`, `/health` → 200 | ✅ |
+| **12.7** | Env vars бота | Переменные из 12.2 заданы на Render (webhook работает, бот жив), **кроме** `CLIENT_PORTAL_URL` — задан только локально в `bot/.env.local` (gitignored), на Render добавить вручную, иначе `/myweb` ответит «портал не настроен» | ⏳ (добавить CLIENT_PORTAL_URL на Render) |
+| **12.8** | Проверить деплой бота | `GET /health` → `{"ok":true}`; webhook принимает апдейты (`pending_update_count: 0`) | ✅ |
+| **12.9** | Создать Vercel проект | Веб развёрнут: `https://opencode-tvoy-trener-bor.vercel.app` (root directory = `web/`) | ✅ |
+| **12.10** | Настроить Vercel env vars | Переменные из 12.3 заданы (страницы рендерятся, база отвечает) | ✅ |
+| **12.11** | Проверить деплой веба | `/` → 200, `/login` → 200, `/clients/...` → 307 (редирект на auth), клиентский портал `/client/[token]` → 200 | ✅ |
+| **12.12** | Переключить webhook | `setWebhook` = `https://tvoi-trener-bot.onrender.com/webhook`, secret token задан | ✅ |
+| **12.13** | Тест бота в продакшене | `/health` OK; проверить команды `/start`, `/menu` — вручную в Telegram | ⏳ |
+| **12.14** | Тест веба в продакшене | Страницы открываются; залогиниться в админку — вручную | ⏳ |
+| **12.15** | Тест end-to-end | Полный цикл: бот → веб → замеры → чек-ин (вручную) | ⏳ |
+| **12.16** | Ротировать GitHub PAT | ⚠️ В `git remote` URL зашит PAT. Создать новый минимальный PAT, сменить remote | ⏳ |
 | **12.17** | Отключить GAS | Удалить триггер `sendDueMessages` в Google Apps Script | ⏳ |
 | **12.18** | Остановить Worker | Деактивировать Cloudflare Worker (не удалять сразу) | ⏳ |

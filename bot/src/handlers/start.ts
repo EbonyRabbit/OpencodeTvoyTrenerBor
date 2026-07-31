@@ -6,6 +6,7 @@ import {
   type Client,
 } from "../lib/clients.js";
 import { t, applyClientLanguage, type Language } from "../i18n/index.js";
+import { startTrainingDaysSetup } from "./training-days.js";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
@@ -21,6 +22,10 @@ function buildConnectedMessage(client: Client, lang: Language): string {
   }
 
   return lines.join("\n");
+}
+
+function needsScheduleSetup(client: Client): boolean {
+  return !!client.program_id && (client.training_days ?? []).length === 0;
 }
 
 export async function startHandler(ctx: MyContext): Promise<void> {
@@ -56,7 +61,11 @@ export async function startHandler(ctx: MyContext): Promise<void> {
 
       applyClientLanguage(ctx, client.language);
       await connectClientToTelegram(client.id, telegramId);
+      ctx.client = client;
       await ctx.reply(buildConnectedMessage(client, ctx.language));
+      if (needsScheduleSetup(client)) {
+        await startTrainingDaysSetup(ctx);
+      }
     } catch (err) {
       console.error(`[START] Connect error for ${telegramId}:`, err);
       await ctx.reply(t("error.connection_error", ctx.language));
@@ -75,7 +84,11 @@ export async function startHandler(ctx: MyContext): Promise<void> {
     applyClientLanguage(ctx, client.language);
 
     if (client.status === "active" && client.payment_status === "paid") {
+      ctx.client = client;
       await ctx.reply(buildConnectedMessage(client, ctx.language));
+      if (needsScheduleSetup(client)) {
+        await startTrainingDaysSetup(ctx);
+      }
       return;
     }
 

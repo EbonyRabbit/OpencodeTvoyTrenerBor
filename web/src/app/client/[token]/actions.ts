@@ -307,6 +307,7 @@ export type ClientSettingsInput = {
   morning_time: string | null;
   measurement_time: string | null;
   measurement_day: number | null;
+  training_days: number[] | null;
 };
 
 export async function updateClientSettings(
@@ -345,6 +346,19 @@ export async function updateClientSettings(
       }
     }
 
+    if (data.training_days !== null) {
+      if (
+        !Array.isArray(data.training_days) ||
+        data.training_days.length === 0 ||
+        data.training_days.some(
+          (d) => !Number.isInteger(d) || d < 1 || d > 7,
+        ) ||
+        new Set(data.training_days).size !== data.training_days.length
+      ) {
+        return { error: "Некорректный список тренировочных дней" };
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from("clients")
       .update({
@@ -353,6 +367,7 @@ export async function updateClientSettings(
         morning_time: data.morning_time || null,
         measurement_time: data.measurement_time || null,
         measurement_day: data.measurement_day ?? null,
+        training_days: data.training_days ?? null,
       })
       .eq("id", clientId);
 

@@ -89,6 +89,19 @@ export async function getWorkoutPlan(
   };
 }
 
+function getTodayISODay(timezone: string): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: timezone,
+  });
+  const dayName = formatter.format(new Date()).toLowerCase();
+  const dayMap: Record<string, number> = {
+    monday: 1, tuesday: 2, wednesday: 3, thursday: 4,
+    friday: 5, saturday: 6, sunday: 7,
+  };
+  return dayMap[dayName] ?? 0;
+}
+
 export async function getTodayWorkout(client: Client): Promise<TodayWorkout | null> {
   if (!client.program_id) return null;
 
@@ -119,10 +132,7 @@ export async function getTodayWorkout(client: Client): Promise<TodayWorkout | nu
   });
   if (!plan) return null;
 
-  const matchedDay = plan.days.find((d) => {
-    const normalizedName = d.day_name.toLowerCase();
-    return normalizedName.includes(todayName);
-  });
+  const matchedDay = matchDayForToday(plan.days, client.training_days, todayName, tz);
 
   if (!matchedDay?.exercises?.length) return null;
 
@@ -131,6 +141,27 @@ export async function getTodayWorkout(client: Client): Promise<TodayWorkout | nu
     day_name: matchedDay.day_name,
     exercises: matchedDay.exercises,
   };
+}
+
+function matchDayForToday(
+  days: ParsedDay[],
+  trainingDays: number[] | null,
+  todayName: string,
+  tz: string,
+): ParsedDay | null {
+  if (trainingDays && trainingDays.length > 0) {
+    const todayISO = getTodayISODay(tz);
+    const dayIndex = trainingDays.indexOf(todayISO);
+    if (dayIndex === -1) return null;
+    const dayOrder = dayIndex + 1;
+    const matched = days.find((d) => d.day_order === dayOrder);
+    if (matched) return matched;
+  }
+
+  return days.find((d) => {
+    const normalizedName = d.day_name.toLowerCase();
+    return normalizedName.includes(todayName);
+  }) ?? null;
 }
 
 function formatExerciseDetailLine(ex: ParsedExercise): string {

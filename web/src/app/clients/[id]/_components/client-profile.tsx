@@ -3,6 +3,7 @@
 import Link from "next/link";
 // import Image from "next/image"; // DISABLED: photo storage removed
 // import { useState } from "react"; // DISABLED: photo storage removed (was used for failedImages state)
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -28,7 +29,7 @@ import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database, Json } from "@/types/supabase";
 
-type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
+type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "training_days" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
 type CheckinRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress" | "nutrition_adherence" | "missed_workouts" | "complaints">;
 type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
@@ -178,6 +179,15 @@ export function ClientProfile({
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
   // const [failedImages, setFailedImages] = useState<Set<string>>(new Set()); // DISABLED: photo storage removed
+
+  const programDayOrders = useMemo(() => {
+    const firstWeek = parsedContent?.weeks?.[0];
+    if (!firstWeek?.days) return [];
+    return firstWeek.days
+      .filter((d) => (d.exercises?.length ?? 0) > 0)
+      .map((d) => d.day_order)
+      .sort((a, b) => a - b);
+  }, [parsedContent]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -590,6 +600,8 @@ export function ClientProfile({
         clientMorningTime={client.morning_time}
         clientMeasurementTime={client.measurement_time}
         clientMeasurementDay={client.measurement_day}
+        clientTrainingDays={client.training_days}
+        programDayOrders={programDayOrders}
       />
 
       <div className="flex justify-end gap-2">

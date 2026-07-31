@@ -15,6 +15,7 @@ import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
 import { myWebHandler } from "./handlers/my-web.js";
+import { scheduleHandler } from "./handlers/training-days.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
@@ -52,7 +53,7 @@ bot.use(async (ctx, next) => {
       ctx.state = null;
     }
 
-    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements" /* || ctx.state?.action === "photos" */ || ctx.state?.action === "checkin" || ctx.state?.action === "pause" || ctx.state?.action === "resume") {
+    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements" /* || ctx.state?.action === "photos" */ || ctx.state?.action === "checkin" || ctx.state?.action === "pause" || ctx.state?.action === "resume" || ctx.state?.action === "training_days") {
       try {
         const client = await findClientByTelegramId(ctx.from.id);
         if (client) ctx.client = client;
@@ -164,6 +165,16 @@ bot.command("mystats", async (ctx) => {
   }
   ctx.client = guard.client;
   await myStatsHandler(ctx);
+});
+
+bot.command("schedule", async (ctx) => {
+  const guard = await guardActiveClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await scheduleHandler(ctx);
 });
 
 bot.command("chat", startCoachChat);

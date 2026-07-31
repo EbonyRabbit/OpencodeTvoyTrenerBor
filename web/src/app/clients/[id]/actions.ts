@@ -397,6 +397,7 @@ export async function updateClient(
     morning_time?: string | null;
     measurement_time?: string | null;
     measurement_day?: number | null;
+    training_days?: number[] | null;
   },
 ): Promise<{ error?: string }> {
   try {
@@ -462,6 +463,24 @@ export async function updateClient(
         update.measurement_day = data.measurement_day;
       } else {
         update.measurement_day = null;
+      }
+    }
+
+    if (data.training_days !== undefined) {
+      if (data.training_days !== null) {
+        if (
+          !Array.isArray(data.training_days) ||
+          data.training_days.length === 0 ||
+          data.training_days.some(
+            (d) => !Number.isInteger(d) || d < 1 || d > 7,
+          ) ||
+          new Set(data.training_days).size !== data.training_days.length
+        ) {
+          return { error: "Некорректный список тренировочных дней" };
+        }
+        update.training_days = data.training_days;
+      } else {
+        update.training_days = null;
       }
     }
 

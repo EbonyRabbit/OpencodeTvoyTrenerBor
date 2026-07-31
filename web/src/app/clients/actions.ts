@@ -53,6 +53,7 @@ export async function createClient(formData: {
       morning_time: null,
       measurement_time: null,
       measurement_day: null,
+      training_days: null,
       access_start_date: null,
       access_end_date: null,
       legacy_id: null,

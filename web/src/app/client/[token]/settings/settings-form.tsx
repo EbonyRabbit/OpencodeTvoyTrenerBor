@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +14,20 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Check } from "lucide-react";
 import { updateClientSettings, type ClientSettingsInput } from "../actions";
-import { TIMEZONE_LIST, LANGUAGE_LABELS, MEASUREMENT_DAY_OPTIONS } from "@/lib/clients";
+import { TIMEZONE_LIST, LANGUAGE_LABELS, MEASUREMENT_DAY_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/clients";
 import type { ClientRow } from "@/lib/clients";
+
+type SettingsClient = Pick<
+  ClientRow,
+  "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "training_days"
+>;
 
 export function SettingsForm({
   client,
+  programDayOrders,
 }: {
-  client: Pick<ClientRow, "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day">;
+  client: SettingsClient;
+  programDayOrders: number[];
 }) {
   const router = useRouter();
   const [language, setLanguage] = useState(client.language);
@@ -29,6 +36,9 @@ export function SettingsForm({
   const [measurementTime, setMeasurementTime] = useState((client.measurement_time ?? "").slice(0, 5));
   const [measurementDay, setMeasurementDay] = useState(
     client.measurement_day != null ? String(client.measurement_day) : "",
+  );
+  const [trainingDays, setTrainingDays] = useState<(number | null)[]>(
+    programDayOrders.map((_, i) => client.training_days?.[i] ?? null),
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -42,7 +52,31 @@ export function SettingsForm({
     setMeasurementDay(
       client.measurement_day != null ? String(client.measurement_day) : "",
     );
-  }, [client]);
+    setTrainingDays(
+      programDayOrders.map((_, i) => client.training_days?.[i] ?? null),
+    );
+  }, [client, programDayOrders]);
+
+  const updateTrainingDay = useCallback(
+    (index: number, value: number | null) => {
+      setTrainingDays((prev) => {
+        const next = [...prev];
+        const prevValue = next[index];
+        next[index] = value;
+
+        if (prevValue != null && value != null && prevValue !== value) {
+          for (let i = 0; i < next.length; i++) {
+            if (i !== index && next[i] === value) next[i] = null;
+          }
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const hasSchedule = programDayOrders.length > 0;
+  const scheduleComplete = hasSchedule && trainingDays.every((d) => d != null);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +91,7 @@ export function SettingsForm({
         morning_time: morningTime || null,
         measurement_time: measurementTime || null,
         measurement_day: measurementDay ? Number(measurementDay) : null,
+        training_days: scheduleComplete ? trainingDays.map((d) => d as number) : null,
       };
 
       const result = await updateClientSettings(data);
@@ -94,12 +129,12 @@ export function SettingsForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Уведомления и язык</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSave} aria-label="Настройки клиента" className="space-y-4">
+    <form onSubmit={handleSave} aria-label="Настройки клиента" className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Уведомления и язык</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="settings-language" className="text-xs text-muted-foreground">
               Язык
@@ -175,21 +210,66 @@ export function SettingsForm({
               className="h-9"
             />
           </div>
+        </CardContent>
+      </Card>
 
-          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-
-          <Button type="submit" disabled={saving} className="w-full">
-            {saving ? (
-              <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                Сохранение...
-              </>
-            ) : (
-              "Сохранить настройки"
+      {hasSchedule && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Расписание тренировок</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Выбери день недели для каждой тренировки. Расписание применяется ко всем
+              неделям программы.
+            </p>
+            {programDayOrders.map((order, i) => (
+              <div key={order} className="grid grid-cols-[100px_1fr] items-center gap-3">
+                <span className="text-sm">День {order}</span>
+                <Select
+                  value={trainingDays[i] != null ? String(trainingDays[i]) : ""}
+                  onValueChange={(v) => updateTrainingDay(i, v ? Number(v) : null)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выбери день" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Не выбран</SelectItem>
+                    {WEEKDAY_OPTIONS.map(({ value, label }) => {
+                      const taken = trainingDays.some(
+                        (d, di) => di !== i && d === value,
+                      );
+                      return (
+                        <SelectItem key={value} value={String(value)} disabled={taken}>
+                          {label}{taken ? " (занят)" : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+            {scheduleComplete && (
+              <p className="text-xs text-green-600">
+                ✓ Расписание заполнено
+              </p>
             )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+
+      <Button type="submit" disabled={saving} className="w-full">
+        {saving ? (
+          <>
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            Сохранение...
+          </>
+        ) : (
+          "Сохранить настройки"
+        )}
+      </Button>
+    </form>
   );
 }

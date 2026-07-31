@@ -12,7 +12,7 @@ import {
   togglePayment,
   updateClient,
 } from "../actions";
-import { TIMEZONE_LIST, MEASUREMENT_DAY_OPTIONS, LANGUAGE_LABELS } from "@/lib/clients";
+import { TIMEZONE_LIST, MEASUREMENT_DAY_OPTIONS, LANGUAGE_LABELS, WEEKDAY_OPTIONS } from "@/lib/clients";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,6 +45,8 @@ export function ClientActions({
   clientMorningTime,
   clientMeasurementTime,
   clientMeasurementDay,
+  clientTrainingDays,
+  programDayOrders,
 }: {
   clientId: string;
   currentCode: string | null;
@@ -57,6 +59,8 @@ export function ClientActions({
   clientMorningTime: string | null;
   clientMeasurementTime: string | null;
   clientMeasurementDay: number | null;
+  clientTrainingDays?: number[] | null;
+  programDayOrders?: number[];
 }) {
   const router = useRouter();
   const [activating, setActivating] = useState(false);
@@ -89,6 +93,7 @@ export function ClientActions({
     morning_time: string;
     measurement_time: string;
     measurement_day: string;
+    training_days: (number | null)[];
   }>({
     name: "",
     language: "ru",
@@ -96,6 +101,7 @@ export function ClientActions({
     morning_time: "",
     measurement_time: "",
     measurement_day: "",
+    training_days: [],
   });
 
   const loadPrograms = useCallback(async () => {
@@ -260,9 +266,24 @@ export function ClientActions({
       morning_time: (clientMorningTime ?? "").slice(0, 5),
       measurement_time: (clientMeasurementTime ?? "").slice(0, 5),
       measurement_day: clientMeasurementDay != null ? String(clientMeasurementDay) : "",
+      training_days: (programDayOrders ?? []).map((_, i) => clientTrainingDays?.[i] ?? null),
     });
     setShowEditDialog(true);
-  }, [clientName, clientLanguage, clientTimezone, clientMorningTime, clientMeasurementTime, clientMeasurementDay]);
+  }, [clientName, clientLanguage, clientTimezone, clientMorningTime, clientMeasurementTime, clientMeasurementDay, clientTrainingDays, programDayOrders]);
+
+  const handleUpdateTrainingDay = useCallback((index: number, value: number | null) => {
+    setEditForm((f) => {
+      const next = [...f.training_days];
+      const prevValue = next[index];
+      next[index] = value;
+      if (prevValue != null && value != null && prevValue !== value) {
+        for (let i = 0; i < next.length; i++) {
+          if (i !== index && next[i] === value) next[i] = null;
+        }
+      }
+      return { ...f, training_days: next };
+    });
+  }, []);
 
   const handleSaveEdit = useCallback(async () => {
     setEditLoading(true);
@@ -275,6 +296,7 @@ export function ClientActions({
         morning_time: string | null;
         measurement_time: string | null;
         measurement_day: number | null;
+        training_days: number[] | null;
       } = {
         name: editForm.name,
         language: editForm.language,
@@ -282,7 +304,18 @@ export function ClientActions({
         morning_time: editForm.morning_time || null,
         measurement_time: editForm.measurement_time || null,
         measurement_day: editForm.measurement_day ? Number(editForm.measurement_day) : null,
+        training_days:
+          programDayOrders && programDayOrders.length > 0
+            ? editForm.training_days.map((d) => d as number)
+            : null,
       };
+      if (
+        payload.training_days &&
+        payload.training_days.some((d) => d == null)
+      ) {
+        setEditError("Выберите день недели для каждой тренировки");
+        return;
+      }
       const result = await updateClient(clientId, payload);
       if (result.error) {
         setEditError(result.error);
@@ -295,7 +328,7 @@ export function ClientActions({
     } finally {
       setEditLoading(false);
     }
-  }, [clientId, editForm, router]);
+  }, [clientId, editForm, programDayOrders, router]);
 
   return (
     <div className="space-y-3">
@@ -653,6 +686,44 @@ export function ClientActions({
                 onChange={(e) => setEditForm((f) => ({ ...f, measurement_time: e.target.value }))}
               />
             </div>
+
+            {programDayOrders && programDayOrders.length > 0 && (
+              <div className="space-y-3 border-t pt-4">
+                <div>
+                  <p className="text-sm font-medium">Расписание тренировок</p>
+                  <p className="text-xs text-muted-foreground">
+                    Выберите дни недели для каждой тренировки.
+                  </p>
+                </div>
+                {programDayOrders.map((order, i) => (
+                  <div key={order} className="grid grid-cols-[80px_1fr] items-center gap-2">
+                    <span className="text-sm">День {order}</span>
+                    <Select
+                      value={editForm.training_days[i] != null ? String(editForm.training_days[i]) : ""}
+                      onValueChange={(v) => handleUpdateTrainingDay(i, v ? Number(v) : null)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Не выбран" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Не выбран</SelectItem>
+                        {WEEKDAY_OPTIONS.map(({ value, label }) => {
+                          const taken = editForm.training_days.some(
+                            (d, di) => di !== i && d === value,
+                          );
+                          return (
+                            <SelectItem key={value} value={String(value)} disabled={taken}>
+                              {label}{taken ? " (занят)" : ""}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <DialogFooter>
               <DialogClose render={<Button variant="outline" type="button" />}>
                 Отмена

@@ -33,6 +33,7 @@ export interface Database {
           morning_time: string | null;
           measurement_time: string | null;
           measurement_day: number | null;
+          training_days: number[] | null;
           access_start_date: string | null;
           access_end_date: string | null;
           legacy_id: string | null;

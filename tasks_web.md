@@ -604,6 +604,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **12.10** | Настроить Vercel env vars | Переменные из 12.3 заданы (страницы рендерятся, база отвечает) | ✅ |
 | **12.11** | Проверить деплой веба | `/` → 200, `/login` → 200, `/clients/...` → 307 (редирект на auth), клиентский портал `/client/[token]` → 200 | ✅ |
 | **12.12** | Переключить webhook | `setWebhook` = `https://tvoi-trener-bot.onrender.com/webhook`, secret token задан | ✅ |
+| **12.19** | Витрина программ + заявки на покупку | Бот: кнопка «📚 Смотреть программы» в `/start`, каталог шаблонов (active=true, client_id IS NULL), кнопка «Купить» → `/buy/{id}?tg={telegramId}`. Веб: публичная страница `/buy/[id]` (формы, валидация, rate-limit 5/мин, dedup 120с), заявка в `bot_logs` (action=`purchase_request`), уведомление коучу в Telegram. Commit `e329e4f`, ревью 9.5/10. ⏳ Деплой: добавить на Render `CLIENT_PORTAL_URL`+`PAYMENT_BASE_URL`, на Vercel `TELEGRAM_BOT_TOKEN`+`COACH_CHAT_ID` | ✅ (код) |
 | **12.13** | Тест бота в продакшене | `/health` OK; проверить команды `/start`, `/menu` — вручную в Telegram | ⏳ |
 | **12.14** | Тест веба в продакшене | Страницы открываются; залогиниться в админку — вручную | ⏳ |
 | **12.15** | Тест end-to-end | Полный цикл: бот → веб → замеры → чек-ин (вручную) | ⏳ |

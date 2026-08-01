@@ -84,7 +84,14 @@ function WeekItem({
               const exercises = day.exercises ?? [];
               return (
                 <div key={dayKey}>
-                  <h4 className="mb-2 text-sm font-medium">{day.day_name}</h4>
+                  <h4 className="mb-2 text-sm font-medium">
+                    {day.day_name}
+                    {day.focus && (
+                      <span className="ml-2 text-muted-foreground">
+                        — {day.focus}
+                      </span>
+                    )}
+                  </h4>
                   {exercises.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Нет упражнений

@@ -139,6 +139,7 @@ export async function getTodayWorkout(client: Client): Promise<TodayWorkout | nu
   return {
     ...plan,
     day_name: matchedDay.day_name,
+    goal: matchedDay.focus ?? null,
     exercises: matchedDay.exercises,
   };
 }

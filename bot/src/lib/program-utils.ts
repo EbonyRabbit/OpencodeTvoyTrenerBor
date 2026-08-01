@@ -19,6 +19,7 @@ export type ParsedWeek = {
 export type ParsedDay = {
   day_name: string;
   day_order: number;
+  focus?: string;
   exercises?: ParsedExercise[];
 };
 

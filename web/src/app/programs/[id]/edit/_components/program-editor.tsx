@@ -298,6 +298,19 @@ function DaySection({
           }
           className="h-7 w-40 text-xs font-medium"
         />
+        <Input
+          value={day.focus ?? ""}
+          onChange={(e) =>
+            dispatch({
+              type: "UPDATE_DAY",
+              weekIndex,
+              dayIndex,
+              payload: { focus: e.target.value.trim() || undefined },
+            })
+          }
+          placeholder="Фокус (напр. Верх, Ноги)"
+          className="h-7 w-52 text-xs"
+        />
         <Button
           type="button"
           variant="ghost"

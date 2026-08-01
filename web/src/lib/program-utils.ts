@@ -21,6 +21,7 @@ export type ParsedWeek = {
 export type ParsedDay = {
   day_name: string;
   day_order: number;
+  focus?: string;
   exercises?: ParsedExercise[];
 };
 
@@ -74,6 +75,7 @@ function isValidDay(value: unknown): value is ParsedDay {
   const d = value as Record<string, unknown>;
   if (typeof d.day_name !== "string") return false;
   if (typeof d.day_order !== "number" || !Number.isFinite(d.day_order)) return false;
+  if (d.focus !== undefined && typeof d.focus !== "string") return false;
   if (d.exercises !== undefined) {
     if (!Array.isArray(d.exercises)) return false;
     for (const e of d.exercises) {

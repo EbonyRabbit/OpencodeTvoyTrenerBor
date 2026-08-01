@@ -18,6 +18,20 @@ function getTodayDayName(tz: string): string {
     .toLowerCase();
 }
 
+function getTodayISODay(tz: string): number {
+  const dayName = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: tz,
+  })
+    .format(new Date())
+    .toLowerCase();
+  const dayMap: Record<string, number> = {
+    monday: 1, tuesday: 2, wednesday: 3, thursday: 4,
+    friday: 5, saturday: 6, sunday: 7,
+  };
+  return dayMap[dayName] ?? 0;
+}
+
 function daysBetween(dateStrA: string, dateStrB: string): number {
   const a = new Date(dateStrA + "T00:00:00Z");
   const b = new Date(dateStrB + "T00:00:00Z");
@@ -27,9 +41,16 @@ function daysBetween(dateStrA: string, dateStrB: string): number {
 function matchDay(
   days: ParsedDay[],
   todayName: string,
+  todayISODay: number,
+  trainingDays: number[] | null,
   startDate: string | null,
   todayStr: string,
 ): ParsedDay | undefined {
+  if (trainingDays && trainingDays.length > 0) {
+    const dayIndex = trainingDays.indexOf(todayISODay);
+    if (dayIndex === -1) return undefined;
+    return days.find((d) => d.day_order === dayIndex + 1);
+  }
   return days.find((d) => {
     const normalizedName = d.day_name.toLowerCase();
     if (normalizedName.includes(todayName)) return true;
@@ -39,6 +60,18 @@ function matchDay(
     }
     return false;
   });
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function todayLabelFor(iso: number): string {
+  const base = new Date(Date.UTC(2026, 0, 5 + (iso - 1)));
+  return new Intl.DateTimeFormat("ru-RU", {
+    weekday: "long",
+    timeZone: "UTC",
+  }).format(base);
 }
 
 export default async function WorkoutPage() {
@@ -56,9 +89,9 @@ export default async function WorkoutPage() {
 
   const { data: client } = await supabaseAdmin
     .from("clients")
-    .select("program_id, timezone")
+    .select("program_id, timezone, training_days")
     .eq("id", clientId)
-    .maybeSingle<Pick<ClientRow, "program_id" | "timezone">>();
+    .maybeSingle<Pick<ClientRow, "program_id" | "timezone" | "training_days">>();
 
   if (!client?.program_id) {
     return (
@@ -73,6 +106,7 @@ export default async function WorkoutPage() {
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
   const todayName = getTodayDayName(tz);
+  const todayISODay = getTodayISODay(tz);
 
   const { data: schedule } = await supabaseAdmin
     .from("program_schedule")
@@ -136,10 +170,19 @@ export default async function WorkoutPage() {
     );
   }
 
-  const matchedDay = matchDay(weekData.days, todayName, currentWeek.start_date, todayStr);
+  const matchedDay = matchDay(
+    weekData.days,
+    todayName,
+    todayISODay,
+    client.training_days,
+    currentWeek.start_date,
+    todayStr,
+  );
 
   if (!matchedDay?.exercises?.length) {
-    const dayNames = weekData.days.map((d) => d.day_name).join(", ");
+    const dayNames = client.training_days?.length
+      ? client.training_days.map((iso) => capitalize(todayLabelFor(iso))).join(", ")
+      : weekData.days.map((d) => d.day_name).join(", ");
     return (
       <Card>
         <CardContent className="py-8 text-center">
@@ -153,10 +196,14 @@ export default async function WorkoutPage() {
     );
   }
 
+  const dayTitle = client.training_days?.length
+    ? capitalize(todayName)
+    : matchedDay.day_name;
+
   return (
     <div>
       <div className="mb-4">
-        <h2 className="text-lg font-semibold">{matchedDay.day_name}</h2>
+        <h2 className="text-lg font-semibold">{dayTitle}</h2>
         <p className="text-sm text-muted-foreground">
           Неделя {currentWeek.week_number}
           {weekData.is_deload && " (разгрузочная)"}

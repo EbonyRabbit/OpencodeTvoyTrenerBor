@@ -125,7 +125,8 @@ export async function runMorningNotification(bot: Bot<MyContext>): Promise<void>
         const fullClient = await findClientByTelegramId(client.telegram_id);
         if (!fullClient) continue;
 
-        const workout = await getTodayWorkout(fullClient);
+        const lang = (client.language || "ru") as Language;
+        const workout = await getTodayWorkout(fullClient, lang);
         if (!workout) continue;
 
         const todayStr = getTodayDateStr(tz);
@@ -134,7 +135,6 @@ export async function runMorningNotification(bot: Bot<MyContext>): Promise<void>
         const dedupResult = await markAsSent(dedupKey, DEDUP_TTL_HOURS);
         if (dedupResult !== "sent") continue;
 
-        const lang = (client.language || "ru") as Language;
         const greeting = t("morning.greeting", lang, { name: client.name });
         const header = t("morning.header", lang);
         const workoutText = formatWorkoutMessage(workout, lang);

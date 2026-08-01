@@ -8,6 +8,7 @@ import {
   getWorkoutDaysCount,
 } from "../lib/program-utils.js";
 import { t, applyClientLanguage } from "../i18n/index.js";
+import { formatSchedule } from "./training-days.js";
 import { guardActiveClient } from "./guards.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
@@ -106,7 +107,14 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
         lines.push(t("program.workout_days", ctx.language, { count: workoutDays }));
       }
 
-      if (currentWeekData?.days && currentWeekData.days.length > 0) {
+      const trainingDays = client.training_days;
+      if (trainingDays && trainingDays.length > 0) {
+        lines.push("");
+        lines.push(t("program.days_header", ctx.language));
+        for (const line of formatSchedule(trainingDays, ctx.language).split("\n")) {
+          lines.push(`  ${line}`);
+        }
+      } else if (currentWeekData?.days && currentWeekData.days.length > 0) {
         lines.push("");
         lines.push(t("program.days_header", ctx.language));
         for (const day of currentWeekData.days) {

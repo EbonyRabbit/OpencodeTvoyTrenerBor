@@ -102,7 +102,11 @@ function getTodayISODay(timezone: string): number {
   return dayMap[dayName] ?? 0;
 }
 
-export async function getTodayWorkout(client: Client): Promise<TodayWorkout | null> {
+function weekdayFullName(iso: number, lang: Language): string {
+  return t(`schedule.day_fullnames.${String(iso)}`, lang);
+}
+
+export async function getTodayWorkout(client: Client, lang: Language = "ru"): Promise<TodayWorkout | null> {
   if (!client.program_id) return null;
 
   const tz = client.timezone || DEFAULT_TIMEZONE;
@@ -136,9 +140,12 @@ export async function getTodayWorkout(client: Client): Promise<TodayWorkout | nu
 
   if (!matchedDay?.exercises?.length) return null;
 
+  const scheduledIsoDay =
+    (client.training_days?.length ?? 0) > 0 ? getTodayISODay(tz) : null;
+
   return {
     ...plan,
-    day_name: matchedDay.day_name,
+    day_name: scheduledIsoDay ? weekdayFullName(scheduledIsoDay, lang) : matchedDay.day_name,
     goal: matchedDay.focus ?? null,
     exercises: matchedDay.exercises,
   };
@@ -413,7 +420,7 @@ export async function sendTodayWorkout(
   client: Client,
   telegramId: number,
 ): Promise<boolean> {
-  const workout = await getTodayWorkout(client);
+  const workout = await getTodayWorkout(client, sender.language);
 
   if (!workout) {
     await sender.reply(t("workout.no_workout_today", sender.language));

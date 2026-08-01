@@ -142,13 +142,36 @@ export async function handleProgramRequestCallback(ctx: MyContext, programId: st
 
     const bot = (await import("../bot.js")).bot;
     const coachChatId = config.coachChatId;
+    let notificationFailed = false;
 
     if (coachChatId !== 0n) {
       const { findClientByTelegramId } = await import("../lib/clients.js");
       const client = await findClientByTelegramId(ctx.from.id);
       const clientName = client?.name ?? ctx.from.id;
       const coachMsg = `📩 Клиент ${clientName} запросил программу: ${programTitle}`;
-      await bot.api.sendMessage(String(coachChatId), coachMsg);
+      try {
+        await bot.api.sendMessage(String(coachChatId), coachMsg);
+      } catch (sendErr) {
+        console.warn(`[PROGRAMS] Coach notification failed for ${ctx.from.id}:`, sendErr);
+        notificationFailed = true;
+      }
+    } else {
+      notificationFailed = true;
+    }
+
+    const { error: logError } = await supabaseAdmin.from("bot_logs").insert({
+      action: notificationFailed ? "program_request:coach_notification_failed" : "program_request",
+      status: notificationFailed ? "error" : "info",
+      telegram_id: ctx.from.id,
+      details: JSON.stringify({ program_id: programId, program_title: programTitle }),
+    });
+    if (logError) {
+      console.warn("[PROGRAMS] Failed to log request:", logError.message);
+    }
+
+    if (notificationFailed) {
+      await ctx.reply(t("programs.request_error", lang));
+      return;
     }
 
     await ctx.reply(t("programs.request_sent", lang));

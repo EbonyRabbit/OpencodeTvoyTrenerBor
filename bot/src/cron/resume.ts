@@ -104,7 +104,7 @@ export async function runAutoResume(bot: Bot<MyContext>): Promise<void> {
         const dedupResult = await markAsSent(dedupKey, DEDUP_TTL_HOURS);
         if (dedupResult === "sent") {
           try {
-            const workout = await getTodayWorkout(client);
+            const workout = await getTodayWorkout(client, lang);
             const header = t("resume.resumed_header", lang);
             const msg = workout
               ? `${header}\n\n${formatWorkoutMessage(workout, lang)}`

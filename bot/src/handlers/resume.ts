@@ -156,7 +156,7 @@ export async function handleResumeCallback(ctx: MyContext, strategyParam: string
   await ctx.reply(`${t("resume.confirmed", lang)}\n${t("resume.suggested_strategy", lang, { strategy: strategyLabel })}`);
 
   try {
-    const workout = await getTodayWorkout(client);
+    const workout = await getTodayWorkout(client, lang);
     const header = t("resume.resumed_header", lang);
     const msg = workout
       ? `${header}\n\n${formatWorkoutMessage(workout, lang)}`

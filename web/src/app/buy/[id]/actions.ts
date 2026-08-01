@@ -15,7 +15,7 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 5;
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 
-const DEDUP_WINDOW_MS = 120_000;
+const DEDUP_WINDOW_MS = 900_000;
 const dedupMap = new Map<string, number>();
 
 setInterval(() => {

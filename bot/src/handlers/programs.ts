@@ -147,8 +147,22 @@ export async function handleProgramRequestCallback(ctx: MyContext, programId: st
     if (coachChatId !== 0n) {
       const { findClientByTelegramId } = await import("../lib/clients.js");
       const client = await findClientByTelegramId(ctx.from.id);
-      const clientName = client?.name ?? ctx.from.id;
-      const coachMsg = `📩 Клиент ${clientName} запросил программу: ${programTitle}`;
+      const clientName = client?.name ?? "Неизвестный клиент";
+      const tgLink = ctx.from.username
+        ? `https://t.me/${ctx.from.username}`
+        : null;
+      const coachMsg = [
+        "📩 Запрос от клиента",
+        "",
+        `👤 ${clientName}`,
+        ctx.from.username
+          ? `🔗 @${ctx.from.username} (${tgLink})`
+          : `🆔 TG ID: ${ctx.from.id}`,
+        "",
+        `Хочет: ${programTitle}`,
+        "",
+        "Свяжитесь с клиентом в Telegram.",
+      ].join("\n");
       try {
         await bot.api.sendMessage(String(coachChatId), coachMsg);
       } catch (sendErr) {

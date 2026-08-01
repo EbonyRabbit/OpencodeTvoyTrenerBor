@@ -10,7 +10,7 @@ import { setState, clearState } from "../state/machine.js";
 import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
 import { handleEveningYes, handleEveningNo, handleEveningPostpone } from "./evening-poll.js";
 import { startMeasurements, showMeasurementHistory } from "./measurements.js";
-import { handleScheduleStart, handleSchedulePick, handleScheduleCancel } from "./training-days.js";
+import { handleScheduleStart, handleScheduleToggle, handleScheduleDone, handleScheduleCancel } from "./training-days.js";
 import { handleResumeCallback } from "./resume.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
 import { supabaseAdmin } from "../lib/supabase-admin.js";
@@ -103,7 +103,8 @@ registerCallback("measurements_history", async (ctx) => { await showMeasurementH
 // registerCallback("photo_history", async (ctx) => { await ctx.answerCallbackQuery().catch(() => {}); await showPhotoHistory(ctx); }); // DISABLED: photo storage removed
 registerCallback("resume", async (ctx, strategy) => { await handleResumeCallback(ctx, strategy); });
 registerCallback("sched_start", async (ctx) => { await handleScheduleStart(ctx); });
-registerCallback("sched_sel", async (ctx, iso) => { await handleSchedulePick(ctx, iso); });
+registerCallback("sched_toggle", async (ctx, iso) => { await handleScheduleToggle(ctx, iso); });
+registerCallback("sched_done", async (ctx) => { await handleScheduleDone(ctx); });
 registerCallback("sched_cancel", async (ctx) => { await handleScheduleCancel(ctx); });
 
 function buildExerciseKeyboard(

@@ -250,7 +250,7 @@ async function completeCheckin(
 
     const { error } = await supabaseAdmin
       .from("checkins")
-      .insert(logEntry as never);
+      .insert(logEntry);
 
     if (error) {
       console.error(`[CHECKIN] Failed to save checkin for ${client.id}:`, error);

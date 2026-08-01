@@ -54,6 +54,7 @@ export async function createPurchaseRequest(
   input: PurchaseRequestInput,
 ): Promise<{ error?: string }> {
   let dedupKey = "";
+  let dbDedupKey = "";
   try {
     const h = await headers();
     const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
@@ -109,6 +110,28 @@ export async function createPurchaseRequest(
       return { error: "Программа недоступна для покупки." };
     }
 
+    dbDedupKey = `purchase:${programId}:${contact.toLowerCase()}`;
+    const nowIso = new Date().toISOString();
+    const { error: purgeError } = await supabaseAdmin
+      .from("bot_dedup")
+      .delete()
+      .eq("key", dbDedupKey)
+      .lt("expires_at", nowIso);
+    if (purgeError) {
+      console.error("[PURCHASE] Failed to purge expired dedup key:", purgeError.message);
+    }
+
+    const { error: dedupError } = await supabaseAdmin.from("bot_dedup").insert({
+      key: dbDedupKey,
+      expires_at: new Date(Date.now() + DEDUP_WINDOW_MS).toISOString(),
+    });
+    if (dedupError?.code === "23505") {
+      return { error: DEDUP_ERROR_MESSAGE };
+    }
+    if (dedupError) {
+      console.error("[PURCHASE] Failed to write dedup key:", dedupError.message);
+    }
+
     const details = JSON.stringify({
       program_id: program.id,
       program_title: program.title,
@@ -125,9 +148,9 @@ export async function createPurchaseRequest(
     if (logError) {
       console.error("[PURCHASE] Failed to log purchase request:", logError.message);
       dedupMap.delete(dedupKey);
+      await supabaseAdmin.from("bot_dedup").delete().eq("key", dbDedupKey);
       return { error: "Не удалось сохранить заявку. Попробуйте позже." };
     }
-
     const coachChatId = process.env.COACH_CHAT_ID;
 
     const logNotificationFailure = async (reason: string) => {
@@ -165,6 +188,12 @@ export async function createPurchaseRequest(
   } catch (e) {
     console.error("[PURCHASE] createPurchaseRequest error:", e);
     if (dedupKey) dedupMap.delete(dedupKey);
+    if (dbDedupKey) {
+      await supabaseAdmin.from("bot_dedup").delete().eq("key", dbDedupKey).then(
+        () => {},
+        (delErr) => console.error("[PURCHASE] Failed to delete dedup key:", delErr),
+      );
+    }
     return { error: "Произошла ошибка. Попробуйте позже." };
   }
 }

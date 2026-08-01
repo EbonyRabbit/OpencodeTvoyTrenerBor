@@ -14,7 +14,7 @@ import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
-import { myWebHandler } from "./handlers/my-web.js";
+import { myWebHandler, settingsHandler } from "./handlers/my-web.js";
 import { scheduleHandler } from "./handlers/training-days.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
@@ -179,6 +179,16 @@ bot.command("schedule", async (ctx) => {
 
 bot.command("chat", startCoachChat);
 bot.command("chat_end", endCoachChat);
+
+bot.command("settings", async (ctx) => {
+  const guard = await guardAuthenticatedClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await settingsHandler(ctx);
+});
 bot.command("debug_today", adminDebugToday);
 bot.command("recalc_schedule", adminRecalcSchedule);
 bot.command("generate_codes", adminGenerateCodes);
@@ -214,9 +224,6 @@ bot.on("callback_query:data", callbackRouter);
 // });
 
 bot.on("message:text", async (ctx) => {
-  const handled = await handleCoachIncoming(ctx);
-  if (handled) return;
-
   if (ctx.state?.action === "exercise_log") {
     const result = await handleWizardInput(ctx);
     if (result.type === "expired") {
@@ -252,6 +259,12 @@ bot.on("message:text", async (ctx) => {
     await handlePauseInput(ctx);
     return;
   }
+
+  const text = ctx.message?.text ?? "";
+  if (text.startsWith("/")) return;
+
+  const handled = await handleCoachIncoming(ctx);
+  if (handled) return;
 
   await handleFreeTextMessage(ctx);
 });

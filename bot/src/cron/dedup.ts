@@ -14,10 +14,9 @@ export async function markAsSent(key: string, ttlHours = DEFAULT_TTL_HOURS): Pro
 
   const expiresAt = new Date(Date.now() + ttlHours * 3600_000).toISOString();
 
-  // TODO: regenerate Supabase types after adding bot_dedup table
   const { error } = await supabaseAdmin
     .from("bot_dedup")
-    .insert({ key, expires_at: expiresAt } as never);
+    .insert({ key, expires_at: expiresAt });
 
   if (error) {
     if (error.code === "23505") {

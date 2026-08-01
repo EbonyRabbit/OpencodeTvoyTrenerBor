@@ -318,6 +318,17 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["bot_logs"]["Row"]>;
         Relationships: [];
       };
+      bot_dedup: {
+        Row: {
+          id: string;
+          key: string;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["bot_dedup"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["bot_dedup"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

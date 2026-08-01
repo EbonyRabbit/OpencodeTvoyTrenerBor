@@ -7,10 +7,6 @@ import { t, type Language } from "../i18n/index.js";
 
 export const WEEKDAYS_ISO = [1, 2, 3, 4, 5, 6, 7] as const;
 
-export interface ScheduleSelection {
-  [order: string]: number;
-}
-
 function weekdayLabel(iso: number, lang: Language): string {
   return t(`schedule.day_fullnames.${String(iso)}`, lang);
 }
@@ -40,49 +36,70 @@ export async function getProgramDayOrders(client: Client): Promise<number[] | nu
   return orders.length > 0 ? orders : null;
 }
 
-function buildDayPickKeyboard(
-  selected: ScheduleSelection,
+type ScheduleStateData = {
+  sched_orders: number[];
+  sched_selected: number[];
+  [key: string]: unknown;
+};
+
+function readScheduleData(state: { data?: unknown } | null | undefined): ScheduleStateData {
+  const data = (state?.data ?? {}) as Partial<ScheduleStateData>;
+  return {
+    sched_orders: Array.isArray(data.sched_orders) ? data.sched_orders : [],
+    sched_selected: Array.isArray(data.sched_selected) ? data.sched_selected : [],
+  };
+}
+
+function buildEditorKeyboard(
+  selected: number[],
   lang: Language,
 ): { text: string; callback_data: string }[][] {
-  const used = new Set(Object.values(selected));
+  const selectedSet = new Set(selected);
   const rows: { text: string; callback_data: string }[][] = [];
 
-  const row: { text: string; callback_data: string }[] = [];
   for (const iso of WEEKDAYS_ISO) {
-    if (used.has(iso)) continue;
-    row.push({
-      text: weekdayShortLabel(iso, lang),
-      callback_data: `sched_sel:${iso}`,
-    });
-    if (row.length === 4) {
-      rows.push(row);
-      row.length = 0;
-    }
+    const mark = selectedSet.has(iso) ? "✅" : "⚪️";
+    rows.push([
+      { text: `${mark} ${weekdayShortLabel(iso, lang)}`, callback_data: `sched_toggle:${iso}` },
+    ]);
   }
-  if (row.length > 0) rows.push(row);
 
-  rows.push([{ text: t("schedule.btn_cancel", lang), callback_data: "sched_cancel" }]);
+  rows.push([
+    { text: t("schedule.btn_done", lang), callback_data: "sched_done" },
+    { text: t("schedule.btn_cancel", lang), callback_data: "sched_cancel" },
+  ]);
+
   return rows;
 }
 
-async function sendDayPick(
+function buildEditorText(
+  ordersCount: number,
+  selected: number[],
+  lang: Language,
+): string {
+  const lines = [
+    t("schedule.setup_description", lang, { count: ordersCount }),
+    "",
+    t("schedule.selected_count", lang, {
+      selected: String(selected.length),
+      total: String(ordersCount),
+    }),
+  ];
+  return lines.join("\n");
+}
+
+async function sendEditor(
   ctx: MyContext,
-  order: number,
-  selected: ScheduleSelection,
+  orders: number[],
+  selected: number[],
 ): Promise<void> {
-  const msg = t("schedule.prompt_day", ctx.language, { order: String(order) });
-  await ctx.reply(msg, {
-    reply_markup: { inline_keyboard: buildDayPickKeyboard(selected, ctx.language) },
+  await ctx.reply(buildEditorText(orders.length, selected, ctx.language), {
+    reply_markup: { inline_keyboard: buildEditorKeyboard(selected, ctx.language) },
   });
 }
 
-async function saveSchedule(ctx: MyContext, selected: ScheduleSelection): Promise<boolean> {
+async function saveSchedule(ctx: MyContext, trainingDays: number[]): Promise<boolean> {
   if (!ctx.client || !ctx.from?.id) return false;
-
-  const entries = Object.entries(selected)
-    .map(([order, iso]) => ({ order: Number(order), iso }))
-    .sort((a, b) => a.order - b.order);
-  const trainingDays = entries.map((e) => e.iso);
 
   const { error } = await supabaseAdmin
     .from("clients")
@@ -107,22 +124,19 @@ export async function startTrainingDaysSetup(ctx: MyContext): Promise<void> {
     return;
   }
 
-  const selected: ScheduleSelection = {};
+  const data: ScheduleStateData = { sched_orders: orders, sched_selected: [] };
 
   try {
     await setState(ctx.from.id, {
       action: "training_days",
       step: "pick",
-      data: { sched_orders: orders, sched_order: orders[0], sched_selected: selected },
+      data,
     });
   } catch (err) {
     console.warn(`[SCHEDULE] setState failed for ${ctx.from.id}:`, err);
   }
 
-  await ctx.reply(
-    t("schedule.setup_description", ctx.language, { count: String(orders.length) }),
-  );
-  await sendDayPick(ctx, orders[0], selected);
+  await sendEditor(ctx, orders, []);
 }
 
 export async function scheduleHandler(ctx: MyContext): Promise<void> {
@@ -165,7 +179,7 @@ export async function handleScheduleStart(ctx: MyContext): Promise<void> {
   await startTrainingDaysSetup(ctx);
 }
 
-export async function handleSchedulePick(ctx: MyContext, isoRaw: string): Promise<void> {
+export async function handleScheduleToggle(ctx: MyContext, isoRaw: string): Promise<void> {
   const iso = Number(isoRaw);
   if (!WEEKDAYS_ISO.includes(iso as (typeof WEEKDAYS_ISO)[number])) {
     await ctx.answerCallbackQuery({ text: t("error.invalid_exercise_index", ctx.language), show_alert: true }).catch(() => {});
@@ -176,41 +190,73 @@ export async function handleSchedulePick(ctx: MyContext, isoRaw: string): Promis
     return;
   }
 
+  const { sched_orders: orders, sched_selected: selected } = readScheduleData(ctx.state);
+
+  if (orders.length === 0) {
+    await ctx.answerCallbackQuery({ text: t("schedule.expired", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
+  const index = selected.indexOf(iso);
+  const nextSelected = index === -1 ? [...selected, iso] : selected.filter((d) => d !== iso);
+
+  try {
+    await setState(ctx.from.id, {
+      action: "training_days",
+      step: "pick",
+      data: { sched_orders: orders, sched_selected: nextSelected },
+    });
+  } catch (err) {
+    console.warn(`[SCHEDULE] setState failed for ${ctx.from.id}:`, err);
+    await ctx.answerCallbackQuery({ text: t("error.service_unavailable", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
   await ctx.answerCallbackQuery().catch(() => {});
 
-  const current = await getState(ctx.from.id);
-  const data = current?.data ?? {};
-  const orders = (data.sched_orders as number[] | undefined) ?? [];
-  const selected = (data.sched_selected ?? {}) as ScheduleSelection;
-  const order = Number(data.sched_order ?? (orders[0] ?? 1));
+  try {
+    await ctx.editMessageText(buildEditorText(orders.length, nextSelected, ctx.language), {
+      reply_markup: { inline_keyboard: buildEditorKeyboard(nextSelected, ctx.language) },
+    });
+  } catch (err) {
+    console.warn(`[SCHEDULE] editMessageText failed for ${ctx.from.id}:`, err);
+    await sendEditor(ctx, orders, nextSelected);
+  }
+}
 
-  if (Object.values(selected).includes(iso)) {
-    await sendDayPick(ctx, order, selected);
+export async function handleScheduleDone(ctx: MyContext): Promise<void> {
+  if (!ctx.client || !ctx.from?.id) {
+    await ctx.answerCallbackQuery().catch(() => {});
     return;
   }
 
-  selected[String(order)] = iso;
+  const { sched_orders: orders, sched_selected: selected } = readScheduleData(ctx.state);
 
-  const nextOrder = orders.find((o) => !selected[String(o)]);
-  if (nextOrder !== undefined) {
-    try {
-      await setState(ctx.from.id, {
-        action: "training_days",
-        step: "pick",
-        data: { sched_orders: orders, sched_order: nextOrder, sched_selected: selected },
-      });
-    } catch (err) {
-      console.warn(`[SCHEDULE] setState failed for ${ctx.from.id}:`, err);
-    }
-    await sendDayPick(ctx, nextOrder, selected);
+  if (orders.length === 0) {
+    await ctx.answerCallbackQuery({ text: t("schedule.expired", ctx.language), show_alert: true }).catch(() => {});
     return;
   }
 
-  const saved = await saveSchedule(ctx, selected);
+  if (selected.length !== orders.length) {
+    await ctx.answerCallbackQuery({
+      text: t("schedule.need_exact", ctx.language, {
+        count: orders.length,
+        selected: String(selected.length),
+      }),
+      show_alert: true,
+    }).catch(() => {});
+    return;
+  }
+
+  const trainingDays = [...selected].sort((a, b) => a - b);
+
+  const saved = await saveSchedule(ctx, trainingDays);
   if (!saved) {
-    await ctx.reply(t("error.service_unavailable", ctx.language));
+    await ctx.answerCallbackQuery({ text: t("error.service_unavailable", ctx.language), show_alert: true }).catch(() => {});
     return;
   }
+
+  await ctx.answerCallbackQuery().catch(() => {});
 
   try {
     await clearState(ctx.from.id);
@@ -218,7 +264,6 @@ export async function handleSchedulePick(ctx: MyContext, isoRaw: string): Promis
     console.warn(`[SCHEDULE] clearState failed for ${ctx.from.id}:`, err);
   }
 
-  const trainingDays = orders.map((o) => selected[String(o)]);
   await ctx.reply(t("schedule.done", ctx.language, {
     days: formatSchedule(trainingDays, ctx.language),
   }));

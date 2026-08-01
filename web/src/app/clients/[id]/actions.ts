@@ -7,6 +7,7 @@ import { verifySession } from "@/lib/dal";
 import { generateSchedule } from "@/lib/plan-adjustment";
 import type { Database, PaymentStatus } from "@/types/supabase";
 import { TIMEZONE_LIST, LANGUAGE_LABELS } from "@/lib/clients";
+import { sendTelegramMessage } from "@/lib/telegram";
 import type { ActivityEvent } from "./activity-types";
 import { ACTIVITY_PAGE_SIZE } from "./activity-types";
 
@@ -366,17 +367,11 @@ export async function markPurchased(
       return { error: `Программа назначена, но не удалось создать расписание: ${scheduleError.error}` };
     }
 
-    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-    if (BOT_TOKEN && client.telegram_id) {
+    if (client.telegram_id) {
       const text = `Покупка подтверждена!\n\nПрограмма: ${program.title}\nДоступ до: ${endDate.toLocaleDateString("ru-RU")}\n\nНапишите /menu для начала тренировок.`;
-      try {
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: client.telegram_id, text }),
-        });
-      } catch {
-        // Telegram notification is best-effort
+      const sent = await sendTelegramMessage(client.telegram_id, text);
+      if (!sent) {
+        console.error("[PURCHASE] Client confirmation notification failed for", client.telegram_id);
       }
     }
 

@@ -70,7 +70,7 @@ export async function runAutoResume(bot: Bot<MyContext>): Promise<void> {
       if (client.status !== "active") {
         await logBotEvent("cron:auto_resume", {
           clientId: pause.client_id,
-          status: "skipped",
+          status: "info",
           details: `Client status is ${client.status}`,
         });
         continue;

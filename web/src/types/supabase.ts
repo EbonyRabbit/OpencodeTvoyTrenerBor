@@ -304,6 +304,20 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["plan_pauses"]["Row"]>;
         Relationships: [];
       };
+      bot_logs: {
+        Row: {
+          id: string;
+          client_id: string | null;
+          telegram_id: number | null;
+          action: string;
+          status: string | null;
+          details: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["bot_logs"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["bot_logs"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

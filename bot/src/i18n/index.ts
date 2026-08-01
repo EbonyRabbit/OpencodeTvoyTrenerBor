@@ -13,7 +13,7 @@ const resources = {
       },
       greeting: {
         hello: "Привет, {{name}}!",
-        welcome_new: "Добро пожаловать! Приобретите программу у тренера для начала тренировок.",
+        welcome_new: "Добро пожаловать! 👋 Выберите программу или введите код доступа от тренера.",
         session_expired: "Сессия истекла. Отправьте /start для начала работы.",
         default_name: "клиент",
       },
@@ -291,6 +291,7 @@ const resources = {
         no_description: "",
         request_button: "📩 Запросить",
         buy_button: "💳 Купить",
+        view_button: "📚 Смотреть программы",
         request_sent: "✅ Запрос отправлен тренеру!",
         request_error: "❌ Не удалось отправить запрос. Попробуйте позже.",
       },
@@ -361,7 +362,7 @@ const resources = {
       },
       greeting: {
         hello: "Hello, {{name}}!",
-        welcome_new: "Welcome! Purchase a program from your coach to start training.",
+        welcome_new: "Welcome! 👋 Choose a program or enter your access code from your coach.",
         session_expired: "Session expired. Send /start to begin.",
         default_name: "client",
       },
@@ -639,6 +640,7 @@ const resources = {
         no_description: "",
         request_button: "📩 Request",
         buy_button: "💳 Buy",
+        view_button: "📚 Browse programs",
         request_sent: "✅ Request sent to coach!",
         request_error: "❌ Failed to send request. Please try again later.",
       },

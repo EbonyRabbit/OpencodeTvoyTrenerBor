@@ -6,6 +6,7 @@ import {
   type Client,
 } from "../lib/clients.js";
 import { t, applyClientLanguage, type Language } from "../i18n/index.js";
+import { InlineKeyboard } from "grammy";
 import { startTrainingDaysSetup } from "./training-days.js";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
@@ -77,7 +78,11 @@ export async function startHandler(ctx: MyContext): Promise<void> {
     const client = await findClientByTelegramId(telegramId);
 
     if (!client) {
-      await ctx.reply(t("greeting.welcome_new", ctx.language));
+      const keyboard = new InlineKeyboard().text(
+        t("programs.view_button", ctx.language),
+        "programs_open",
+      );
+      await ctx.reply(t("greeting.welcome_new", ctx.language), { reply_markup: keyboard });
       return;
     }
 

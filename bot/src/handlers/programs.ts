@@ -67,6 +67,7 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
       .from("programs")
       .select("id, title, type, description, duration_weeks, price")
       .eq("active", true)
+      .is("client_id", null)
       .order("title");
 
     if (error) {
@@ -82,6 +83,7 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
 
     const lines: string[] = [t("programs.title", lang), ""];
     const keyboard = new InlineKeyboard();
+    const buyerTelegramId = ctx.from.id;
 
     programs.forEach((program, i) => {
       lines.push(formatProgram(i + 1, program, lang));
@@ -93,8 +95,9 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
         const buyLabel = truncateButtonLabel(
           `${t("programs.buy_button", lang)} — ${program.title}`,
         );
+        const buyUrl = `${config.paymentBaseUrl}/buy/${program.id}?tg=${buyerTelegramId}`;
         keyboard.row()
-          .url(buyLabel, `${config.paymentBaseUrl}/programs/${program.id}/buy`)
+          .url(buyLabel, buyUrl)
           .text(requestLabel, `program_request:${program.id}`);
       } else {
         keyboard.row().text(requestLabel, `program_request:${program.id}`);

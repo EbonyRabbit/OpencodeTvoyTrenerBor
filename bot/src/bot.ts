@@ -185,6 +185,11 @@ bot.command("generate_codes", adminGenerateCodes);
 
 bot.on("callback_query:data", async (ctx, next) => {
   const data = ctx.callbackQuery?.data;
+  if (data === "programs_open") {
+    ctx.answerCallbackQuery().catch(() => {});
+    await programsHandler(ctx);
+    return;
+  }
   if (data?.startsWith("program_request:")) {
     const programId = data.slice("program_request:".length);
     await handleProgramRequestCallback(ctx, programId);

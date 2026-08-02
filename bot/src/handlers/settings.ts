@@ -28,16 +28,10 @@ const TIMEZONE_LIST = [
   "America/Chicago",
 ] as const;
 
-const TIME_PRESETS = [
-  "06:00",
-  "07:00",
-  "08:00",
-  "09:00",
-  "10:00",
-  "18:00",
-  "19:00",
-  "20:00",
-] as const;
+const TIME_HOURS: readonly string[] = Array.from(
+  { length: 24 },
+  (_, h) => `${String(h).padStart(2, "0")}:00`,
+);
 
 const WEEKDAYS_ISO = [1, 2, 3, 4, 5, 6, 7];
 
@@ -137,9 +131,9 @@ function tzKeyboard(lang: Language): Btn[][] {
 
 function timeKeyboard(lang: Language, prefix: string): Btn[][] {
   const rows: Btn[][] = [];
-  for (let i = 0; i < TIME_PRESETS.length; i += 3) {
+  for (let i = 0; i < TIME_HOURS.length; i += 6) {
     rows.push(
-      TIME_PRESETS.slice(i, i + 3).map((tm) => ({
+      TIME_HOURS.slice(i, i + 6).map((tm) => ({
         text: tm,
         callback_data: `${prefix}_set:${tm}`,
       })),
@@ -322,7 +316,7 @@ export async function handleSettingsCallback(
 
   if (data.startsWith("settings_morning_set:")) {
     const tm = data.slice("settings_morning_set:".length);
-    if (!(TIME_PRESETS as readonly string[]).includes(tm)) {
+    if (!TIME_HOURS.includes(tm)) {
       await ctx.answerCallbackQuery().catch(() => {});
       return;
     }
@@ -337,7 +331,7 @@ export async function handleSettingsCallback(
 
   if (data.startsWith("settings_measure_time_set:")) {
     const tm = data.slice("settings_measure_time_set:".length);
-    if (!(TIME_PRESETS as readonly string[]).includes(tm)) {
+    if (!TIME_HOURS.includes(tm)) {
       await ctx.answerCallbackQuery().catch(() => {});
       return;
     }

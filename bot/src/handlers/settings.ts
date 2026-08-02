@@ -1,0 +1,362 @@
+import type { MyContext } from "../bot.js";
+import type { Client } from "../lib/clients.js";
+import { supabaseAdmin } from "../lib/supabase-admin.js";
+import { t, type Language } from "../i18n/index.js";
+import {
+  formatSchedule,
+  weekdayShortLabel,
+  handleScheduleStart,
+} from "./training-days.js";
+
+// ⚠️ MUST stay in sync with web/src/lib/clients.ts (TIMEZONE_LIST)
+const TIMEZONE_LIST = [
+  "Europe/Moscow",
+  "Europe/Kiev",
+  "Europe/Minsk",
+  "Asia/Almaty",
+  "Asia/Tashkent",
+  "Asia/Astana",
+  "Asia/Dubai",
+  "Asia/Bangkok",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Paris",
+  "America/New_York",
+  "America/Los_Angeles",
+  "America/Chicago",
+] as const;
+
+const TIME_PRESETS = [
+  "06:00",
+  "07:00",
+  "08:00",
+  "09:00",
+  "10:00",
+  "18:00",
+  "19:00",
+  "20:00",
+] as const;
+
+const WEEKDAYS_ISO = [1, 2, 3, 4, 5, 6, 7];
+
+type Btn = { text: string; callback_data: string };
+
+function clientLang(client: Client): Language {
+  return client.language === "en" ? "en" : "ru";
+}
+
+function langLabel(lang: Language): string {
+  return t("settings.lang_" + lang, lang);
+}
+
+function measureDayLabel(iso: number | null, lang: Language): string {
+  if (iso === null || iso < 1 || iso > 7) {
+    return t("settings.value_none", lang);
+  }
+  return t(`schedule.day_fullnames.${String(iso)}`, lang);
+}
+
+function shortTz(value: string): string {
+  const parts = value.split("/");
+  return parts[parts.length - 1] ?? value;
+}
+
+function panelText(client: Client): string {
+  const lang = clientLang(client);
+  const lines = [
+    t("settings.title", lang),
+    "",
+    t("settings.lang", lang, { value: langLabel(lang) }),
+    t("settings.timezone", lang, {
+      value: client.timezone ?? t("settings.value_none", lang),
+    }),
+    t("settings.morning_time", lang, {
+      value: client.morning_time ?? t("settings.value_none", lang),
+    }),
+    t("settings.measure_day", lang, {
+      value: measureDayLabel(client.measurement_day, lang),
+    }),
+    t("settings.measure_time", lang, {
+      value: client.measurement_time ?? t("settings.value_none", lang),
+    }),
+    "",
+    `${t("settings.train_days", lang)}:`,
+    formatSchedule(client.training_days, lang),
+    "",
+    t("settings.choose", lang),
+  ];
+  return lines.join("\n");
+}
+
+function panelKeyboard(client: Client): Btn[][] {
+  const lang = clientLang(client);
+  const rows: Btn[][] = [
+    [{ text: t("settings.lang", lang, { value: langLabel(lang) }), callback_data: "settings_lang" }],
+    [{ text: t("settings.timezone", lang, { value: client.timezone ?? t("settings.value_none", lang) }), callback_data: "settings_tz" }],
+    [{ text: t("settings.morning_time", lang, { value: client.morning_time ?? t("settings.value_none", lang) }), callback_data: "settings_morning" }],
+    [{ text: t("settings.measure_day", lang, { value: measureDayLabel(client.measurement_day, lang) }), callback_data: "settings_measure_day" }],
+    [{ text: t("settings.measure_time", lang, { value: client.measurement_time ?? t("settings.value_none", lang) }), callback_data: "settings_measure_time" }],
+  ];
+  const footer: Btn[] = [];
+  if (client.program_id) {
+    footer.push({ text: t("settings.train_days", lang), callback_data: "settings_days" });
+  }
+  footer.push({ text: t("settings.close", lang), callback_data: "settings_close" });
+  rows.push(footer);
+  return rows;
+}
+
+function langKeyboard(lang: Language): Btn[][] {
+  return [
+    [
+      { text: t("settings.lang_ru", lang), callback_data: "settings_lang_set:ru" },
+      { text: t("settings.lang_en", lang), callback_data: "settings_lang_set:en" },
+    ],
+    [{ text: t("settings.back", lang), callback_data: "settings_back" }],
+  ];
+}
+
+function tzKeyboard(lang: Language): Btn[][] {
+  const rows: Btn[][] = [];
+  for (let i = 0; i < TIMEZONE_LIST.length; i += 2) {
+    rows.push([
+      { text: shortTz(TIMEZONE_LIST[i]), callback_data: `settings_tz_set:${TIMEZONE_LIST[i]}` },
+      ...(i + 1 < TIMEZONE_LIST.length
+        ? [{ text: shortTz(TIMEZONE_LIST[i + 1]), callback_data: `settings_tz_set:${TIMEZONE_LIST[i + 1]}` }]
+        : []),
+    ]);
+  }
+  rows.push([
+    { text: t("settings.off", lang), callback_data: "settings_tz_off" },
+    { text: t("settings.back", lang), callback_data: "settings_back" },
+  ]);
+  return rows;
+}
+
+function timeKeyboard(lang: Language, prefix: string): Btn[][] {
+  const rows: Btn[][] = [];
+  for (let i = 0; i < TIME_PRESETS.length; i += 3) {
+    rows.push(
+      TIME_PRESETS.slice(i, i + 3).map((tm) => ({
+        text: tm,
+        callback_data: `${prefix}_set:${tm}`,
+      })),
+    );
+  }
+  rows.push([
+    { text: t("settings.off", lang), callback_data: `${prefix}_off` },
+    { text: t("settings.back", lang), callback_data: "settings_back" },
+  ]);
+  return rows;
+}
+
+function measureDayKeyboard(lang: Language): Btn[][] {
+  const rows: Btn[][] = [];
+  for (let i = 0; i < WEEKDAYS_ISO.length; i += 3) {
+    rows.push(
+      WEEKDAYS_ISO.slice(i, i + 3).map((iso) => ({
+        text: weekdayShortLabel(iso, lang),
+        callback_data: `settings_measure_day_set:${iso}`,
+      })),
+    );
+  }
+  rows.push([{ text: t("settings.back", lang), callback_data: "settings_back" }]);
+  return rows;
+}
+
+function isNotModified(err: unknown): boolean {
+  return err instanceof Error && /message is not modified/i.test(err.message);
+}
+
+async function editOrSend(
+  ctx: MyContext,
+  text: string,
+  keyboard: Btn[][],
+): Promise<void> {
+  try {
+    await ctx.editMessageText(text, { reply_markup: { inline_keyboard: keyboard } });
+  } catch (err) {
+    if (isNotModified(err)) return;
+    try {
+      await ctx.reply(text, { reply_markup: { inline_keyboard: keyboard } });
+    } catch {
+      // fallback reply failed
+    }
+  }
+}
+
+async function renderPanel(ctx: MyContext, client: Client): Promise<void> {
+  await editOrSend(ctx, panelText(client), panelKeyboard(client));
+}
+
+async function openEditor(ctx: MyContext, which: string): Promise<void> {
+  const client = ctx.client;
+  if (!client) return;
+  const lang = clientLang(client);
+  const editors: Record<string, { text: string; keyboard: Btn[][] }> = {
+    lang: { text: t("settings.edit_lang", lang), keyboard: langKeyboard(lang) },
+    tz: { text: t("settings.edit_tz", lang), keyboard: tzKeyboard(lang) },
+    morning: { text: t("settings.edit_morning", lang), keyboard: timeKeyboard(lang, "settings_morning") },
+    measure_day: { text: t("settings.edit_measure_day", lang), keyboard: measureDayKeyboard(lang) },
+    measure_time: { text: t("settings.edit_measure_time", lang), keyboard: timeKeyboard(lang, "settings_measure_time") },
+  };
+  const editor = editors[which];
+  if (!editor) return;
+  await editOrSend(ctx, editor.text, editor.keyboard);
+}
+
+type SettingsPatch = Partial<
+  Pick<
+    Client,
+    "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day"
+  >
+>;
+
+async function saveClient(clientId: string, patch: SettingsPatch): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from("clients")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", clientId);
+  if (error) {
+    console.error(`[SETTINGS] Save error for ${clientId}:`, error.message);
+    return false;
+  }
+  return true;
+}
+
+async function applyPatch(
+  ctx: MyContext,
+  patch: SettingsPatch,
+): Promise<void> {
+  const client = ctx.client;
+  if (!client) return;
+  await ctx.answerCallbackQuery().catch(() => {});
+  const ok = await saveClient(client.id, patch);
+  if (!ok) {
+    await ctx.reply(t("settings.save_error", clientLang(client))).catch(() => {});
+    return;
+  }
+  Object.assign(client, patch);
+  await renderPanel(ctx, client);
+}
+
+export async function settingsHandler(ctx: MyContext): Promise<void> {
+  const client = ctx.client;
+  if (!client) {
+    await ctx.reply(t("greeting.session_expired", ctx.language));
+    return;
+  }
+  await ctx.reply(panelText(client), {
+    reply_markup: { inline_keyboard: panelKeyboard(client) },
+  });
+}
+
+export async function handleSettingsCallback(
+  ctx: MyContext,
+  data: string,
+): Promise<void> {
+  const client = ctx.client;
+  if (!client) return;
+
+  if (
+    data === "settings_lang" ||
+    data === "settings_tz" ||
+    data === "settings_morning" ||
+    data === "settings_measure_day" ||
+    data === "settings_measure_time"
+  ) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    await openEditor(ctx, data.slice("settings_".length));
+    return;
+  }
+
+  if (data === "settings_back") {
+    await ctx.answerCallbackQuery().catch(() => {});
+    await renderPanel(ctx, client);
+    return;
+  }
+
+  if (data === "settings_days") {
+    await handleScheduleStart(ctx);
+    return;
+  }
+
+  if (data === "settings_close") {
+    await ctx.answerCallbackQuery().catch(() => {});
+    try {
+      await ctx.editMessageText(t("settings.closed", clientLang(client)), {
+        reply_markup: { inline_keyboard: [] },
+      });
+    } catch {
+      // message may be gone
+    }
+    return;
+  }
+
+  if (data.startsWith("settings_lang_set:")) {
+    const code = data.slice("settings_lang_set:".length);
+    if (code !== "ru" && code !== "en") {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    await applyPatch(ctx, { language: code });
+    return;
+  }
+
+  if (data.startsWith("settings_tz_set:")) {
+    const zone = data.slice("settings_tz_set:".length);
+    if (!(TIMEZONE_LIST as readonly string[]).includes(zone)) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    await applyPatch(ctx, { timezone: zone });
+    return;
+  }
+
+  if (data === "settings_tz_off") {
+    await applyPatch(ctx, { timezone: null });
+    return;
+  }
+
+  if (data.startsWith("settings_morning_set:")) {
+    const tm = data.slice("settings_morning_set:".length);
+    if (!(TIME_PRESETS as readonly string[]).includes(tm)) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    await applyPatch(ctx, { morning_time: tm });
+    return;
+  }
+
+  if (data === "settings_morning_off") {
+    await applyPatch(ctx, { morning_time: null });
+    return;
+  }
+
+  if (data.startsWith("settings_measure_time_set:")) {
+    const tm = data.slice("settings_measure_time_set:".length);
+    if (!(TIME_PRESETS as readonly string[]).includes(tm)) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    await applyPatch(ctx, { measurement_time: tm });
+    return;
+  }
+
+  if (data === "settings_measure_time_off") {
+    await applyPatch(ctx, { measurement_time: null });
+    return;
+  }
+
+  if (data.startsWith("settings_measure_day_set:")) {
+    const iso = Number(data.slice("settings_measure_day_set:".length));
+    if (!Number.isInteger(iso) || iso < 1 || iso > 7) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    await applyPatch(ctx, { measurement_day: iso });
+    return;
+  }
+}

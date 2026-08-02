@@ -2,15 +2,12 @@ import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent, type ParsedDay } from "@/lib/program-utils";
 import type { ClientRow } from "@/lib/clients";
+import { getTodayDateStr } from "@/lib/date-utils";
 import { WorkoutForm } from "./workout-form";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarOff } from "lucide-react";
+import { CalendarOff, CheckCircle2 } from "lucide-react";
 
 const DEFAULT_TIMEZONE = "Europe/Moscow";
-
-function getTodayDateStr(tz: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
-}
 
 function getTodayDayName(tz: string): string {
   return new Intl.DateTimeFormat("ru-RU", { weekday: "long", timeZone: tz })
@@ -200,6 +197,24 @@ export default async function WorkoutPage() {
     ? capitalize(todayName)
     : matchedDay.day_name;
 
+  const { data: logs, error: logsError } = await supabaseAdmin
+    .from("workout_logs")
+    .select("exercise")
+    .eq("client_id", clientId)
+    .eq("date", todayStr);
+  if (logsError) {
+    console.error(`[WORKOUT] Logs query failed for ${clientId}:`, logsError.message);
+  }
+
+  const loggedNames = new Set(
+    (logs ?? []).map((l) => l.exercise?.toLowerCase()).filter(Boolean),
+  );
+  const workoutCompleted =
+    matchedDay.exercises.length > 0 &&
+    matchedDay.exercises.every((ex) =>
+      loggedNames.has(ex.name.toLowerCase()),
+    );
+
   return (
     <div>
       <div className="mb-4">
@@ -209,11 +224,23 @@ export default async function WorkoutPage() {
           {weekData.is_deload && " (разгрузочная)"}
         </p>
       </div>
-      <WorkoutForm
-        exercises={matchedDay.exercises}
-        date={todayStr}
-        week={currentWeek.week_number}
-      />
+      {workoutCompleted ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-600" />
+            <p className="text-lg font-semibold">Тренировка завершена</p>
+            <p className="text-sm text-muted-foreground">
+              Все упражнения записаны. Отличная работа!
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <WorkoutForm
+          exercises={matchedDay.exercises}
+          date={todayStr}
+          week={currentWeek.week_number}
+        />
+      )}
     </div>
   );
 }

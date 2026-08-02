@@ -14,7 +14,8 @@ import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
-import { myWebHandler, settingsHandler } from "./handlers/my-web.js";
+import { myWebHandler } from "./handlers/my-web.js";
+import { settingsHandler, handleSettingsCallback } from "./handlers/settings.js";
 import { scheduleHandler } from "./handlers/training-days.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
@@ -198,6 +199,16 @@ bot.on("callback_query:data", async (ctx, next) => {
   if (data === "programs_open") {
     ctx.answerCallbackQuery().catch(() => {});
     await programsHandler(ctx);
+    return;
+  }
+  if (data?.startsWith("settings_")) {
+    const guard = await guardAuthenticatedClient(ctx);
+    if (typeof guard === "string") {
+      await ctx.answerCallbackQuery({ text: guard, show_alert: true }).catch(() => {});
+      return;
+    }
+    ctx.client = guard.client;
+    await handleSettingsCallback(ctx, data);
     return;
   }
   if (data?.startsWith("program_request:")) {

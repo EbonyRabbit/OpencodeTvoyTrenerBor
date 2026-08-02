@@ -11,7 +11,7 @@ function weekdayLabel(iso: number, lang: Language): string {
   return t(`schedule.day_fullnames.${String(iso)}`, lang);
 }
 
-function weekdayShortLabel(iso: number, lang: Language): string {
+export function weekdayShortLabel(iso: number, lang: Language): string {
   return t(`schedule.day_names.${String(iso)}`, lang);
 }
 

@@ -34,11 +34,16 @@ function truncateButtonLabel(label: string, maxBytes = TELEGRAM_BUTTON_MAX_BYTES
   return ELLIPSIS;
 }
 
+function formatPrice(price: number | null): string {
+  if (price === null || !Number.isFinite(price)) return "";
+  return `${price.toLocaleString("ru-RU")} ₽`;
+}
+
 function formatProgram(index: number, program: Program, lang: Language): string {
   const type = program.type || "—";
   const weeks = program.duration_weeks ?? 12;
-  const priceLine = program.price
-    ? t("programs.price_line", lang, { price: String(program.price) })
+  const priceLine = program.price != null
+    ? t("programs.price_line", lang, { price: formatPrice(program.price) })
     : "";
   const descriptionLine = program.description
     ? t("programs.description_line", lang, { description: program.description.slice(0, 100) })

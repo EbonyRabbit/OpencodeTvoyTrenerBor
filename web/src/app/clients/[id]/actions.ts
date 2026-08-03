@@ -19,6 +19,7 @@ type RawMessage = { id: string; created_at: string; direction: string; text: str
 type RawNotification = { id: string; created_at: string; type: string; status: string };
 
 const PER_TABLE_SIZE = 15;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function fetchPage(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -271,6 +272,38 @@ export async function disableClient(
 
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/clients");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function deleteClient(
+  clientId: string,
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    if (!UUID_RE.test(clientId)) return { error: "Некорректный идентификатор" };
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+
+    const { error } = await supabaseAdmin
+      .from("clients")
+      .delete()
+      .eq("id", clientId);
+    if (error) return { error: error.message };
+
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${clientId}`);
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };

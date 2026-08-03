@@ -137,7 +137,7 @@ export async function runMorningNotification(bot: Bot<MyContext>): Promise<void>
 
         const greeting = t("morning.greeting", lang, { name: client.name });
         const header = t("morning.header", lang);
-        const workoutText = formatWorkoutMessage(workout, lang);
+        const workoutText = await formatWorkoutMessage(workout, lang, fullClient);
         const message = `${greeting}\n\n${header}\n\n${workoutText}`;
         const truncated = truncateMessage(message, t("program.truncation_suffix", lang));
         const keyboard = buildMorningKeyboard(lang);

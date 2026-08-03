@@ -159,7 +159,7 @@ export async function handleResumeCallback(ctx: MyContext, strategyParam: string
     const workout = await getTodayWorkout(client, lang);
     const header = t("resume.resumed_header", lang);
     const msg = workout
-      ? `${header}\n\n${formatWorkoutMessage(workout, lang)}`
+      ? `${header}\n\n${await formatWorkoutMessage(workout, lang, client)}`
       : `${header}\n\n${t("resume.no_workout_today", lang)}`;
     const truncated = truncateMessage(msg, t("program.truncation_suffix", lang));
     await ctx.reply(truncated);

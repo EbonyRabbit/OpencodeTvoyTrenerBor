@@ -181,13 +181,131 @@ function formatExerciseDetailLine(ex: ParsedExercise): string {
   return `   ${parts.join(", ")}`;
 }
 
-export function formatExercise(index: number, ex: ParsedExercise, lang: Language): string {
+export interface PreviousLog {
+  weight: number | null;
+  sets: number | null;
+  reps: string | null;
+}
+
+const PSEUDO_EXERCISE = /^\[/;
+
+function isPseudoName(name: string): boolean {
+  return PSEUDO_EXERCISE.test(name.trim());
+}
+
+function escapeLikeValue(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
+    .replace(/\*/g, "\\*");
+}
+
+function postgrestValue(value: string): string {
+  if (/[(),"]/.test(value)) {
+    const doubled = value.replace(/\\/g, "\\\\");
+    return `"${doubled.replace(/"/g, '\\"')}"`;
+  }
+  return escapeLikeValue(value);
+}
+
+const LAST_LOGS_CACHE_TTL_MS = 30_000;
+const LAST_LOGS_CACHE_MAX_SIZE = 100;
+const lastLogsCache = new Map<string, { at: number; value: Map<string, PreviousLog> }>();
+
+function cacheKey(clientId: string, names: string[]): string {
+  return `${clientId}:${[...names].sort().join("|")}`;
+}
+
+function cacheSet(key: string, value: Map<string, PreviousLog>): void {
+  if (lastLogsCache.size >= LAST_LOGS_CACHE_MAX_SIZE) {
+    const oldest = lastLogsCache.keys().next();
+    if (!oldest.done) lastLogsCache.delete(oldest.value);
+  }
+  lastLogsCache.set(key, { at: Date.now(), value });
+}
+
+export async function getPreviousWorkoutLogs(
+  client: Client,
+  exerciseNames: string[],
+): Promise<Map<string, PreviousLog>> {
+  const result = new Map<string, PreviousLog>();
+  const wanted = new Set(
+    exerciseNames.map((n) => n.trim().toLowerCase()).filter(Boolean),
+  );
+  if (wanted.size === 0) return result;
+
+  const key = cacheKey(client.id, Array.from(wanted));
+  const cached = lastLogsCache.get(key);
+  if (cached && Date.now() - cached.at < LAST_LOGS_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+
+  const orFilter = Array.from(wanted).map(postgrestValue).map((n) => `exercise.ilike.${n}`).join(",");
+
+  const { data, error } = await supabaseAdmin
+    .from("workout_logs")
+    .select("exercise, date, sets, reps, weight")
+    .eq("client_id", client.id)
+    .lt("date", todayStr)
+    .or(orFilter)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    console.error(`[WORKOUT] Previous logs query error for ${client.id}:`, error.message);
+    return result;
+  }
+
+  for (const row of data ?? []) {
+    const name = row.exercise?.trim().toLowerCase() ?? "";
+    if (!name || isPseudoName(name) || !wanted.has(name)) continue;
+    if (result.has(name)) continue;
+    result.set(name, {
+      weight: row.weight,
+      sets: row.sets,
+      reps: row.reps,
+    });
+  }
+
+  cacheSet(key, result);
+  return result;
+}
+
+function formatPreviousLog(log: PreviousLog): string {
+  const weight = log.weight != null ? `${log.weight} кг` : null;
+  const setsReps =
+    log.sets != null && log.reps
+      ? `${log.sets}×${log.reps}`
+      : log.sets != null
+        ? `${log.sets} подх.`
+        : log.reps
+          ? log.reps
+          : null;
+  return [weight, setsReps].filter(Boolean).join(" ");
+}
+
+export function formatExercise(
+  index: number,
+  ex: ParsedExercise,
+  lang: Language,
+  last?: PreviousLog | null,
+): string {
   const lines: string[] = [];
 
   lines.push(t("workout.exercise_item", lang, { index, name: ex.name }));
 
   const detailLine = formatExerciseDetailLine(ex);
   if (detailLine) lines.push(detailLine);
+
+  const lastDetail = last ? formatPreviousLog(last) : "";
+  if (lastDetail) {
+    lines.push(t("workout.exercise_last", lang, { detail: lastDetail }));
+  }
 
   if (ex.rest) {
     lines.push(t("workout.exercise_rest", lang, { rest: ex.rest }));
@@ -200,7 +318,16 @@ export function formatExercise(index: number, ex: ParsedExercise, lang: Language
   return lines.join("\n");
 }
 
-export function formatWorkoutMessage(workout: TodayWorkout, lang: Language): string {
+export async function formatWorkoutMessage(
+  workout: TodayWorkout,
+  lang: Language,
+  client: Client,
+): Promise<string> {
+  const lastLogs = await getPreviousWorkoutLogs(
+    client,
+    workout.exercises.map((ex) => ex.name),
+  );
+
   const lines: string[] = [];
 
   lines.push(t("workout.today_title", lang));
@@ -220,19 +347,21 @@ export function formatWorkoutMessage(workout: TodayWorkout, lang: Language): str
   lines.push(t("workout.exercises_header", lang));
 
   for (let i = 0; i < workout.exercises.length; i++) {
-    lines.push(formatExercise(i + 1, workout.exercises[i], lang));
+    const name = workout.exercises[i].name.trim().toLowerCase();
+    lines.push(formatExercise(i + 1, workout.exercises[i], lang, lastLogs.get(name)));
     lines.push("");
   }
 
   return lines.join("\n").trim();
 }
 
-export function formatSingleExercise(
+export async function formatSingleExercise(
   index: number,
   total: number,
   ex: ParsedExercise,
   lang: Language,
-): string {
+  client: Client,
+): Promise<string> {
   const lines: string[] = [];
 
   lines.push(t("workout.exercise_header", lang, { current: index + 1, total }));
@@ -258,6 +387,14 @@ export function formatSingleExercise(
 
   if (ex.rest) {
     lines.push(t("workout.exercise_rest_detail", lang, { rest: ex.rest }));
+  }
+
+  const lastLogs = await getPreviousWorkoutLogs(client, [ex.name]);
+  const last = lastLogs.get(ex.name.trim().toLowerCase());
+  const lastDetail = last ? formatPreviousLog(last) : "";
+  if (lastDetail) {
+    lines.push("");
+    lines.push(t("workout.exercise_last", lang, { detail: lastDetail }));
   }
 
   if (ex.notes) {
@@ -442,7 +579,7 @@ export async function sendTodayWorkout(
     console.warn(`[WORKOUT] setState failed for ${telegramId}:`, stateErr);
   }
 
-  const message = formatWorkoutMessage(workout, sender.language);
+  const message = await formatWorkoutMessage(workout, sender.language, client);
   const truncated = truncateMessage(message, t("program.truncation_suffix", sender.language));
 
   const buttons = [

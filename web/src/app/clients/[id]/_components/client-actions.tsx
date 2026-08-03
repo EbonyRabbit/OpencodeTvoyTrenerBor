@@ -8,6 +8,7 @@ import {
   generateConnectCode,
   generateClientToken,
   disableClient,
+  deleteClient,
   markPurchased,
   togglePayment,
   updateClient,
@@ -66,6 +67,7 @@ export function ClientActions({
   const [activating, setActivating] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [disabling, setDisabling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +198,30 @@ export function ClientActions({
       setError("Произошла ошибка");
     } finally {
       setDisabling(false);
+    }
+  }, [clientId, router]);
+
+  const handleDelete = useCallback(async () => {
+    if (
+      !confirm(
+        "Удалить клиента БЕЗВОЗВРАТНО? Все данные (тренировки, замеры, чек-ины, чат) будут удалены навсегда. Это действие нельзя отменить.",
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      const result = await deleteClient(clientId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.replace("/clients");
+    } catch {
+      setError("Произошла ошибка");
+    } finally {
+      setDeleting(false);
     }
   }, [clientId, router]);
 
@@ -445,6 +471,16 @@ export function ClientActions({
           onClick={openPurchaseDialog}
         >
           Подтвердить покупку
+        </Button>
+
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="border-red-600/40 bg-transparent text-red-600 hover:bg-red-600 hover:text-white"
+        >
+          {deleting ? "Удаление..." : "Удалить клиента"}
         </Button>
       </div>
 

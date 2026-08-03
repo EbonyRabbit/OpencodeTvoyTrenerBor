@@ -20,8 +20,18 @@ import {
   type ProgramRow,
 } from "@/lib/program-utils";
 import { ProgramWeekPreview } from "./program-week-preview";
-import { toggleProgramStatus, getAssignableClients, assignToClient, deleteProgram } from "../actions";
+import { toggleProgramStatus, getAssignableClients, assignToClient, deleteProgram, updateProgramPrice } from "../actions";
 import { Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 function formatPrice(price: number | null): string {
   if (price === null) return "По запросу";
@@ -78,6 +88,38 @@ export function ProgramDetail({
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const [showPriceDialog, setShowPriceDialog] = useState(false);
+  const [priceDraft, setPriceDraft] = useState(program.price != null ? String(program.price) : "");
+  const [savingPrice, setSavingPrice] = useState(false);
+  const [priceError, setPriceError] = useState<string | null>(null);
+
+  const handleSavePrice = useCallback(async () => {
+    setPriceError(null);
+    let nextPrice: number | null = null;
+    if (priceDraft.trim()) {
+      nextPrice = Number(priceDraft);
+      if (!Number.isFinite(nextPrice) || nextPrice < 0) {
+        setPriceError("Цена должна быть положительным числом");
+        return;
+      }
+    }
+    setSavingPrice(true);
+    try {
+      const result = await updateProgramPrice(program.id, nextPrice);
+      if (result.error) {
+        setPriceError(result.error);
+        return;
+      }
+      setSuccessMsg(nextPrice === null ? "Цена снята (по запросу)" : "Цена обновлена");
+      setShowPriceDialog(false);
+      router.refresh();
+    } catch {
+      setPriceError("Произошла ошибка");
+    } finally {
+      setSavingPrice(false);
+    }
+  }, [priceDraft, program.id, router]);
 
   const handleToggle = useCallback(async () => {
     if (program.active) {
@@ -225,9 +267,23 @@ export function ProgramDetail({
       <div className="grid gap-6 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Информация
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Информация
+              </CardTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setPriceError(null);
+                  setPriceDraft(program.price != null ? String(program.price) : "");
+                  setShowPriceDialog(true);
+                }}
+              >
+                Изменить цену
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-1">
             <InfoRow label="Цена" value={formatPrice(program.price)} />
@@ -372,6 +428,46 @@ export function ProgramDetail({
       <Separator />
 
       <ProgramWeekPreview parsed={parsed} />
+
+      <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Изменить цену</DialogTitle>
+            <DialogDescription>
+              Укажите стоимость программы. Пустое поле — «по запросу».
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor="program-price-edit" className="text-sm font-medium">
+              Цена (₽)
+            </label>
+            <Input
+              id="program-price-edit"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="Например: 9900"
+              value={priceDraft}
+              onChange={(e) => setPriceDraft(e.target.value)}
+              disabled={savingPrice}
+            />
+            {priceError && (
+              <p className="text-sm text-red-600" role="alert">
+                {priceError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              Отмена
+            </DialogClose>
+            <Button type="button" onClick={handleSavePrice} disabled={savingPrice}>
+              {savingPrice ? "Сохранение..." : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

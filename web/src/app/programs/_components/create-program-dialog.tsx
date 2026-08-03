@@ -34,6 +34,7 @@ export function CreateProgramDialog() {
   const [durationWeeks, setDurationWeeks] = useState("12");
   const [equipment, setEquipment] = useState("");
   const [language, setLanguage] = useState("ru");
+  const [price, setPrice] = useState("");
 
   const canSubmit = useMemo(() => {
     if (loading) return false;
@@ -49,6 +50,7 @@ export function CreateProgramDialog() {
     setDurationWeeks("12");
     setEquipment("");
     setLanguage("ru");
+    setPrice("");
     setError(null);
   }, []);
 
@@ -67,6 +69,15 @@ export function CreateProgramDialog() {
       return;
     }
 
+    let parsedPrice: number | undefined;
+    if (price.trim()) {
+      parsedPrice = Number(price);
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+        setError("Цена должна быть положительным числом");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const result = await createProgram({
@@ -75,6 +86,7 @@ export function CreateProgramDialog() {
         duration_weeks: weeks,
         equipment: equipment.trim() || undefined,
         language,
+        price: parsedPrice,
       });
 
       if (result.error) {
@@ -92,7 +104,7 @@ export function CreateProgramDialog() {
     } finally {
       setLoading(false);
     }
-  }, [title, description, durationWeeks, equipment, language, reset, router]);
+  }, [title, description, durationWeeks, equipment, language, price, reset, router]);
 
   return (
     <Dialog
@@ -183,6 +195,23 @@ export function CreateProgramDialog() {
                 placeholder="Штанга, гантели, турник..."
                 value={equipment}
                 onChange={(e) => setEquipment(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="grid gap-1.5">
+              <label htmlFor="program-price" className="text-sm font-medium">
+                Цена (₽)
+              </label>
+              <Input
+                id="program-price"
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                placeholder="Например: 9900. Пусто — по запросу"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
                 disabled={loading}
               />
             </div>

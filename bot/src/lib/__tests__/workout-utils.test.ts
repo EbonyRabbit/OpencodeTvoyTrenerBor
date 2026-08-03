@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 
+const mocks = vi.hoisted(() => ({
+  mockFrom: vi.fn(),
+}));
+
 vi.mock("../../config.js", () => ({
   config: {
     telegram: { botToken: "test", webhookSecret: "test" },
@@ -12,7 +16,24 @@ vi.mock("../../config.js", () => ({
   },
 }));
 
-import { truncateMessage, formatProgressMessage, formatTrendsMessage } from "../workout-utils.js";
+vi.mock("../supabase-admin.js", () => ({
+  supabaseAdmin: { from: mocks.mockFrom },
+}));
+
+import { truncateMessage, formatProgressMessage, formatTrendsMessage, formatExercise, getPreviousWorkoutLogs } from "../workout-utils.js";
+
+function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
+  const builder = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    lt: vi.fn(() => builder),
+    or: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    limit: vi.fn(() => ({ data: rows, error })),
+  };
+  mocks.mockFrom.mockReturnValue(builder);
+  return builder;
+}
 
 describe("truncateMessage", () => {
   const suffix = "\n\n⚠️ …";
@@ -51,6 +72,89 @@ describe("formatProgressMessage", () => {
     const result = formatProgressMessage(progress, "en");
     expect(result).toBeTruthy();
     expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+describe("formatExercise", () => {
+  it("includes last time line when previous log present", () => {
+    const ex = { name: "Присед", sets: "4", reps: "8", weight: "60" };
+    const result = formatExercise(1, ex, "ru", { weight: 60, sets: 4, reps: "8" });
+    expect(result).toContain("Прошлый раз");
+    expect(result).toContain("60");
+    expect(result).toContain("4×8");
+  });
+
+  it("omits last time line when no previous log", () => {
+    const ex = { name: "Присед", sets: "4", reps: "8", weight: "60" };
+    const result = formatExercise(1, ex, "ru", null);
+    expect(result).not.toContain("Прошлый раз");
+  });
+
+  it("formats weight-only previous log", () => {
+    const ex = { name: "Жим", sets: "3", reps: "10", weight: "40" };
+    const result = formatExercise(1, ex, "ru", { weight: 40, sets: null, reps: null });
+    expect(result).toContain("40 кг");
+  });
+});
+
+describe("getPreviousWorkoutLogs", () => {
+  const client = { id: "client-1", timezone: "Europe/Moscow" } as Parameters<typeof getPreviousWorkoutLogs>[0];
+
+  it("returns empty map when no exercises requested", async () => {
+    const builder = mockLogsQuery([]);
+    const result = await getPreviousWorkoutLogs(client, []);
+    expect(result.size).toBe(0);
+    expect(builder.limit).not.toHaveBeenCalled();
+  });
+
+  it("matches exercises case-insensitively and takes the latest row", async () => {
+    mockLogsQuery([
+      { exercise: "жим штанги лёжа", date: "2026-07-27", sets: 5, reps: "8", weight: 62.5 },
+      { exercise: "Жим штанги лёжа", date: "2026-07-20", sets: 4, reps: "8", weight: 60 },
+      { exercise: "[SKIP]", date: "2026-07-28", sets: null, reps: null, weight: null },
+      { exercise: "Становая тяга", date: "2026-07-21", sets: 3, reps: "5", weight: 100 },
+    ]);
+    const result = await getPreviousWorkoutLogs(client, ["Жим Штанги Лёжа"]);
+    const entry = result.get("жим штанги лёжа");
+    expect(entry).toBeDefined();
+    expect(entry?.weight).toBe(62.5);
+    expect(entry?.sets).toBe(5);
+    expect(result.size).toBe(1);
+  });
+
+  it("ignores unrelated exercises not in the plan", async () => {
+    mockLogsQuery([
+      { exercise: "Присед", date: "2026-07-20", sets: 4, reps: "8", weight: 80 },
+    ]);
+    const result = await getPreviousWorkoutLogs(client, ["Жим лёжа"]);
+    expect(result.size).toBe(0);
+  });
+
+  it("queries with client_id filter, before-today and ordered by date desc", async () => {
+    const builder = mockLogsQuery([]);
+    await getPreviousWorkoutLogs(client, ["Присед"]);
+    expect(builder.eq).toHaveBeenCalledWith("client_id", "client-1");
+    expect(builder.lt).toHaveBeenCalledWith("date", expect.any(String));
+    expect(builder.or).toHaveBeenCalledWith("exercise.ilike.присед");
+    expect(builder.order).toHaveBeenCalledWith("date", { ascending: false });
+  });
+
+  it("escapes reserved and wildcard characters in or-filter", async () => {
+    const builder = mockLogsQuery([]);
+    await getPreviousWorkoutLogs(client, [
+      "Жим лёжа (узкий хват)",
+      "Тяга 50%",
+      "Подтягивания с весом, 5кг",
+    ]);
+    expect(builder.or).toHaveBeenCalledWith(
+      'exercise.ilike."жим лёжа (узкий хват)",exercise.ilike.тяга 50\\%,exercise.ilike."подтягивания с весом, 5кг"',
+    );
+  });
+
+  it("degrades gracefully when query fails", async () => {
+    mockLogsQuery([], { message: "boom" });
+    const result = await getPreviousWorkoutLogs(client, ["Присед"]);
+    expect(result.size).toBe(0);
   });
 });
 

@@ -147,11 +147,12 @@ async function showExercise(
     return;
   }
 
-  const text = formatSingleExercise(
+  const text = await formatSingleExercise(
     index,
     effectiveWorkout.exercises.length,
     effectiveWorkout.exercises[index],
     ctx.language,
+    ctx.client,
   );
   const keyboard = buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language);
 

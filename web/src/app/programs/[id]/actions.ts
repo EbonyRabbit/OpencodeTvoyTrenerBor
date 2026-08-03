@@ -74,6 +74,44 @@ export async function createProgram(input: {
   }
 }
 
+export async function updateProgramPrice(
+  programId: string,
+  price: number | null,
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    if (!UUID_RE.test(programId)) return { error: "Некорректный идентификатор" };
+
+    if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      return { error: "Некорректная цена" };
+    }
+
+    const { data: program, error: fetchError } = await supabaseAdmin
+      .from("programs")
+      .select("id")
+      .eq("id", programId)
+      .maybeSingle();
+    if (fetchError) return { error: fetchError.message };
+    if (!program) return { error: "Программа не найдена" };
+
+    const { error } = await supabaseAdmin
+      .from("programs")
+      .update({ price, updated_at: new Date().toISOString() })
+      .eq("id", programId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/programs/${programId}`);
+    revalidatePath("/programs");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
 export async function toggleProgramStatus(
   programId: string,
   newActive: boolean,

@@ -7,10 +7,32 @@ export function parseSets(input: string): string | null {
   return null;
 }
 
+export function repsListMatchesSets(reps: string, sets?: string): boolean {
+  if (!reps.includes("/")) return true;
+  const setsCount = Number(sets);
+  if (!Number.isInteger(setsCount) || setsCount <= 0) return true;
+  return reps.split("/").length === setsCount;
+}
+
 export function parseReps(input: string): string | null {
   const trimmed = input.trim();
 
-  const rangeMatch = trimmed.match(/^(\d+)\s*[-–/]\s*(\d+)$/);
+  if (trimmed.includes("/")) {
+    const parts = trimmed
+      .split("/")
+      .map((p) => p.trim());
+    if (parts.length < 2 || parts.length > 100) return null;
+    const nums: number[] = [];
+    for (const part of parts) {
+      if (!/^\d+$/.test(part)) return null;
+      const num = Number(part);
+      if (num <= 0 || num > 100) return null;
+      nums.push(num);
+    }
+    return nums.join("/");
+  }
+
+  const rangeMatch = trimmed.match(/^(\d+)\s*[-–]\s*(\d+)$/);
   if (rangeMatch) {
     const a = Number(rangeMatch[1]);
     const b = Number(rangeMatch[2]);
@@ -25,7 +47,7 @@ export function parseReps(input: string): string | null {
 }
 
 export function parseWeight(input: string): string | null {
-  const trimmed = input.trim().toLowerCase().replace(/кг|kg/, "").trim();
+  const trimmed = input.trim().toLowerCase().replace(/кг|kg/, "").replace(",", ".").trim();
   if (!trimmed) return null;
   const num = Number(trimmed);
   if (!isNaN(num) && num >= 0 && num <= 1000) return String(num);
@@ -41,7 +63,7 @@ export function parseRpe(input: string): string | null {
 }
 
 export function parseMeasurement(input: string): string | null {
-  const trimmed = input.trim().toLowerCase().replace(/кг|kg|см|cm/g, "").trim();
+  const trimmed = input.trim().toLowerCase().replace(/кг|kg|см|cm/g, "").replace(",", ".").trim();
   if (!trimmed) return null;
   const num = Number(trimmed);
   if (!isNaN(num) && num >= 0 && num <= 300) return String(num);

@@ -3,9 +3,12 @@
 import type { HistoryRow } from "./page";
 
 function formatLog(log: { exercise: string; weight: number | null; sets: number | null; reps: string | null }): string {
-  const weight = log.weight != null ? `${log.weight} кг` : null;
-  const setsReps =
-    log.sets != null && log.reps
+  const weight =
+    log.weight != null && log.weight > 0 ? `${log.weight} кг` : log.weight === 0 ? "вес тела" : null;
+  const perSetList = log.reps && log.reps.includes("/");
+  const setsReps = perSetList
+    ? log.reps
+    : log.sets != null && log.reps
       ? `${log.sets}×${log.reps}`
       : log.sets != null
         ? `${log.sets} подх.`

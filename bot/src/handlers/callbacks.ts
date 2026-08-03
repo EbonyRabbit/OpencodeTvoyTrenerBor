@@ -129,7 +129,7 @@ function buildExerciseKeyboard(
   return rows;
 }
 
-async function showExercise(
+export async function showExercise(
   ctx: MyContext,
   index: number,
   workout?: TodayWorkout | null,

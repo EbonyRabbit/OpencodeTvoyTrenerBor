@@ -4,9 +4,9 @@ import { startHandler } from "./handlers/start.js";
 import { menuHandler } from "./handlers/menu.js";
 import { myProgramHandler } from "./handlers/my-program.js";
 import { todayHandler } from "./handlers/today.js";
-import { callbackRouter, handleSkipReason } from "./handlers/callbacks.js";
+import { callbackRouter, handleSkipReason, showExercise } from "./handlers/callbacks.js";
 import { guardActiveClient, guardAuthenticatedClient } from "./handlers/guards.js";
-import { handleWizardInput, startExerciseLogging } from "./handlers/wizard.js";
+import { handleWizardInput } from "./handlers/wizard.js";
 import { startMeasurements, handleMeasurementsInput, showMeasurementHistory } from "./handlers/measurements.js";
 // import { startPhotos, handlePhotoMessage, showPhotoHistory } from "./handlers/photos.js"; // DISABLED: photo storage removed
 import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
@@ -242,7 +242,7 @@ bot.on("message:text", async (ctx) => {
     } else if (result.type === "completed" && result.nextExerciseIndex != null && ctx.client) {
       const workout = await getTodayWorkout(ctx.client);
       if (workout) {
-        await startExerciseLogging(ctx, result.nextExerciseIndex, workout);
+        await showExercise(ctx, result.nextExerciseIndex, workout);
       }
     }
     return;

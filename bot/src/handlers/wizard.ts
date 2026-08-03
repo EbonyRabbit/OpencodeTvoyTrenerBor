@@ -1,8 +1,8 @@
 import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import type { TodayWorkout } from "../lib/workout-utils.js";
-import { getTodayDateStr } from "../lib/workout-utils.js";
-import { parseSets, parseReps, parseWeight, parseRpe } from "../lib/wizard-validators.js";
+import { getTodayDateStr, getTodayWorkout } from "../lib/workout-utils.js";
+import { parseSets, parseReps, parseWeight, parseRpe, repsListMatchesSets } from "../lib/wizard-validators.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { markAsSent } from "../cron/dedup.js";
@@ -24,7 +24,6 @@ export interface WizardData {
 export interface WizardResult {
   type: "next_step" | "completed" | "expired";
   nextExerciseIndex?: number;
-  summary?: string;
 }
 
 const WIZARD_STEPS = ["sets", "reps", "weight", "rpe", "comment"] as const;
@@ -47,9 +46,9 @@ function getStepPrompt(step: WizardStep, lang: Language): { text: string; hint: 
     case "reps":
       return { text: t("wizard.step_reps", lang), hint: t("wizard.step_reps_hint", lang), required: true };
     case "weight":
-      return { text: t("wizard.step_weight", lang), hint: t("wizard.step_weight_hint", lang), required: false };
+      return { text: t("wizard.step_weight", lang), hint: t("wizard.step_weight_hint", lang), required: true };
     case "rpe":
-      return { text: t("wizard.step_rpe", lang), hint: t("wizard.step_rpe_hint", lang), required: false };
+      return { text: t("wizard.step_rpe", lang), hint: t("wizard.step_rpe_hint", lang), required: true };
     case "comment":
       return { text: t("wizard.step_comment", lang), hint: t("wizard.step_comment_hint", lang), required: false };
   }
@@ -66,11 +65,17 @@ function validateStep(step: WizardStep, input: string): string | null {
 }
 
 function buildSummary(data: WizardData, lang: Language): string {
+  const weightLine =
+    data.weight === "0"
+      ? `${t("wizard.summary_bodyweight", lang)}\n`
+      : data.weight
+        ? `${t("wizard.summary_weight", lang, { weight: data.weight })}\n`
+        : "";
   return t("wizard.logged_summary", lang, {
     exercise: data.exercise_name,
     sets: data.sets ?? "-",
     reps: data.reps ?? "-",
-    weight_line: data.weight ? `${t("wizard.summary_weight", lang, { weight: data.weight })}\n` : "",
+    weight_line: weightLine,
     rpe_line: data.rpe ? `${t("wizard.summary_rpe", lang, { rpe: data.rpe })}\n` : "",
     comment_line: data.comment ? `${t("wizard.summary_comment", lang, { comment: data.comment })}` : "",
   });
@@ -126,7 +131,7 @@ export async function handleWizardInput(ctx: MyContext): Promise<WizardResult> {
   if (text === "/skip") {
     const stepInfo = getStepPrompt(currentStep, ctx.language);
     if (stepInfo.required) {
-      await ctx.reply(t("wizard.invalid_input", ctx.language));
+      await ctx.reply(t("wizard.step_required", ctx.language));
       return { type: "next_step" };
     }
     return await advanceWizard(ctx, currentStep, null);
@@ -136,6 +141,17 @@ export async function handleWizardInput(ctx: MyContext): Promise<WizardResult> {
   if (validated === null) {
     await ctx.reply(t("wizard.invalid_input", ctx.language));
     return { type: "next_step" };
+  }
+
+  if (currentStep === "reps" && validated.includes("/")) {
+    const data = (ctx.state?.data ?? {}) as unknown as WizardData;
+    if (!repsListMatchesSets(validated, data.sets)) {
+      await ctx.reply(t("wizard.reps_sets_mismatch", ctx.language, {
+        sets: String(data.sets),
+        reps: String(validated.split("/").length),
+      }));
+      return { type: "next_step" };
+    }
   }
 
   return await advanceWizard(ctx, currentStep, validated);
@@ -155,7 +171,7 @@ export async function handleWizardSkip(ctx: MyContext, _params: string): Promise
 
   const stepInfo = getStepPrompt(currentStep, ctx.language);
   if (stepInfo.required) {
-    await ctx.answerCallbackQuery({ text: t("wizard.invalid_input", ctx.language), show_alert: true }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: t("wizard.step_required", ctx.language), show_alert: true }).catch(() => {});
     return;
   }
 
@@ -163,10 +179,10 @@ export async function handleWizardSkip(ctx: MyContext, _params: string): Promise
   const result = await advanceWizard(ctx, currentStep, null);
 
   if (result.type === "completed" && result.nextExerciseIndex != null && ctx.client) {
-    const { getTodayWorkout } = await import("../lib/workout-utils.js");
+    const { showExercise } = await import("./callbacks.js");
     const workout = await getTodayWorkout(ctx.client);
     if (workout) {
-      await startExerciseLogging(ctx, result.nextExerciseIndex, workout);
+      await showExercise(ctx, result.nextExerciseIndex, workout);
     }
   }
 }
@@ -248,7 +264,7 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
 
   const nextIndex = data.exercise_index + 1;
   if (nextIndex < data.exercise_count) {
-    return { type: "completed", nextExerciseIndex: nextIndex, summary };
+    return { type: "completed", nextExerciseIndex: nextIndex };
   }
 
   await ctx.reply(t("wizard.all_done", ctx.language));

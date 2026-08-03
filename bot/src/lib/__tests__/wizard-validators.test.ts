@@ -11,7 +11,30 @@ import {
   parseCount,
   parseDate,
   parsePauseReason,
+  repsListMatchesSets,
 } from "../wizard-validators.js";
+
+describe("repsListMatchesSets", () => {
+  it("returns true for non-list reps", () => {
+    expect(repsListMatchesSets("8", "3")).toBe(true);
+    expect(repsListMatchesSets("8-10", "3")).toBe(true);
+  });
+
+  it("returns true when list length matches sets", () => {
+    expect(repsListMatchesSets("10/10/10", "3")).toBe(true);
+  });
+
+  it("returns false when list length mismatches sets", () => {
+    expect(repsListMatchesSets("10/10", "3")).toBe(false);
+    expect(repsListMatchesSets("10/10/10/10", "3")).toBe(false);
+  });
+
+  it("does not reject when sets is missing or invalid", () => {
+    expect(repsListMatchesSets("10/10/10", undefined)).toBe(true);
+    expect(repsListMatchesSets("10/10/10", "abc")).toBe(true);
+    expect(repsListMatchesSets("10/10/10", "0")).toBe(true);
+  });
+});
 
 describe("parseSets", () => {
   it("parses valid integers", () => {
@@ -52,12 +75,42 @@ describe("parseReps", () => {
     expect(parseReps("8–10")).toBe("8-10");
   });
 
-  it("parses range with slash", () => {
-    expect(parseReps("8/10")).toBe("8-10");
-  });
-
   it("parses range with spaces", () => {
     expect(parseReps("8 - 10")).toBe("8-10");
+  });
+
+  it("parses per-set list with slashes", () => {
+    expect(parseReps("10/10/10")).toBe("10/10/10");
+    expect(parseReps("8/7/6")).toBe("8/7/6");
+    expect(parseReps("8/10")).toBe("8/10");
+  });
+
+  it("parses per-set list with spaces", () => {
+    expect(parseReps("10 / 10 / 10")).toBe("10/10/10");
+  });
+
+  it("rejects invalid per-set lists", () => {
+    expect(parseReps("0/10/10")).toBeNull();
+    expect(parseReps("10/0/10")).toBeNull();
+    expect(parseReps("10/101/10")).toBeNull();
+    expect(parseReps("10/abc/10")).toBeNull();
+    expect(parseReps("10//10")).toBeNull();
+  });
+
+  it("rejects per-set ranges", () => {
+    expect(parseReps("8-10/8-10")).toBeNull();
+  });
+
+  it("rejects empty or slash-only input", () => {
+    expect(parseReps("")).toBeNull();
+    expect(parseReps("   ")).toBeNull();
+    expect(parseReps("/")).toBeNull();
+    expect(parseReps("10/")).toBeNull();
+    expect(parseReps("/10")).toBeNull();
+  });
+
+  it("rejects lists over 100 values", () => {
+    expect(parseReps(Array(101).fill("8").join("/"))).toBeNull();
   });
 
   it("rejects invalid ranges", () => {
@@ -85,6 +138,11 @@ describe("parseWeight", () => {
   it("strips kg suffix", () => {
     expect(parseWeight("60kg")).toBe("60");
     expect(parseWeight("60 kg")).toBe("60");
+  });
+
+  it("parses comma decimals", () => {
+    expect(parseWeight("60,5")).toBe("60.5");
+    expect(parseWeight("60,5 кг")).toBe("60.5");
   });
 
   it("parses zero", () => {

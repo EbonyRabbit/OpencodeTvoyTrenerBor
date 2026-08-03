@@ -95,6 +95,35 @@ describe("formatExercise", () => {
     const result = formatExercise(1, ex, "ru", { weight: 40, sets: null, reps: null });
     expect(result).toContain("40 кг");
   });
+
+  it("formats per-set reps list without sets multiplier", () => {
+    const ex = { name: "Жим", sets: "3", reps: "10/10/10", weight: "40" };
+    const result = formatExercise(1, ex, "ru", { weight: 40, sets: 3, reps: "10/10/10" });
+    const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
+    expect(lastLine).toContain("10/10/10");
+    expect(lastLine).not.toContain("3×");
+  });
+
+  it("formats varying per-set reps list", () => {
+    const ex = { name: "Тяга", sets: "3", reps: "8/7/6", weight: "60" };
+    const result = formatExercise(1, ex, "ru", { weight: 60, sets: 3, reps: "8/7/6" });
+    expect(result).toContain("8/7/6");
+  });
+
+  it("still formats ranges with sets multiplier", () => {
+    const ex = { name: "Присед", sets: "3", reps: "8-10", weight: "60" };
+    const result = formatExercise(1, ex, "ru", { weight: 60, sets: 3, reps: "8-10" });
+    const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
+    expect(lastLine).toContain("3×8-10");
+  });
+
+  it("shows bodyweight instead of 0 kg", () => {
+    const ex = { name: "Отжимания", sets: "3", reps: "15", weight: "0" };
+    const result = formatExercise(1, ex, "ru", { weight: 0, sets: 3, reps: "15" });
+    const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
+    expect(lastLine).toContain("вес тела");
+    expect(lastLine).not.toContain("0 кг");
+  });
 });
 
 describe("getPreviousWorkoutLogs", () => {

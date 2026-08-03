@@ -277,9 +277,12 @@ export async function getPreviousWorkoutLogs(
 }
 
 function formatPreviousLog(log: PreviousLog): string {
-  const weight = log.weight != null ? `${log.weight} кг` : null;
-  const setsReps =
-    log.sets != null && log.reps
+  const weight =
+    log.weight != null && log.weight > 0 ? `${log.weight} кг` : log.weight === 0 ? "вес тела" : null;
+  const perSetList = log.reps != null && String(log.reps).includes("/");
+  const setsReps = perSetList
+    ? log.reps
+    : log.sets != null && log.reps
       ? `${log.sets}×${log.reps}`
       : log.sets != null
         ? `${log.sets} подх.`

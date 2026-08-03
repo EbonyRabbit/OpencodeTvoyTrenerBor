@@ -8,6 +8,7 @@ import {
   getTodayDateStr,
   formatWorkoutMessage,
   truncateMessage,
+  isTodayWorkoutCompleted,
 } from "../lib/workout-utils.js";
 import { markAsSent } from "./dedup.js";
 import { logBotEvent } from "./logger.js";
@@ -128,6 +129,8 @@ export async function runMorningNotification(bot: Bot<MyContext>): Promise<void>
         const lang = (client.language || "ru") as Language;
         const workout = await getTodayWorkout(fullClient, lang);
         if (!workout) continue;
+
+        if (await isTodayWorkoutCompleted(fullClient, workout)) continue;
 
         const todayStr = getTodayDateStr(tz);
         const dedupKey = `morning:${client.id}:${todayStr}`;

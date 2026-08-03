@@ -3,7 +3,7 @@ import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import type { Client } from "../lib/clients.js";
 import { t, type Language } from "../i18n/index.js";
-import { getTodayDateStr, getTodayWorkout, formatWorkoutMessage, truncateMessage } from "../lib/workout-utils.js";
+import { getTodayDateStr, getTodayWorkout, isTodayWorkoutCompleted, formatWorkoutMessage, truncateMessage } from "../lib/workout-utils.js";
 import { markAsSent } from "./dedup.js";
 import { logBotEvent } from "./logger.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
@@ -106,11 +106,16 @@ export async function runAutoResume(bot: Bot<MyContext>): Promise<void> {
           try {
             const workout = await getTodayWorkout(client, lang);
             const header = t("resume.resumed_header", lang);
-            const msg = workout
-              ? `${header}\n\n${await formatWorkoutMessage(workout, lang, client)}`
-              : `${header}\n\n${t("resume.no_workout_today", lang)}`;
-            const truncated = truncateMessage(msg, t("program.truncation_suffix", lang));
-            await bot.api.sendMessage(client.telegram_id, truncated);
+            if (workout && await isTodayWorkoutCompleted(client, workout)) {
+              const truncated = truncateMessage(`${header}\n\n${t("workout.already_completed", lang)}`, t("program.truncation_suffix", lang));
+              await bot.api.sendMessage(client.telegram_id, truncated);
+            } else {
+              const msg = workout
+                ? `${header}\n\n${await formatWorkoutMessage(workout, lang, client)}`
+                : `${header}\n\n${t("resume.no_workout_today", lang)}`;
+              const truncated = truncateMessage(msg, t("program.truncation_suffix", lang));
+              await bot.api.sendMessage(client.telegram_id, truncated);
+            }
             await sleep(MSG_DELAY_MS);
           } catch (sendErr) {
             console.warn(`[RESUME] Failed to notify client ${client.telegram_id}:`, sendErr);

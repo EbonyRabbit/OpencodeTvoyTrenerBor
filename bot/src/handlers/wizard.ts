@@ -1,7 +1,7 @@
 import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import type { TodayWorkout } from "../lib/workout-utils.js";
-import { getTodayDateStr, getTodayWorkout } from "../lib/workout-utils.js";
+import { getTodayDateStr, getTodayWorkout, isTodayWorkoutCompleted } from "../lib/workout-utils.js";
 import { parseSets, parseReps, parseWeight, parseRpe, repsListMatchesSets } from "../lib/wizard-validators.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
@@ -22,7 +22,7 @@ export interface WizardData {
 }
 
 export interface WizardResult {
-  type: "next_step" | "completed" | "expired";
+  type: "next_step" | "completed" | "expired" | "already_completed";
   nextExerciseIndex?: number;
 }
 
@@ -225,6 +225,12 @@ async function advanceWizard(
 
 async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardResult> {
   if (!ctx.from?.id || !ctx.client) return { type: "expired" };
+
+  if (await isTodayWorkoutCompleted(ctx.client)) {
+    await ctx.reply(t("workout.already_completed", ctx.language));
+    await clearState(ctx.from.id).catch(() => {});
+    return { type: "already_completed" };
+  }
 
   const tz = ctx.client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);

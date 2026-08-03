@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatProgressMessage, formatTrendsMessage, formatExercise, getPreviousWorkoutLogs } from "../workout-utils.js";
+import { truncateMessage, formatProgressMessage, formatTrendsMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -184,6 +184,76 @@ describe("getPreviousWorkoutLogs", () => {
     mockLogsQuery([], { message: "boom" });
     const result = await getPreviousWorkoutLogs(client, ["Присед"]);
     expect(result.size).toBe(0);
+  });
+});
+
+describe("isTodayWorkoutCompleted", () => {
+  const client = {
+    id: "client-1",
+    program_id: "prog-1",
+    timezone: "Europe/Moscow",
+  } as Parameters<typeof isTodayWorkoutCompleted>[0];
+
+  const workout = {
+    week_number: 3,
+    is_deload: false,
+    goal: null,
+    day_name: "Понедельник",
+    days: [],
+    exercises: [{ name: "Присед" }, { name: "Жим лёжа" }],
+  } as Parameters<typeof isTodayWorkoutCompleted>[1];
+
+  function mockTodayLogs(rows: Array<{ exercise?: string | null }>, error: { message: string } | null = null) {
+    const eq2 = vi.fn(() => ({ data: rows, error }));
+    const eq1 = vi.fn(() => ({ eq: eq2 }));
+    const select = vi.fn(() => ({ eq: eq1 }));
+    mocks.mockFrom.mockReturnValue({ select });
+    return { select, eq1, eq2 };
+  }
+
+  it("returns false when only some exercises are logged", async () => {
+    mockTodayLogs([{ exercise: "Присед" }]);
+    expect(await isTodayWorkoutCompleted(client, workout)).toBe(false);
+  });
+
+  it("returns false without making a query when workout has no exercises", async () => {
+    mocks.mockFrom.mockClear();
+    await isTodayWorkoutCompleted(client, { ...workout, exercises: [] });
+    expect(mocks.mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("trims names on both sides", async () => {
+    mockTodayLogs([{ exercise: "  Присед " }, { exercise: "жим лёжа" }]);
+    expect(await isTodayWorkoutCompleted(client, {
+      ...workout,
+      exercises: [{ name: " Присед " }, { name: "Жим лёжа" }],
+    })).toBe(true);
+  });
+
+  it("returns true when every exercise is logged today", async () => {
+    mockTodayLogs([{ exercise: "Присед" }, { exercise: "жим лёжа" }]);
+    expect(await isTodayWorkoutCompleted(client, workout)).toBe(true);
+  });
+
+  it("matches case-insensitively and ignores pseudo rows", async () => {
+    mockTodayLogs([{ exercise: "присед" }, { exercise: "[SKIP]" }, { exercise: "ЖИМ ЛЁЖА" }]);
+    expect(await isTodayWorkoutCompleted(client, workout)).toBe(true);
+  });
+
+  it("returns false when query fails", async () => {
+    mockTodayLogs([], { message: "boom" });
+    expect(await isTodayWorkoutCompleted(client, workout)).toBe(false);
+  });
+
+  it("returns false when no program is assigned", async () => {
+    expect(await isTodayWorkoutCompleted({ ...client, program_id: null }, workout)).toBe(false);
+  });
+
+  it("filters today's logs by client and date", async () => {
+    const { eq1, eq2 } = mockTodayLogs([]);
+    await isTodayWorkoutCompleted(client, workout);
+    expect(eq1).toHaveBeenCalledWith("client_id", "client-1");
+    expect(eq2).toHaveBeenCalledWith("date", expect.any(String));
   });
 });
 

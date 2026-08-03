@@ -207,12 +207,12 @@ export default async function WorkoutPage() {
   }
 
   const loggedNames = new Set(
-    (logs ?? []).map((l) => l.exercise?.toLowerCase()).filter(Boolean),
+    (logs ?? []).map((l) => l.exercise?.trim().toLowerCase()).filter(Boolean),
   );
   const workoutCompleted =
     matchedDay.exercises.length > 0 &&
     matchedDay.exercises.every((ex) =>
-      loggedNames.has(ex.name.toLowerCase()),
+      loggedNames.has(ex.name.trim().toLowerCase()),
     );
 
   return (

@@ -408,6 +408,40 @@ export async function formatSingleExercise(
   return lines.join("\n");
 }
 
+export async function isTodayWorkoutCompleted(
+  client: Client,
+  workout?: TodayWorkout | null,
+): Promise<boolean> {
+  if (!client.program_id) return false;
+
+  const effective = workout ?? await getTodayWorkout(client);
+  if (!effective?.exercises?.length) return false;
+
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+
+  const { data: logs, error } = await supabaseAdmin
+    .from("workout_logs")
+    .select("exercise")
+    .eq("client_id", client.id)
+    .eq("date", todayStr);
+
+  if (error) {
+    console.error(`[WORKOUT] Completion query error for ${client.id}:`, error.message);
+    return false;
+  }
+
+  const loggedNames = new Set(
+    (logs ?? [])
+      .map((l) => l.exercise?.trim().toLowerCase())
+      .filter((name): name is string => Boolean(name) && !isPseudoName(name)),
+  );
+
+  return effective.exercises.every((ex) =>
+    loggedNames.has(ex.name.trim().toLowerCase()),
+  );
+}
+
 export async function getTodayProgress(
   client: Client,
 ): Promise<{ exercise: string; done: boolean }[]> {
@@ -564,6 +598,11 @@ export async function sendTodayWorkout(
 
   if (!workout) {
     await sender.reply(t("workout.no_workout_today", sender.language));
+    return false;
+  }
+
+  if (await isTodayWorkoutCompleted(client, workout)) {
+    await sender.reply(t("workout.already_completed", sender.language));
     return false;
   }
 

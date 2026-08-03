@@ -2,6 +2,7 @@ import type { MyContext } from "../bot.js";
 import { guardActiveClient } from "./guards.js";
 import {
   getTodayWorkout,
+  isTodayWorkoutCompleted,
   formatSingleExercise,
   type TodayWorkout,
 } from "../lib/workout-utils.js";
@@ -147,6 +148,16 @@ export async function showExercise(
     return;
   }
 
+  if (await isTodayWorkoutCompleted(ctx.client, effectiveWorkout)) {
+    await ctx.reply(t("workout.already_completed", ctx.language));
+    try {
+      await clearState(ctx.from.id);
+    } catch (err) {
+      console.warn(`[CALLBACK] clearState failed for ${ctx.from.id}:`, err);
+    }
+    return;
+  }
+
   const text = await formatSingleExercise(
     index,
     effectiveWorkout.exercises.length,
@@ -172,6 +183,12 @@ async function handleTodayOpen(ctx: MyContext, _params: string): Promise<void> {
     if (!workout) {
       await ctx.answerCallbackQuery({ text: t("workout.no_workout_today", ctx.language) }).catch(() => {});
       await ctx.reply(t("workout.no_workout_today", ctx.language));
+      return;
+    }
+
+    if (await isTodayWorkoutCompleted(ctx.client, workout)) {
+      await ctx.answerCallbackQuery({ text: t("workout.already_completed", ctx.language) }).catch(() => {});
+      await ctx.reply(t("workout.already_completed", ctx.language));
       return;
     }
 
@@ -221,6 +238,11 @@ async function handleExerciseLog(ctx: MyContext, params: string): Promise<void> 
     return;
   }
 
+  if (await isTodayWorkoutCompleted(ctx.client, workout)) {
+    await ctx.answerCallbackQuery({ text: t("workout.already_completed", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
   await ctx.answerCallbackQuery().catch(() => {});
   await startExerciseLogging(ctx, index, workout);
 }
@@ -262,6 +284,16 @@ async function handleSkipWorkout(ctx: MyContext, _params: string): Promise<void>
   await ctx.answerCallbackQuery().catch(() => {});
 
   if (ctx.client) {
+    if (await isTodayWorkoutCompleted(ctx.client)) {
+      await ctx.reply(t("workout.already_completed", ctx.language));
+      try {
+        await clearState(ctx.from.id);
+      } catch (err) {
+        console.warn(`[CALLBACK] clearState failed for ${ctx.from.id}:`, err);
+      }
+      return;
+    }
+
     try {
       await setState(ctx.from.id, {
         action: "skip_workout",
@@ -285,6 +317,12 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
   if (!text) return false;
 
   const reason = text === "/skip" ? t("wizard.skip_no_reason", ctx.language) : text;
+
+  if (await isTodayWorkoutCompleted(ctx.client)) {
+    await ctx.reply(t("workout.already_completed", ctx.language));
+    await clearState(ctx.from.id).catch(() => {});
+    return true;
+  }
 
   const tz = ctx.client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);

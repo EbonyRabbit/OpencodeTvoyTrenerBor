@@ -1,7 +1,7 @@
 import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
-import { getTodayDateStr, getTodayWorkout, formatWorkoutMessage, truncateMessage } from "../lib/workout-utils.js";
+import { getTodayDateStr, getTodayWorkout, isTodayWorkoutCompleted, formatWorkoutMessage, truncateMessage } from "../lib/workout-utils.js";
 import { getActivePause, resumePlan, suggestStrategy, type ResumeStrategy, type PlanPause } from "../lib/plan-adjustment.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { daysBetween } from "../lib/date-utils.js";
@@ -158,11 +158,16 @@ export async function handleResumeCallback(ctx: MyContext, strategyParam: string
   try {
     const workout = await getTodayWorkout(client, lang);
     const header = t("resume.resumed_header", lang);
-    const msg = workout
-      ? `${header}\n\n${await formatWorkoutMessage(workout, lang, client)}`
-      : `${header}\n\n${t("resume.no_workout_today", lang)}`;
-    const truncated = truncateMessage(msg, t("program.truncation_suffix", lang));
-    await ctx.reply(truncated);
+    if (workout && await isTodayWorkoutCompleted(client, workout)) {
+      const truncated = truncateMessage(`${header}\n\n${t("workout.already_completed", lang)}`, t("program.truncation_suffix", lang));
+      await ctx.reply(truncated);
+    } else {
+      const msg = workout
+        ? `${header}\n\n${await formatWorkoutMessage(workout, lang, client)}`
+        : `${header}\n\n${t("resume.no_workout_today", lang)}`;
+      const truncated = truncateMessage(msg, t("program.truncation_suffix", lang));
+      await ctx.reply(truncated);
+    }
   } catch (err) {
     console.warn(`[RESUME] Failed to send today's workout:`, err);
   }

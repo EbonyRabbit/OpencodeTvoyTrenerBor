@@ -27,10 +27,12 @@ export function WorkoutForm({
   exercises,
   date,
   week,
+  dayOrder,
 }: {
   exercises: ParsedExercise[];
   date: string;
   week: number | null;
+  dayOrder: number | null;
 }) {
   const [inputs, setInputs] = useState<ExerciseInput[]>(
     exercises.map((ex) => ({
@@ -62,7 +64,7 @@ export function WorkoutForm({
         rpe: toNum(inp.rpe),
         comment: inp.comment || null,
       }));
-      const result = await logWorkoutFromWeb(date, week, payload);
+      const result = await logWorkoutFromWeb(date, week, dayOrder, payload);
       if (result.error) {
         setError(result.error);
       } else {

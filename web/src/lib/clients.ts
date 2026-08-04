@@ -2,7 +2,20 @@ import type { Database } from "@/types/supabase";
 
 export type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 
-export type ClientWithProgram = ClientRow & {
+export type ClientWithProgram = Pick<
+  ClientRow,
+  | "id"
+  | "name"
+  | "telegram_id"
+  | "status"
+  | "payment_status"
+  | "language"
+  | "timezone"
+  | "access_start_date"
+  | "access_end_date"
+  | "created_at"
+  | "program_id"
+> & {
   program: { title: string } | null;
 };
 

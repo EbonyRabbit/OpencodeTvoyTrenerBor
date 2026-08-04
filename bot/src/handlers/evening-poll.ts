@@ -32,6 +32,7 @@ async function handleEveningResponse(
     client_id: client.id,
     date: todayStr,
     week: workout.week_number,
+    day_order: workout.day_order,
     exercise: `[EVENING_${response.toUpperCase()}]`,
     comment: `Evening poll: ${response}`,
   } as never;

@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent } from "@/lib/program-utils";
 import { calculateAdherence, getAdherenceColor } from "@/lib/adherence";
 import { safeFetch } from "@/lib/safe-fetch";
+import { getTodayDateStr } from "@/lib/date-utils";
+import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Database } from "@/types/supabase";
 
@@ -16,11 +18,6 @@ function getGreeting(): string {
   if (hour < 12) return "Доброе утро";
   if (hour < 18) return "Добрый день";
   return "Добрый вечер";
-}
-
-function getTodayString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 export default async function ClientHomePage({
@@ -40,7 +37,7 @@ export default async function ClientHomePage({
     .maybeSingle<ClientRow>();
   if (!client) notFound();
 
-  const today = getTodayString();
+  const today = getTodayDateStr(client.timezone || DEFAULT_TIMEZONE);
 
   const [programResult, scheduleResult, workoutResult, checkinResult] = await Promise.all([
     client.program_id
@@ -66,9 +63,9 @@ export default async function ClientHomePage({
     safeFetch(
       supabaseAdmin
         .from("workout_logs")
-        .select("date")
+        .select("date, exercise, week, day_order")
         .eq("client_id", clientId),
-      [] as { date: string }[],
+      [] as { date: string; exercise?: string | null; week?: number | null; day_order?: number | null }[],
     ),
     safeFetch(
       supabaseAdmin
@@ -84,7 +81,7 @@ export default async function ClientHomePage({
 
   const program = programResult.data as Parameters<typeof getParsedContent>[0] | null;
   const schedule = scheduleResult.data ?? [];
-  const workoutLogs = (workoutResult.data ?? []) as { date: string }[];
+  const workoutLogs = (workoutResult.data ?? []) as Parameters<typeof calculateAdherence>[2];
   const latestCheckin = checkinResult.data as { created_at: string; wellbeing: number | null; sleep: number | null; stress: number | null } | null;
 
   const parsed = program ? getParsedContent(program) : null;
@@ -94,19 +91,20 @@ export default async function ClientHomePage({
   );
 
   const adherence = schedule.length > 0 && parsed
-    ? calculateAdherence(schedule, parsed, workoutLogs)
+    ? calculateAdherence(schedule, parsed, workoutLogs, client.training_days, today)
     : null;
 
   const currentWeekStats = currentWeek && parsed
     ? (() => {
-        const weekData = parsed.weeks?.find((w) => w.week_number === currentWeek.week_number);
-        const expected = weekData?.days?.filter((d) => (d.exercises?.length ?? 0) > 0).length ?? 0;
-        if (expected === 0) return null;
-        const completed = workoutLogs.filter(
-          (l) => currentWeek.start_date && l.date >= currentWeek.start_date && l.date <= today,
-        ).length;
-        const adherencePct = Math.min(Math.round((completed / expected) * 100), 100);
-        return { completed, expected, adherencePct };
+        const week = adherence?.weeks.find(
+          (w) => w.weekNumber === currentWeek.week_number,
+        );
+        if (!week) return null;
+        return {
+          completed: week.completed,
+          expected: week.expected,
+          adherencePct: week.adherencePct,
+        };
       })()
     : null;
 

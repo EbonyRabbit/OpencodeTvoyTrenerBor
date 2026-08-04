@@ -15,6 +15,7 @@ export interface WorkoutPlan {
 
 export type TodayWorkout = WorkoutPlan & {
   day_name: string;
+  day_order: number | null;
   exercises: ParsedExercise[];
 };
 
@@ -102,6 +103,36 @@ function getTodayISODay(timezone: string): number {
   return dayMap[dayName] ?? 0;
 }
 
+export function getIsoWeekday(dateStr: string): number {
+  const date = new Date(`${dateStr}T12:00:00Z`);
+  if (isNaN(date.getTime())) return 0;
+  const iso = date.getUTCDay();
+  return iso === 0 ? 7 : iso;
+}
+
+const RU_DAY_NAME_TO_ISO: Record<string, number> = {
+  понедельник: 1,
+  вторник: 2,
+  среда: 3,
+  четверг: 4,
+  пятница: 5,
+  суббота: 6,
+  воскресенье: 7,
+};
+
+export function dayNameToIso(dayName: string): number {
+  return RU_DAY_NAME_TO_ISO[dayName.trim().toLowerCase()] ?? 0;
+}
+
+export function plannedDateForDay(weekStartDate: string, dayName: string): string | null {
+  const iso = dayNameToIso(dayName);
+  if (iso < 1) return null;
+  const date = new Date(`${weekStartDate}T12:00:00Z`);
+  if (isNaN(date.getTime())) return null;
+  date.setUTCDate(date.getUTCDate() + (iso - 1));
+  return date.toISOString().slice(0, 10);
+}
+
 function weekdayFullName(iso: number, lang: Language): string {
   return t(`schedule.day_fullnames.${String(iso)}`, lang);
 }
@@ -146,9 +177,29 @@ export async function getTodayWorkout(client: Client, lang: Language = "ru"): Pr
   return {
     ...plan,
     day_name: scheduledIsoDay ? weekdayFullName(scheduledIsoDay, lang) : matchedDay.day_name,
+    day_order: matchedDay.day_order ?? null,
     goal: matchedDay.focus ?? null,
     exercises: matchedDay.exercises,
   };
+}
+
+export function dayOrderForDate(
+  dateStr: string,
+  trainingDays: number[] | null,
+): number | null {
+  if (!trainingDays || trainingDays.length === 0) return null;
+  const iso = getIsoWeekday(dateStr);
+  if (iso === 0) return null;
+  const index = trainingDays.indexOf(iso);
+  if (index === -1) return null;
+  return index + 1;
+}
+
+export function matchDayByOrder(
+  days: ParsedDay[],
+  dayOrder: number,
+): ParsedDay | null {
+  return days.find((d) => d.day_order === dayOrder) ?? null;
 }
 
 function matchDayForToday(
@@ -189,7 +240,7 @@ export interface PreviousLog {
 
 const PSEUDO_EXERCISE = /^\[/;
 
-function isPseudoName(name: string): boolean {
+export function isPseudoName(name: string): boolean {
   return PSEUDO_EXERCISE.test(name.trim());
 }
 

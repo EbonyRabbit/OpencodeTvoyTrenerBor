@@ -3,17 +3,26 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent, type ParsedDay } from "@/lib/program-utils";
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
+import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { HistoryGrid } from "./history-grid";
 
-const DEFAULT_TIMEZONE = "Europe/Moscow";
-
 type WorkoutLogRow = {
+  date: string;
   week: number | null;
-  exercise: string | null;
+  day_order: number | null;
+  exercise: string;
   sets: number | null;
   reps: string | null;
   weight: number | null;
+  rpe: number | null;
+  comment: string | null;
+};
+
+type ScheduleRow = {
+  week_number: number;
+  start_date: string | null;
+  end_date: string | null;
 };
 
 const PSEUDO_EXERCISE = /^\[/;
@@ -23,12 +32,43 @@ function normalizeName(value: string | null | undefined): string {
 }
 
 function isPseudoLog(log: WorkoutLogRow): boolean {
-  const name = log.exercise ?? "";
-  return PSEUDO_EXERCISE.test(name.trim());
+  return PSEUDO_EXERCISE.test(log.exercise ?? "");
 }
 
-function isRealLog(log: WorkoutLogRow): boolean {
-  return !isPseudoLog(log) && normalizeName(log.exercise) !== "";
+function isSkipLog(log: WorkoutLogRow): boolean {
+  return normalizeName(log.exercise).startsWith("[skip]");
+}
+
+export type HistoryEntry = {
+  exercise: string;
+  weight: number | null;
+  sets: number | null;
+  reps: string | null;
+  rpe: number | null;
+  comment: string | null;
+  date: string;
+};
+
+export type HistoryCell = {
+  entries: HistoryEntry[];
+};
+
+export type HistoryRow = {
+  day_order: number;
+  exercise: string;
+  cells: Array<HistoryCell | null>;
+};
+
+export type HistoryDay = {
+  day_order: number;
+  day_name: string;
+  focus: string | null;
+  rows: HistoryRow[];
+  skips: Array<string | null>;
+};
+
+function emptyCell(): HistoryCell {
+  return { entries: [] };
 }
 
 function dayExerciseNames(day: ParsedDay | undefined): Set<string> {
@@ -40,24 +80,25 @@ function dayExerciseNames(day: ParsedDay | undefined): Set<string> {
   return names;
 }
 
-export type HistoryCell = {
-  logs: Array<{
-    exercise: string;
-    weight: number | null;
-    sets: number | null;
-    reps: string | null;
-  }>;
+function getIsoWeekday(dateStr: string): number {
+  const date = new Date(`${dateStr}T12:00:00Z`);
+  if (isNaN(date.getTime())) return 0;
+  const iso = date.getUTCDay();
+  return iso === 0 ? 7 : iso;
+}
+
+const DAY_NAME_TO_ISO: Record<string, number> = {
+  понедельник: 1,
+  вторник: 2,
+  среда: 3,
+  четверг: 4,
+  пятница: 5,
+  суббота: 6,
+  воскресенье: 7,
 };
 
-export type HistoryRow = {
-  day_order: number;
-  day_name: string;
-  focus: string | null;
-  cells: Array<HistoryCell | null>;
-};
-
-function emptyCell(): HistoryCell {
-  return { logs: [] };
+function dayNameToIso(dayName: string): number {
+  return DAY_NAME_TO_ISO[normalizeName(dayName)] ?? 0;
 }
 
 export default async function HistoryPage() {
@@ -75,9 +116,9 @@ export default async function HistoryPage() {
 
   const { data: client } = await supabaseAdmin
     .from("clients")
-    .select("program_id, timezone")
+    .select("program_id, timezone, training_days")
     .eq("id", clientId)
-    .maybeSingle<Pick<ClientRow, "program_id" | "timezone">>();
+    .maybeSingle<Pick<ClientRow, "program_id" | "timezone" | "training_days">>();
 
   if (!client?.program_id) {
     return (
@@ -106,10 +147,19 @@ export default async function HistoryPage() {
     );
   }
 
+  const { data: schedule } = await supabaseAdmin
+    .from("program_schedule")
+    .select("week_number, start_date, end_date")
+    .eq("client_id", clientId);
+  const scheduleRows = (schedule ?? []) as ScheduleRow[];
+  const trainingDays = client.training_days ?? [];
+
   const { data: logs, error: logsError } = await supabaseAdmin
     .from("workout_logs")
-    .select("week, exercise, sets, reps, weight")
-    .eq("client_id", clientId);
+    .select("date, week, day_order, exercise, sets, reps, weight, rpe, comment")
+    .eq("client_id", clientId)
+    .order("date", { ascending: true })
+    .order("created_at", { ascending: true });
   if (logsError) {
     console.error(`[HISTORY] Logs query failed for ${clientId}:`, logsError.message);
   }
@@ -128,9 +178,48 @@ export default async function HistoryPage() {
     );
   }
 
-  const firstWeekWithDays = parsed.weeks.find((w) => w.days?.length);
-  const canonicalDays = firstWeekWithDays?.days ?? [];
-  if (canonicalDays.length === 0) {
+  const dayRows = new Map<number, HistoryDay>();
+  const weekNameSets = new Map<number, Map<number, Set<string>>>();
+
+  for (const week of parsed.weeks) {
+    const nameSets = new Map<number, Set<string>>();
+    for (const day of week.days ?? []) {
+      if (!day.exercises?.length) continue;
+
+      const existingDay = dayRows.get(day.day_order);
+      if (existingDay) {
+        if (!existingDay.day_name && day.day_name) existingDay.day_name = day.day_name;
+        if (!existingDay.focus && day.focus) existingDay.focus = day.focus;
+      } else {
+        dayRows.set(day.day_order, {
+          day_order: day.day_order,
+          day_name: day.day_name,
+          focus: day.focus ?? null,
+          rows: [],
+          skips: Array.from({ length: weekCount }, () => null),
+        });
+      }
+
+      const names = new Set<string>();
+      for (const ex of day.exercises ?? []) {
+        const name = normalizeName(ex.name);
+        if (!name) continue;
+        names.add(name);
+        const historyDay = dayRows.get(day.day_order)!;
+        if (!historyDay.rows.some((r) => normalizeName(r.exercise) === name)) {
+          historyDay.rows.push({
+            day_order: day.day_order,
+            exercise: ex.name,
+            cells: Array.from({ length: weekCount }, () => null),
+          });
+        }
+      }
+      nameSets.set(day.day_order, names);
+    }
+    if (nameSets.size > 0) weekNameSets.set(week.week_number, nameSets);
+  }
+
+  if (dayRows.size === 0) {
     return (
       <Card>
         <CardContent className="py-8 text-center">
@@ -140,43 +229,93 @@ export default async function HistoryPage() {
     );
   }
 
-  const weekDays = new Map<number, ParsedDay[]>();
-  for (const week of parsed.weeks) {
-    weekDays.set(week.week_number, week.days ?? []);
+  function weekForDate(date: string): number | null {
+    const week = scheduleRows.find(
+      (w) => w.start_date && w.end_date && date >= w.start_date && date <= w.end_date,
+    );
+    return week?.week_number ?? null;
   }
 
-  const rows: HistoryRow[] = canonicalDays.map((day) => ({
-    day_order: day.day_order,
-    day_name: day.day_name,
-    focus: day.focus ?? null,
-    cells: Array.from({ length: weekCount }, () => null),
-  }));
+  const plannedDateToOrder = new Map<number, Map<string, number>>();
+  for (const week of parsed.weeks) {
+    const scheduleRow = scheduleRows.find((w) => w.week_number === week.week_number);
+    if (!scheduleRow?.start_date) continue;
+    const map = new Map<string, number>();
+    for (const day of week.days ?? []) {
+      const iso = dayNameToIso(day.day_name);
+      if (iso < 1) continue;
+      const date = new Date(`${scheduleRow.start_date}T12:00:00Z`);
+      if (isNaN(date.getTime())) continue;
+      date.setUTCDate(date.getUTCDate() + (iso - 1));
+      map.set(date.toISOString().slice(0, 10), day.day_order);
+    }
+    if (map.size > 0) plannedDateToOrder.set(week.week_number, map);
+  }
 
   for (const log of logs ?? []) {
-    if (!isRealLog(log)) continue;
-    if (log.week == null || log.week < 1 || log.week > weekCount) continue;
+    if (isPseudoLog(log) && !isSkipLog(log)) continue;
+
+    let weekNumber = log.week;
+    if (weekNumber == null) weekNumber = weekForDate(log.date);
+    if (weekNumber == null || weekNumber < 1 || weekNumber > weekCount) continue;
+
+    if (isSkipLog(log)) {
+      let dayOrder = log.day_order;
+      if (dayOrder == null && trainingDays.length > 0) {
+        const iso = getIsoWeekday(log.date);
+        const index = trainingDays.indexOf(iso);
+        if (index !== -1) dayOrder = index + 1;
+      }
+      if (dayOrder == null) {
+        dayOrder = plannedDateToOrder.get(weekNumber)?.get(log.date) ?? null;
+      }
+      const historyDay = dayOrder != null ? dayRows.get(dayOrder) : undefined;
+      if (historyDay) {
+        if (historyDay.skips[weekNumber - 1] == null) {
+          historyDay.skips[weekNumber - 1] = log.comment?.trim() || "без причины";
+        }
+      }
+      continue;
+    }
 
     const name = normalizeName(log.exercise);
-    const daysForWeek = weekDays.get(log.week) ?? canonicalDays;
-    for (const row of rows) {
-      const dayForWeek = daysForWeek.find((d) => d.day_order === row.day_order);
-      const names = dayExerciseNames(dayForWeek ?? dayByOrder(canonicalDays, row.day_order));
-      if (!names.has(name)) continue;
-      const cell = (row.cells[log.week - 1] ??= emptyCell());
-      cell.logs.push({
-        exercise: log.exercise as string,
-        weight: log.weight,
-        sets: log.sets,
-        reps: log.reps,
-      });
-      break;
-    }
-  }
+    const nameSetsForWeek = weekNameSets.get(weekNumber);
+    const daysForWeek = parsed.weeks.find((w) => w.week_number === weekNumber)?.days ?? [];
 
-  const { data: schedule } = await supabaseAdmin
-    .from("program_schedule")
-    .select("week_number, start_date, end_date")
-    .eq("client_id", clientId);
+    let historyDay: HistoryDay | undefined;
+    if (log.day_order != null) {
+      historyDay = dayRows.get(log.day_order);
+      const names = nameSetsForWeek?.get(log.day_order);
+      if (historyDay && names && !names.has(name)) historyDay = undefined;
+    }
+    if (!historyDay && nameSetsForWeek) {
+      for (const [dayOrder, names] of nameSetsForWeek) {
+        if (names.has(name)) {
+          historyDay = dayRows.get(dayOrder);
+          if (historyDay) break;
+        }
+      }
+    }
+    if (!historyDay) {
+      const fallbackDay = daysForWeek.find((d) => dayExerciseNames(d).has(name));
+      historyDay = fallbackDay ? dayRows.get(fallbackDay.day_order) : undefined;
+    }
+    if (!historyDay) continue;
+
+    const historyRow = historyDay.rows.find((r) => normalizeName(r.exercise) === name);
+    if (!historyRow) continue;
+
+    const cell = (historyRow.cells[weekNumber - 1] ??= emptyCell());
+    cell.entries.push({
+      exercise: log.exercise as string,
+      weight: log.weight,
+      sets: log.sets,
+      reps: log.reps,
+      rpe: log.rpe,
+      comment: log.comment,
+      date: log.date,
+    });
+  }
 
   let todayStr: string;
   try {
@@ -185,7 +324,7 @@ export default async function HistoryPage() {
     todayStr = getTodayDateStr(DEFAULT_TIMEZONE);
   }
   let currentWeek: number | null = null;
-  for (const w of schedule ?? []) {
+  for (const w of scheduleRows) {
     if (!w.start_date || !w.end_date) continue;
     if (todayStr >= w.start_date && todayStr <= w.end_date) {
       currentWeek = w.week_number;
@@ -193,12 +332,14 @@ export default async function HistoryPage() {
     }
   }
 
+  const days: HistoryDay[] = [...dayRows.values()].sort((a, b) => a.day_order - b.day_order);
+
   return (
     <div>
       <div className="mb-4">
         <h2 className="text-lg font-semibold">История тренировок</h2>
         <p className="text-sm text-muted-foreground">
-          Сделанные тренировки по неделям. Всего недель: {weekCount}
+          Фактические результаты по неделям. Всего недель: {weekCount}
         </p>
       </div>
       {logsError && (
@@ -209,14 +350,10 @@ export default async function HistoryPage() {
         </Card>
       )}
       <HistoryGrid
-        rows={rows}
+        days={days}
         weekCount={weekCount}
         currentWeek={currentWeek}
       />
     </div>
   );
-}
-
-function dayByOrder(days: ParsedDay[], dayOrder: number): ParsedDay | undefined {
-  return days.find((d) => d.day_order === dayOrder);
 }

@@ -6,6 +6,8 @@ import { safeFetch } from "@/lib/safe-fetch";
 import { getParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 import { calculateAdherence } from "@/lib/adherence";
+import { getTodayDateStr } from "@/lib/date-utils";
+import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { getActivePause } from "@/lib/plan-adjustment";
 import { WorkoutView } from "./_components/workout-view";
 
@@ -43,9 +45,9 @@ export default async function WorkoutsPage({
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, program_id")
+    .select("id, name, program_id, training_days, timezone")
     .eq("id", id)
-    .maybeSingle<{ id: string; name: string; program_id: string | null }>();
+    .maybeSingle<{ id: string; name: string; program_id: string | null; training_days: number[] | null; timezone: string | null }>();
 
   if (!client) {
     notFound();
@@ -79,7 +81,7 @@ export default async function WorkoutsPage({
     safeFetch(
       supabase
         .from("workout_logs")
-        .select("date")
+        .select("date, exercise, week, day_order")
         .eq("client_id", id)
         .order("date", { ascending: false }),
       [],
@@ -109,6 +111,8 @@ export default async function WorkoutsPage({
     filteredSchedule,
     parsedContent,
     workoutLogs ?? [],
+    client.training_days,
+    getTodayDateStr(client.timezone || DEFAULT_TIMEZONE),
   );
 
   return (

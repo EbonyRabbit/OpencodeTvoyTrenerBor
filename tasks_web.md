@@ -613,3 +613,87 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **12.16** | Ротировать GitHub PAT | ⚠️ В `git remote` URL зашит PAT. Создать новый минимальный PAT, сменить remote | ⏳ |
 | **12.17** | Отключить GAS | Удалить триггер `sendDueMessages` в Google Apps Script | ⏳ |
 | **12.18** | Остановить Worker | Деактивировать Cloudflare Worker (не удалять сразу) | ⏳ |
+
+---
+
+## Фаза 13: Корректный подсчёт тренировок + История как таблица плана
+
+### Контекст
+
+Проблемы:
+- Счётчик «выполненных тренировок» нигде не соответствует плану:
+  - портал «Текущая неделя» (`page.tsx`) считал **строки** `workout_logs`
+    (по одной на упражнение) → «8 тренировок» из 8 упражнений;
+  - `adherence.ts` считал уникальные даты с любым логом (частичная и
+    пропущенная тренировка засчитывались);
+  - бот `/mystats` — день с ≥1 логом ≠ выполненная тренировка, псевдо-строки
+    (`[EVENING_*]`) считались реальными.
+- «История тренировок» (`client/[token]/history`) — строки = дни, в ячейках
+  только вес + подходы×повторы (нет RPE, комментария, даты).
+
+Решение:
+- `day_order` в `workout_logs` — точная привязка лога к дню плана
+  (пишется ботом при логировании + бэкфилл старых данных).
+- Единый алгоритм подсчёта (веб и бот): тренировка выполнена, если в
+  запланированную дату залогированы **все** упражнения дня
+  (`weekday → training_days → day_order → план`).
+- История = таблица как в плане: строки = упражнения, столбцы = все недели,
+  в ячейке вес, подходы×повторы, RPE, комментарий, дата; пропуск помечается.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **13.1** | Миграция: `day_order` | `ALTER TABLE workout_logs ADD COLUMN day_order INTEGER;` — применена к production через Management API | ✅ |
+| **13.2** | Бэкфилл `day_order` | `bot/scripts/backfill-workout-day-order.ts`: `isoWeekday(date)` → `training_days` → `day_order`; для `[SKIP]` ещё `week` по дате; idempotent — выполнен (6 обновлено, 2 пропущено) | ✅ |
+| **13.3** | Бот: запись `day_order` | `workout-utils.ts` (`TodayWorkout.day_order`, экспорт `getIsoWeekday`/`dayOrderForDate`/`matchDayByOrder`/`isPseudoName`); `wizard.ts` → insert; skip → `week`+`day_order`; evening-poll → `day_order` | ✅ |
+| **13.4** | Бот: `/mystats` по плану | `my-stats.ts`: completed = полное покрытие плана, skipped отдельно, псевдо-строки исключены | ✅ |
+| **13.5** | Веб: `adherence.ts` | `calculateAdherence(+trainingDays, лог +exercise)`; частичные/пропуски не считаются; fallback по `day_order`; реген `src/types/supabase.ts` (+`day_order`), фикс `ClientWithProgram` под строгий select-парсинг | ✅ |
+| **13.6** | Портал: «Текущая неделя» | `client/[token]/page.tsx`: +`exercise` в select, замена inline-счётчика строк на план-подсчёт через `adherence.weeks` | ✅ |
+| **13.7** | Дашборд тренера | `clients/[id]/workouts/page.tsx`: +`training_days` у клиента, +`exercise` в select логов | ✅ |
+| **13.8** | История: таблица как план | `client/[token]/history/page.tsx` + `history-grid.tsx`: строки = упражнения (секции по дням), столбцы = недели, ячейка = вес/подходы×повторы/RPE/коммент/дата; бейдж «⏭ пропуск» (legacy-скипы: дата → неделя/день); матчинг по `day_order`, иначе по имени | ✅ |
+| **13.9** | Тесты бота | vitest: `getIsoWeekday`, `dayOrderForDate`, `matchDayByOrder`, `isPseudoName` (+ существующие) — 154/154 ✅ | ✅ |
+| **13.10** | Верификация + gate | bot `tsc` ✅ + vitest (160) ✅; web `tsc` ✅ + vitest (15) ✅ + `next build` ✅; код-ревью 4 раунда (7.6 → 8.7 → 9.3 → **9.5**); TASKS.md; коммит+push (Render/Vercel); бэкфилл после деплоя | ✅ |
+
+### Осознанные решения (задокументировано после ревью)
+
+- **Точный матчинг имён** (I6): тренировка считается выполненной только при
+  совпадении ВСЕХ имён плана после `trim().toLowerCase()`. Опечатка клиента
+  или «Жим лежа» vs «Жим лёжа» не засчитается — это компромисс в пользу
+  строгого учёта; нормализация (схлопывание пробелов, ё→е) — на будущее.
+- **Частичная тренировка не отображается в /mystats** (M1): день с частью
+  логов не попадает ни в «выполнено», ни в «пропущено». В вебе такой день
+  виден как «не выполнено» (снижает %). Третий бакет «частично» — на будущее.
+- **Разная семантика путей подсчёта**: date-путь (с `training_days`) требует
+  все упражнения на точную плановую дату; order-путь (fallback) допускает
+  набор по `day_order` с любой даты недели + подмешивание логов плановой даты.
+  Fallback-путь — для legacy-клиентов без `training_days`.
+- **Неизвестный `day_name`** (напр. англ. «Monday») не даёт future-фильтр
+  в order-пути: день всегда считается наступившим. Программы хранятся
+  на русском, поэтому в проде не проявляется.
+- **Скип-бейдж в истории**: при двух скипах на один день/неделю побеждает
+  первый (по дате), причина последнего отбрасывается.
+- **Асимметрия бот/веб при двойном логировании** (P3.4): если тренировка
+  залогирована и на плановой дате (legacy, без `day_order`), и повторно с
+  `day_order` в другой день, веб засчитает день один раз, а `/mystats`
+  может дать два «выполнено» (счёт по датам). Принято, клампинг — на будущее.
+- **Дублирование `plannedDateForDay`** (P3.6): приватная копия в
+  `web/src/lib/adherence.ts` + экспорт из `bot/src/lib/workout-utils.ts`;
+  вынесение в общий пакет отложено, реализации синхронизированы.
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/20260804000000_add_workout_logs_day_order.sql` | Новый |
+| `bot/scripts/backfill-workout-day-order.ts` | Новый |
+| `bot/src/lib/workout-utils.ts` | Изменение (day_order, matchDayForDate, isPseudoName) |
+| `bot/src/handlers/wizard.ts` | Изменение (WizardData.day_order, insert) |
+| `bot/src/handlers/callbacks.ts` | Изменение (skip: week+day_order) |
+| `bot/src/handlers/evening-poll.ts` | Изменение (day_order) |
+| `bot/src/handlers/my-stats.ts` | Изменение (план-подсчёт) |
+| `web/src/lib/adherence.ts` | Изменение (план-подсчёт) |
+| `web/src/app/client/[token]/page.tsx` | Изменение (current-week фикс) |
+| `web/src/app/clients/[id]/workouts/page.tsx` | Изменение (training_days, exercise) |
+| `web/src/app/client/[token]/history/page.tsx` | Изменение (таблица как план) |
+| `web/src/app/client/[token]/history/history-grid.tsx` | Изменение (полные данные в ячейках) |

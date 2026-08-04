@@ -239,6 +239,7 @@ export default async function WorkoutPage() {
           exercises={matchedDay.exercises}
           date={todayStr}
           week={currentWeek.week_number}
+          dayOrder={matchedDay.day_order ?? null}
         />
       )}
     </div>

@@ -13,6 +13,7 @@ export interface WizardData {
   exercise_name: string;
   week_number: number;
   day_name: string;
+  day_order: number | null;
   exercise_count: number;
   sets?: string;
   reps?: string;
@@ -102,6 +103,7 @@ export async function startExerciseLogging(
     exercise_name: exercise.name,
     week_number: workout.week_number,
     day_name: workout.day_name,
+    day_order: workout.day_order,
     exercise_count: workout.exercises.length,
   };
 
@@ -239,6 +241,7 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
     client_id: ctx.client.id,
     date: todayStr,
     week: data.week_number,
+    day_order: data.day_order,
     exercise: data.exercise_name,
     sets: data.sets ? Number(data.sets) : null,
     reps: data.reps ?? null,

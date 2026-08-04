@@ -327,10 +327,13 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
   const tz = ctx.client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
 
+  const todayWorkout = await getTodayWorkout(ctx.client);
+
   const { error } = await supabaseAdmin.from("workout_logs").insert({
     client_id: ctx.client.id,
     date: todayStr,
-    week: null,
+    week: todayWorkout?.week_number ?? null,
+    day_order: todayWorkout?.day_order ?? null,
     exercise: "[SKIP]",
     sets: null,
     reps: null,

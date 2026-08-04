@@ -18,6 +18,7 @@ type ExerciseLog = {
 export async function logWorkoutFromWeb(
   date: string,
   week: number | null,
+  dayOrder: number | null,
   exercises: ExerciseLog[],
 ): Promise<{ error?: string }> {
   try {
@@ -33,6 +34,7 @@ export async function logWorkoutFromWeb(
       client_id: clientId,
       date,
       week,
+      day_order: dayOrder,
       exercise: ex.exercise,
       sets: ex.sets,
       reps: ex.reps,

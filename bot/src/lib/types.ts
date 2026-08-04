@@ -77,6 +77,7 @@ export interface Database {
           client_id: string;
           date: string;
           week: number | null;
+          day_order: number | null;
           exercise: string;
           sets: number | null;
           reps: string | null;

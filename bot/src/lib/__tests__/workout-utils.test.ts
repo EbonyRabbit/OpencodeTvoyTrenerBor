@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted } from "../workout-utils.js";
+import { truncateMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -237,5 +237,80 @@ describe("isTodayWorkoutCompleted", () => {
     await isTodayWorkoutCompleted(client, workout);
     expect(eq1).toHaveBeenCalledWith("client_id", "client-1");
     expect(eq2).toHaveBeenCalledWith("date", expect.any(String));
+  });
+});
+
+describe("getIsoWeekday", () => {
+  it("returns 1 for Monday", () => {
+    expect(getIsoWeekday("2026-08-03")).toBe(1);
+  });
+
+  it("returns 7 for Sunday", () => {
+    expect(getIsoWeekday("2026-08-02")).toBe(7);
+  });
+
+  it("returns 6 for Saturday", () => {
+    expect(getIsoWeekday("2026-08-01")).toBe(6);
+  });
+
+  it("returns 0 for an invalid date", () => {
+    expect(getIsoWeekday("not-a-date")).toBe(0);
+  });
+});
+
+describe("dayOrderForDate", () => {
+  it("maps weekday index in training_days to 1-based order", () => {
+    expect(dayOrderForDate("2026-08-04", [1, 2, 5])).toBe(2);
+  });
+
+  it("returns null for a rest day", () => {
+    expect(dayOrderForDate("2026-08-04", [1, 6])).toBe(null);
+  });
+
+  it("returns null when training_days is empty", () => {
+    expect(dayOrderForDate("2026-08-04", [])).toBe(null);
+  });
+
+  it("returns null when training_days is null", () => {
+    expect(dayOrderForDate("2026-08-04", null)).toBe(null);
+  });
+
+  it("returns null for an invalid date", () => {
+    expect(dayOrderForDate("bad", [1])).toBe(null);
+  });
+});
+
+describe("matchDayByOrder", () => {
+  const days = [
+    { day_order: 1, day_name: "Понедельник", focus: null, exercises: [] },
+    { day_order: 3, day_name: "Среда", focus: null, exercises: [] },
+  ];
+
+  it("finds the day with the matching order", () => {
+    expect(matchDayByOrder(days, 3)?.day_name).toBe("Среда");
+  });
+
+  it("returns null when no day matches", () => {
+    expect(matchDayByOrder(days, 2)).toBeNull();
+  });
+
+  it("returns null for an empty day list", () => {
+    expect(matchDayByOrder([], 1)).toBeNull();
+  });
+});
+
+describe("isPseudoName", () => {
+  it("detects [SKIP] and [EVENING_*] rows", () => {
+    expect(isPseudoName("[SKIP]")).toBe(true);
+    expect(isPseudoName("[EVENING_ФОТО]")).toBe(true);
+  });
+
+  it("trims leading whitespace before checking", () => {
+    expect(isPseudoName("  [SKIP]")).toBe(true);
+  });
+
+  it("rejects regular exercise names", () => {
+    expect(isPseudoName("Присед")).toBe(false);
+    expect(isPseudoName("Бег в скобках [тест]")).toBe(false);
   });
 });

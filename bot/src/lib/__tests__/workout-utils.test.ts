@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatTrendsMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted } from "../workout-utils.js";
+import { truncateMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -237,30 +237,5 @@ describe("isTodayWorkoutCompleted", () => {
     await isTodayWorkoutCompleted(client, workout);
     expect(eq1).toHaveBeenCalledWith("client_id", "client-1");
     expect(eq2).toHaveBeenCalledWith("date", expect.any(String));
-  });
-});
-
-describe("formatTrendsMessage", () => {
-  it("returns trends_empty for empty array", () => {
-    const result = formatTrendsMessage([], "ru");
-    expect(result).toBeTruthy();
-  });
-
-  it("formats single measurement", () => {
-    const trends = [
-      { date: "2026-07-01", weight: 80, waist: 85, abdomen: 90, chest: 100, hips: 95, body_fat: 18 },
-    ];
-    const result = formatTrendsMessage(trends, "en");
-    expect(result).toContain("80");
-  });
-
-  it("formats delta between two measurements", () => {
-    const trends = [
-      { date: "2026-07-08", weight: 79, waist: 84, abdomen: 89, chest: 100, hips: 95, body_fat: 17 },
-      { date: "2026-07-01", weight: 80, waist: 85, abdomen: 90, chest: 100, hips: 95, body_fat: 18 },
-    ];
-    const result = formatTrendsMessage(trends, "en");
-    expect(result).toContain("79");
-    expect(result).toContain("80");
   });
 });

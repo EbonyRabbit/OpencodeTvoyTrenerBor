@@ -17,6 +17,7 @@ import { myStatsHandler } from "./handlers/my-stats.js";
 import { myWebHandler } from "./handlers/my-web.js";
 import { settingsHandler, handleSettingsCallback } from "./handlers/settings.js";
 import { scheduleHandler } from "./handlers/training-days.js";
+import { progressHandler } from "./handlers/progress.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
@@ -74,6 +75,7 @@ bot.use(async (ctx, next) => {
 bot.command("start", startHandler);
 bot.command("menu", menuHandler);
 bot.command("today", todayHandler);
+bot.command("progress", progressHandler);
 bot.command("myprogram", myProgramHandler);
 bot.command("measure", async (ctx) => {
   const guard = await guardActiveClient(ctx);

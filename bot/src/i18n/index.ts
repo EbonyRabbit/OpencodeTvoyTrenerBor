@@ -28,6 +28,7 @@ const resources = {
       menu: {
         title: "Доступные команды:",
         today: "/today — тренировка дня",
+        progress: "/progress — замеры тела и динамика",
         checkin: "/checkin — чек-ин",
         myprogram: "/myprogram — моя программа",
         programs: "/programs — каталог программ",
@@ -36,6 +37,10 @@ const resources = {
         settings: "/settings — настройки",
         myweb: "/myweb — мой веб-портал",
         schedule: "/schedule — расписание тренировок",
+      },
+      progress: {
+        title: "Прогресс и замеры:",
+        dynamics_button: "📊 Динамика",
       },
       program: {
         title_label: "Программа: {{title}}",
@@ -411,6 +416,7 @@ const resources = {
       menu: {
         title: "Available commands:",
         today: "/today — today's workout",
+        progress: "/progress — measurements and dynamics",
         checkin: "/checkin — check-in",
         myprogram: "/myprogram — my program",
         programs: "/programs — program catalog",
@@ -419,6 +425,10 @@ const resources = {
         settings: "/settings — settings",
         myweb: "/myweb — my web portal",
         schedule: "/schedule — training schedule",
+      },
+      progress: {
+        title: "Progress and measurements:",
+        dynamics_button: "📊 Dynamics",
       },
       program: {
         title_label: "Program: {{title}}",

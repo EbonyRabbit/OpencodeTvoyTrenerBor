@@ -442,55 +442,6 @@ export async function isTodayWorkoutCompleted(
   );
 }
 
-export async function getTodayProgress(
-  client: Client,
-): Promise<{ exercise: string; done: boolean }[]> {
-  if (!client.program_id) return [];
-
-  const workout = await getTodayWorkout(client);
-  if (!workout) return [];
-
-  const tz = client.timezone || DEFAULT_TIMEZONE;
-  const todayStr = getTodayDateStr(tz);
-
-  const { data: logs } = await supabaseAdmin
-    .from("workout_logs")
-    .select("exercise")
-    .eq("client_id", client.id)
-    .eq("date", todayStr)
-    .eq("week", workout.week_number);
-
-  const doneExercises = new Set(
-    (logs ?? []).map((l) => l.exercise?.toLowerCase()).filter(Boolean),
-  );
-
-  return workout.exercises.map((ex) => ({
-    exercise: ex.name,
-    done: doneExercises.has(ex.name.toLowerCase()),
-  }));
-}
-
-export function formatProgressMessage(
-  progress: { exercise: string; done: boolean }[],
-  lang: Language,
-): string {
-  if (progress.length === 0) {
-    return t("workout.progress_none", lang);
-  }
-
-  const lines: string[] = [t("workout.progress_title", lang), ""];
-
-  for (const item of progress) {
-    if (item.done) {
-      lines.push(t("workout.progress_done", lang, { exercise: item.exercise }));
-    } else {
-      lines.push(t("workout.progress_remaining", lang, { exercise: item.exercise }));
-    }
-  }
-
-  return lines.join("\n");
-}
-
 interface MeasurementRow {
   date: string;
   weight: number | null;

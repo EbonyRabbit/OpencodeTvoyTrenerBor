@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatProgressMessage, formatTrendsMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted } from "../workout-utils.js";
+import { truncateMessage, formatTrendsMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -55,23 +55,6 @@ describe("truncateMessage", () => {
     const msg = "A".repeat(4000) + "\n" + "B".repeat(200);
     const result = truncateMessage(msg, suffix);
     expect(result).not.toContain("\nB");
-  });
-});
-
-describe("formatProgressMessage", () => {
-  it("returns progress_none for empty array", () => {
-    const result = formatProgressMessage([], "ru");
-    expect(result).toBeTruthy();
-  });
-
-  it("formats done and remaining exercises", () => {
-    const progress = [
-      { exercise: "Squat", done: true },
-      { exercise: "Bench", done: false },
-    ];
-    const result = formatProgressMessage(progress, "en");
-    expect(result).toBeTruthy();
-    expect(result.length).toBeGreaterThan(0);
   });
 });
 

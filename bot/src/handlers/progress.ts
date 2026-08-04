@@ -15,6 +15,7 @@ export async function progressHandler(ctx: MyContext): Promise<void> {
 
     const keyboard = new InlineKeyboard()
       .text(t("measure.reminder.button", ctx.language), "measurements_start")
+      .row()
       .text(t("progress.dynamics_button", ctx.language), "measurements_history");
 
     await ctx.reply(t("progress.title", ctx.language), {

@@ -71,7 +71,7 @@ function DayGroup({
     <>
       <tr>
         <td className="sticky left-0 z-10 border-b border-r bg-background px-3 py-2 align-top">
-          <div className="font-medium">{day.day_name}</div>
+          <div className="font-medium">День {day.day_order}</div>
           {day.focus && (
             <div className="text-xs text-muted-foreground">{day.focus}</div>
           )}
@@ -151,13 +151,26 @@ function DayGroup({
   );
 }
 
+const MONTHS_SHORT = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+function formatDate(entry: HistoryEntry): string | null {
+  if (!entry.date) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(entry.date);
+  if (!match) return entry.date;
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return entry.date;
+  return `${day} ${MONTHS_SHORT[month - 1]}`;
+}
+
 function EntryLine({ entry }: { entry: HistoryEntry }) {
   const weight = formatWeight(entry);
   const setsReps = formatSetsReps(entry);
+  const date = formatDate(entry);
   return (
     <div className="flex flex-col gap-0.5">
-      {entry.date && (
-        <div className="text-[11px] text-muted-foreground">{entry.date}</div>
+      {date && (
+        <div className="text-[11px] text-muted-foreground">{date}</div>
       )}
       <div className="font-medium">
         {[weight, setsReps].filter(Boolean).join(" ") || "—"}

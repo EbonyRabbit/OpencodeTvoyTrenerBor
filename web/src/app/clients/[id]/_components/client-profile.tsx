@@ -164,7 +164,7 @@ export function ClientProfile({
   client: ClientRow;
   latestCheckin: CheckinRow | null;
   latestMeasurement: MeasurementRow | null;
-  workoutCount: number;
+  workoutCount: number | null;
   checkinCount: number;
   messageCount: number;
   schedule: ScheduleRow[];
@@ -342,7 +342,10 @@ export function ClientProfile({
 
       <div className="grid gap-6 sm:grid-cols-3">
         <SectionCard title="Статистика">
-          <InfoRow label="Тренировок" value={String(workoutCount)} />
+          <InfoRow
+            label="Тренировок"
+            value={workoutCount == null ? "—" : String(workoutCount)}
+          />
           <InfoRow label="Чек-инов" value={String(checkinCount)} />
           <InfoRow label="Сообщений" value={String(messageCount)} />
           <InfoRow label="Недель в расписании" value={String(schedule.length)} />

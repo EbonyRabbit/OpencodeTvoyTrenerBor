@@ -697,3 +697,45 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/app/clients/[id]/workouts/page.tsx` | Изменение (training_days, exercise) |
 | `web/src/app/client/[token]/history/page.tsx` | Изменение (таблица как план) |
 | `web/src/app/client/[token]/history/history-grid.tsx` | Изменение (полные данные в ячейках) |
+
+---
+
+## Фаза 14 — Счётчик «Тренировок» в блоке «Статистика» тренера
+
+### Проблема
+
+В `clients/[id]` блок «Статистика» показывал «Тренировок» = сырое количество
+строк `workout_logs` (8 упражнений одного дня = «8 тренировок» вместо 2).
+
+### Решение
+
+- Серверный RPC `count_client_workout_days(client_id)` — подсчёт по правилам
+  Фазы 13 (полное покрытие упражнений планового дня), а не строк логов.
+- `SECURITY INVOKER`, пустой `search_path`, `authenticated`/`service_role`.
+- timezone клиента валидируется через `pg_timezone_names` (fallback Moscow);
+  JSON-разбор программы защищён от legacy/malformed структур.
+- При ошибке RPC UI показывает `—` (не ложный ноль); ошибка логируется.
+- `web/src/lib/workout-stats.ts` (`resolveWorkoutCount`) + 3 теста;
+  `adherence.ts`: псевдо-упражнения `[...` исключаются и из плана (+ тест).
+- Индекс `(client_id, date)`.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **14.1** | RPC + миграция | `20260804010000_count_client_workout_days.sql` — применена к production через Management API | ✅ |
+| **14.2** | Веб-интеграция | `page.tsx` → `rpc`, `resolveWorkoutCount`, `—` при ошибке, тип в `supabase.ts` | ✅ |
+| **14.3** | Тесты | `workout-stats.test.ts` (3), `adherence.test.ts` (16: псевдо-упражнение в плане) — 19/19 | ✅ |
+| **14.4** | Верификация + gate | web `tsc` ✅ + vitest (19) ✅ + `next build` ✅; ревью 2 раунда (8.7 → 9.3 → **9.8**); production RPC проверен: 8 строк → **2** тренировочных дня | ✅ |
+| **14.5** | Деплой | коммит + push (Vercel) | ✅ |
+
+### Файлы
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/20260804010000_count_client_workout_days.sql` | Новый |
+| `web/src/lib/workout-stats.ts` + `.test.ts` | Новые |
+| `web/src/app/clients/[id]/page.tsx` | Изменение (RPC вместо count) |
+| `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (`—` при ошибке) |
+| `web/src/types/supabase.ts` | Изменение (тип RPC) |
+| `web/src/lib/adherence.ts` + `.test.ts` | Изменение (псевдо-упражнения в плане) |

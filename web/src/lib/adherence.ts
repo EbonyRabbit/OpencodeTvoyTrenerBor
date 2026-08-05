@@ -44,7 +44,7 @@ function getPlannedDayNames(
   const week = parsed?.weeks?.find((w) => w.week_number === weekNumber);
   const day = week?.days?.find((d) => d.day_order === dayOrder);
   if (!day?.exercises?.length) return [];
-  return day.exercises.map((ex) => normalizeName(ex.name)).filter(Boolean);
+  return day.exercises.map((ex) => normalizeName(ex.name)).filter(isRealExercise);
 }
 
 function isCompletedDay(

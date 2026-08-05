@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase-server";
 // import { supabaseAdmin } from "@/lib/supabase-admin"; // DISABLED: photo storage removed
 import { getParsedContent } from "@/lib/program-utils";
 import { safeFetch, safeCount } from "@/lib/safe-fetch";
+import { resolveWorkoutCount } from "@/lib/workout-stats";
 // import { resolvePhotoUrls } from "@/lib/photos"; // DISABLED: photo storage removed
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
@@ -81,9 +82,7 @@ export default async function ClientProfilePage({
       supabase.from("checkins").select("date, wellbeing, sleep, stress, nutrition_adherence, missed_workouts, complaints").eq("client_id", id).order("date", { ascending: false }).limit(1).maybeSingle(),
       null,
     ),
-    safeCount(
-      supabase.from("workout_logs").select("*", { count: "exact", head: true }).eq("client_id", id),
-    ),
+    supabase.rpc("count_client_workout_days", { p_client_id: id }),
     safeCount(
       supabase.from("checkins").select("*", { count: "exact", head: true }).eq("client_id", id),
     ),
@@ -110,6 +109,11 @@ export default async function ClientProfilePage({
 
   const parsedContent = typedClient.program ? getParsedContent(typedClient.program) : null;
 
+  const workoutCount = resolveWorkoutCount(workoutCountResult);
+  if (workoutCountResult.error) {
+    console.error("Failed to count client workout days:", workoutCountResult.error);
+  }
+
   const measurementHistory = (measurementHistoryResult.data ?? []).reverse();
   const checkinHistory = (checkinHistoryResult.data ?? []).reverse();
   const latestMeasurement = measurementHistory.length > 0
@@ -128,7 +132,7 @@ export default async function ClientProfilePage({
         client={typedClient}
         latestCheckin={latestCheckinResult.data}
         latestMeasurement={latestMeasurement}
-        workoutCount={workoutCountResult.count}
+        workoutCount={workoutCount}
         checkinCount={checkinCountResult.count}
         messageCount={messageCountResult.count}
         schedule={scheduleResult.data ?? []}

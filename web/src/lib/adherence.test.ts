@@ -107,6 +107,27 @@ describe("calculateAdherence (date path)", () => {
     expect(result.weeks[0].completed).toBe(0);
   });
 
+  it("ignores pseudo exercises in the program plan", () => {
+    const parsed: ParsedContent = {
+      weeks: [{
+        week_number: 1,
+        days: [{
+          day_order: 1,
+          day_name: "Понедельник",
+          exercises: [{ name: "Присед" }, { name: "[EVENING_ФОТО]" }],
+        }],
+      }],
+    };
+    const result = calculateAdherence(
+      [SCHEDULE[0]],
+      parsed,
+      [log("2026-08-03", "Присед")],
+      [1],
+      "2026-08-07",
+    );
+    expect(result.weeks[0].completed).toBe(1);
+  });
+
   it("does not count future planned days of the current week", () => {
     // today = Wednesday: Monday and Wednesday are due, Friday is not
     const result = calculateAdherence(

@@ -900,7 +900,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      count_client_workout_days: {
+        Args: { p_client_id: string }
+        Returns: number
+      }
     }
     Enums: {
       client_status: "active" | "inactive" | "access_expired"

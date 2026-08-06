@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useId } from "react";
+import { useState, useId, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -14,8 +14,11 @@ import {
   getColumns,
   getCellValue,
   getBlockColor,
+  getCompositeLetters,
+  isCompositeExercise,
   type ParsedContent,
   type ParsedWeek,
+  type ParsedExercise,
 } from "@/lib/program-utils";
 
 function ChevronDown({ open }: { open: boolean }) {
@@ -30,6 +33,75 @@ function ChevronDown({ open }: { open: boolean }) {
     >
       <path d="m6 9 6 6 6-6" />
     </svg>
+  );
+}
+
+const EXERCISE_COLUMN = "Упражнение";
+
+function typeBadge(type?: string): ReactNode | null {
+  if (type === "superset") return <Badge variant="secondary" className="mr-1.5 text-[10px]">СУПЕРСЕТ</Badge>;
+  if (type === "circuit") return <Badge variant="secondary" className="mr-1.5 text-[10px]">КРУГ</Badge>;
+  if (type === "cardio") return <Badge variant="secondary" className="mr-1.5 text-[10px]">КАРДИО</Badge>;
+  return null;
+}
+
+function ExerciseRows({ exercise, columns, letter }: { exercise: ParsedExercise; columns: string[]; letter?: string }) {
+  const type = exercise.type ?? "strength";
+  const isComposite = isCompositeExercise(exercise);
+  const nameCell = (
+    <>
+      {letter && (
+        <span className="mr-1 text-xs font-semibold text-muted-foreground">{letter}</span>
+      )}
+      {typeBadge(exercise.type)}
+      {exercise.name}
+    </>
+  );
+  const cardioMetrics = [
+    exercise.distance ? `Дистанция: ${exercise.distance}` : null,
+    exercise.duration ? `Время: ${exercise.duration}` : null,
+    exercise.pace ? `Темп: ${exercise.pace}` : null,
+    exercise.heart_rate ? `Пульс: ${exercise.heart_rate}` : null,
+    exercise.rounds ? `Раунды: ${exercise.rounds}` : null,
+  ].filter(Boolean);
+
+  return (
+    <>
+      <TableRow className={getBlockColor(exercise.block)}>
+        {columns.map((col) => (
+          <TableCell key={col}>
+            {col === EXERCISE_COLUMN ? nameCell : getCellValue(exercise, col)}
+          </TableCell>
+        ))}
+      </TableRow>
+      {cardioMetrics.length > 0 && (
+        <TableRow>
+          <TableCell colSpan={columns.length} className="text-xs text-muted-foreground">
+            {cardioMetrics.join(" · ")}
+          </TableCell>
+        </TableRow>
+      )}
+      {isComposite && (exercise.children?.length ?? 0) > 0 && (
+        <TableRow>
+          <TableCell colSpan={columns.length} className="p-0">
+            <div className="ml-6 border-l border-muted pl-3">
+              <Table>
+                <TableBody>
+                  {exercise.children!.map((child, ci) => (
+                    <ExerciseRows
+                      key={ci}
+                      exercise={child}
+                      columns={columns}
+                      letter={`${letter ?? "A"}${ci + 1}`}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
 
@@ -82,6 +154,7 @@ function WeekItem({
             days.map((day, dayIdx) => {
               const dayKey = day.day_order ?? dayIdx;
               const exercises = day.exercises ?? [];
+              const letters = getCompositeLetters(exercises);
               return (
                 <div key={dayKey}>
                   <h4 className="mb-2 text-sm font-medium">
@@ -108,13 +181,12 @@ function WeekItem({
                         </TableHeader>
                         <TableBody>
                           {exercises.map((ex, i) => (
-                            <TableRow key={i} className={getBlockColor(ex.block)}>
-                              {columns.map((col) => (
-                                <TableCell key={col}>
-                                  {getCellValue(ex, col)}
-                                </TableCell>
-                              ))}
-                            </TableRow>
+                            <ExerciseRows
+                              key={i}
+                              exercise={ex}
+                              columns={columns}
+                              letter={isCompositeExercise(ex) ? letters.get(i) : undefined}
+                            />
                           ))}
                         </TableBody>
                       </Table>

@@ -83,6 +83,11 @@ export interface Database {
           reps: string | null;
           weight: number | null;
           rpe: number | null;
+          rounds: number | null;
+          distance_km: number | null;
+          duration_sec: number | null;
+          heart_rate: number | null;
+          pace: string | null;
           comment: string | null;
           created_at: string;
           updated_at: string;

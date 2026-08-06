@@ -1,7 +1,7 @@
 import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
-import { getParsedContent } from "../lib/program-utils.js";
+import { getParsedContent, flattenLoggableExercises } from "../lib/program-utils.js";
 import {
   getTodayDateStr,
   dayOrderForDate,
@@ -125,7 +125,7 @@ async function getMonthWorkoutPlan(
     const dayNames = new Map<number, string[]>();
     const datesForDay = new Map<string, number>();
     for (const day of week.days ?? []) {
-      const names = (day.exercises ?? [])
+      const names = flattenLoggableExercises(day.exercises ?? [])
         .map((ex) => ex.name?.trim().toLowerCase() ?? "")
         .filter(Boolean);
       if (names.length > 0) {

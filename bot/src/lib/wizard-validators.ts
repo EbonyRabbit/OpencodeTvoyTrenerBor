@@ -62,6 +62,140 @@ export function parseRpe(input: string): string | null {
   return null;
 }
 
+export function parseDurationSec(input: string): string | null {
+  const trimmed = input.trim().toLowerCase();
+  if (trimmed.startsWith("-")) return null;
+  const full = trimmed.match(/^(\d+)\s*:\s*(\d{1,2})\s*:\s*(\d{1,2})$/);
+  if (full) {
+    const h = Number(full[1]);
+    const m = Number(full[2]);
+    const s = Number(full[3]);
+    if (m > 59 || s > 59) return null;
+    const total = h * 3600 + m * 60 + s;
+    if (total > 0 && total <= 86400) return String(total);
+    return null;
+  }
+
+  const min = trimmed.match(/^(\d{1,3})\s*:\s*(\d{1,2})$/);
+  if (min) {
+    const m = Number(min[1]);
+    const s = Number(min[2]);
+    if (s > 59) return null;
+    const total = m * 60 + s;
+    if (total > 0 && total <= 86400) return String(total);
+    return null;
+  }
+
+  let totalMinutes = 0;
+  let totalSeconds = 0;
+  const parts = trimmed.replace(/,/g, ".").match(/(\d+(?:\.\d+)?)\s*([а-яa-z]*)/g);
+  if (!parts || parts.length === 0) return null;
+
+  for (const part of parts) {
+    const match = part.match(/^(\d+(?:\.\d+)?)\s*([а-яa-z]*)$/);
+    if (!match) return null;
+    const num = Number(match[1]);
+    if (num <= 0) return null;
+    const unit = match[2];
+    if (unit.startsWith("сек") || unit.startsWith("s")) {
+      totalSeconds += num;
+    } else if (unit.startsWith("ч") || unit.startsWith("h")) {
+      totalMinutes += num * 60;
+    } else if (unit.startsWith("м")) {
+      totalMinutes += num;
+    } else {
+      totalMinutes += num;
+    }
+  }
+
+  const total = totalMinutes * 60 + totalSeconds;
+  if (total > 0 && total <= 86400) return String(total);
+  return null;
+}
+
+export function parseDistanceKm(input: string): string | null {
+  const trimmed = input.trim().toLowerCase().replace(/,/g, ".").replace(/\s+/g, " ");
+  if (!trimmed) return null;
+
+  const km = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:км|km)?$/);
+  if (km) {
+    const num = Number(km[1]);
+    if (num > 0 && num <= 500) return String(num);
+    return null;
+  }
+
+  const meters = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:м|m)$/);
+  if (meters) {
+    const num = Number(meters[1]);
+    if (num > 0 && num <= 200_000) return String(num / 1000);
+    return null;
+  }
+
+  return null;
+}
+
+export function parsePace(input: string): string | null {
+  const trimmed = input.trim().toLowerCase().replace(/\/км|\/км\/ч|\/кмч|\/km\/h|\/kmh|\/мин|мин\/км|км\/ч|km\/h/g, "").trim();
+  if (!trimmed) return null;
+  const time = trimmed.match(/^(\d{1,3})\s*:\s*(\d{2})$/);
+  if (time) {
+    const m = Number(time[1]);
+    const s = Number(time[2]);
+    if (s > 59 || m > 599) return null;
+    return `${m}:${s}`;
+  }
+  const num = Number(trimmed.replace(",", "."));
+  if (!isNaN(num) && num > 0 && num <= 30) return String(num);
+  return null;
+}
+
+export function parseHeartRate(input: string): string | null {
+  const trimmed = input.trim().toLowerCase().replace(/уд\/мин|уд\б|bpm|пульс/g, "").replace(/\s+/g, " ").trim();
+  if (!trimmed) return null;
+  const range = trimmed.match(/^(\d{2,3})\s*[-–]\s*(\d{2,3})$/);
+  if (range) {
+    const a = Number(range[1]);
+    const b = Number(range[2]);
+    if (a >= 30 && a <= 250 && b >= 30 && b <= 250 && a <= b) return `${a}-${b}`;
+    return null;
+  }
+  const num = Number(trimmed);
+  if (Number.isInteger(num) && num >= 30 && num <= 250) return String(num);
+  return null;
+}
+
+export function parseRounds(input: string): string | null {
+  const trimmed = input.trim().toLowerCase();
+  if (trimmed === "макс" || trimmed === "max" || trimmed === "максимум") return "МАКС";
+  const num = Number(trimmed);
+  if (Number.isInteger(num) && num >= 0 && num <= 99) return String(num);
+  return null;
+}
+
+export const AMRAP_ROUNDS_SENTINEL = -1;
+
+export function roundsValue(validated: string | undefined): number | null {
+  if (!validated) return null;
+  if (validated === "МАКС") return AMRAP_ROUNDS_SENTINEL;
+  const num = Number(validated);
+  if (!Number.isInteger(num) || num < 0) return null;
+  return num;
+}
+
+export function heartRateValue(validated: string | undefined): number | null {
+  if (!validated) return null;
+  const range = validated.match(/^(\d{2,3})\s*[-–]\s*(\d{2,3})$/);
+  if (range) {
+    const a = Number(range[1]);
+    const b = Number(range[2]);
+    if (a < 30 || b > 250 || a > b) return null;
+    return Math.round((a + b) / 2);
+  }
+  const num = Number(validated);
+  if (Number.isInteger(num) && num >= 30 && num <= 250) return num;
+  return null;
+}
+
 export function parseMeasurement(input: string): string | null {
   const trimmed = input.trim().toLowerCase().replace(/кг|kg|см|cm/g, "").replace(",", ".").trim();
   if (!trimmed) return null;

@@ -738,4 +738,81 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/app/clients/[id]/page.tsx` | Изменение (RPC вместо count) |
 | `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (`—` при ошибке) |
 | `web/src/types/supabase.ts` | Изменение (тип RPC) |
+
+---
+
+## Фаза 15: Суперсеты, AMRAP/круговые и кардио (бег)
+
+### Контекст
+
+Текущее состояние:
+- Одна строка = одно упражнение: `sets/reps/weight/rpe`
+- Нет композитных упражнений (суперсеты показываются отдельными карточками в боте)
+- Для бега/кардио нет полей пульса и темпа (только вес/RPE)
+- `workout_logs`: нет колонок rounds/distance/duration/pace/heart_rate
+
+Цель:
+- Суперсеты отображаются в боте как ОДНО упражнение (выполняются подряд)
+- AMRAP/круговые: «20 минут, максимум раундов (присед 20×60кг, берпи ×10, бег 500м)»
+- Кардио-упражнения: вместо веса/RPE — дистанция/время/темп/пульс
+
+### Архитектурные решения
+
+| Решение | Выбор |
+|---------|-------|
+| Модель | `ParsedExercise.type`: strength (default) / cardio / superset / circuit |
+| Композиты | Родитель `children?: ParsedExercise[]` (вложенные группы, A1/A2) |
+| Логирование суперсета | По строке на каждого ребёнка (реальные имена → прошлый раз/история/объём) |
+| Логирование круга | Одна строка: `exercise = имя круга`, `rounds`, `duration_sec` |
+| Логирование кардио | Одна строка: `distance_km`, `duration_sec`, `pace`, `heart_rate` |
+| Units vs leaves | Units — показ/навигация (композит = 1 карточка); Leaves — завершённость/аналитика (`flattenLoggableExercises`) |
+| Хранилище метрик | Числовые + темп текстом (для аналитики) |
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **15.1** | Типы `ParsedExercise` (web) | `type` + `children` + `duration/rounds/distance/pace/heart_rate` в `web/src/lib/program-utils.ts`, рекурсивная валидация, `flattenLoggableExercises`, `isComposite` | ✅ |
+| **15.2** | Типы `ParsedExercise` (bot) | Зеркальные изменения в `bot/src/lib/program-utils.ts` | ✅ |
+| **15.3** | Тесты валидации (web) | vitest: суперсет/круг/кардио valid + invalid + flatten | ✅ |
+| **15.4** | Миграция `workout_logs` | `rounds INTEGER`, `distance_km NUMERIC(6,2)`, `duration_sec INTEGER`, `heart_rate NUMERIC(3,1)`, `pace TEXT` | ✅ |
+| **15.5** | Обновить типы Supabase | `web/src/types/supabase.ts`: новые колонки в `workout_logs.Row` | ✅ |
+| **15.6** | RPC `count_client_workout_days` | Раскрывать `children` суперсетов в плановых упражнениях | ✅ |
+| **15.7** | Редактор: тип строки | Дропдаун «Тип» (Сила/Кардио/Суперсет/Круг) в `program-editor.tsx` | ✅ |
+| **15.8** | Редактор: дети | `ADD_CHILD/UPDATE_CHILD/DELETE_CHILD` в reducer, вложенные строки A1/A2 | ✅ |
+| **15.9** | Редактор: кардио-колонки | Дистанция/Время/Темп/Пульс вместо Подходы/Вес/RPE | ✅ |
+| **15.10** | Редактор: валидация | Композит ≥2 детей, все с именами | ✅ |
+| **15.11** | Бот: рендер композитов | Суперсет/круг/кардио в `workout-utils.ts`, навигация по units, «прошлый раз» по leaves | ✅ |
+| **15.12** | Бот: завершённость | `isTodayWorkoutCompleted` по leaves | ✅ |
+| **15.13** | Бот: wizard по типу | Кардио/суперсет/круг шаги в `wizard.ts`, вставка новых полей | ✅ |
+| **15.14** | Бот: валидаторы | `parseRounds`, `parseDurationSec`, `parseDistanceKm`, `parsePace`, `parseHeartRate` | ✅ |
+| **15.15** | Бот: i18n | ru/en ключи для кардио/суперсета/круга | ✅ |
+| **15.16** | Бот: `/mystats` | Плановые имена через leaves | ✅ |
+| **15.17** | Портал: форма тренировки | `workout-form.tsx` по типу, `actions.ts` (logWorkoutFromWeb) новые поля | ✅ |
+| **15.18** | Портал: завершённость | `workout/page.tsx` через `flattenLoggableExercises` | ✅ |
+| **15.19** | История | `history/page.tsx` + `history-grid.tsx`: раунды/темп/пульс, матчинг детей суперсета | ✅ |
+| **15.20** | Превью программы | `program-week-preview.tsx`: вложенные дети + кардио-колонки | ✅ |
+| **15.21** | Верификация + gate | bot tsc + vitest; web tsc + vitest + next build; ревью ≥9.5; обновить TASKS.md | ✅ (фиксы по ревью 8.2→9.5: precision heart_rate + follow-up миграция, N+1 batch previous logs, cardio-дети в визарде, web-валидация, i18n метрик) |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/20260805000000_add_workout_logs_metrics.sql` | Новый |
+| `supabase/migrations/20260804010000_count_client_workout_days.sql` | Изменение (flatten детей) |
+| `web/src/lib/program-utils.ts` | Изменение (типы, валидация, flatten, getCellValue) |
+| `bot/src/lib/program-utils.ts` | Изменение (зеркально) |
+| `web/src/types/supabase.ts` | Изменение (колонки workout_logs) |
+| `web/src/app/programs/[id]/edit/_components/program-editor.tsx` | Изменение |
+| `web/src/app/programs/[id]/_components/program-week-preview.tsx` | Изменение |
+| `bot/src/lib/workout-utils.ts` | Изменение |
+| `bot/src/lib/wizard-validators.ts` | Изменение |
+| `bot/src/handlers/wizard.ts` | Изменение |
+| `bot/src/handlers/my-stats.ts` | Изменение |
+| `bot/src/i18n/index.ts` | Изменение |
+| `web/src/app/client/[token]/workout/workout-form.tsx` | Изменение |
+| `web/src/app/client/[token]/workout/page.tsx` | Изменение |
+| `web/src/app/client/[token]/actions.ts` | Изменение |
+| `web/src/app/client/[token]/history/page.tsx` | Изменение |
+| `web/src/app/client/[token]/history/history-grid.tsx` | Изменение |
 | `web/src/lib/adherence.ts` + `.test.ts` | Изменение (псевдо-упражнения в плане) |

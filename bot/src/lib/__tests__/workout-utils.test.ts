@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName } from "../workout-utils.js";
+import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -59,9 +59,15 @@ describe("truncateMessage", () => {
 });
 
 describe("formatExercise", () => {
+  function withLast(ex: Record<string, unknown>, log: Record<string, unknown> | null) {
+    const map = new Map();
+    if (log) map.set(String(ex.name).trim().toLowerCase(), log);
+    return formatExercise(1, ex as never, "ru", map as ReadonlyMap<string, never>);
+  }
+
   it("includes last time line when previous log present", () => {
     const ex = { name: "Присед", sets: "4", reps: "8", weight: "60" };
-    const result = formatExercise(1, ex, "ru", { weight: 60, sets: 4, reps: "8" });
+    const result = withLast(ex, { weight: 60, sets: 4, reps: "8" });
     expect(result).toContain("Прошлый раз");
     expect(result).toContain("60");
     expect(result).toContain("4×8");
@@ -69,19 +75,19 @@ describe("formatExercise", () => {
 
   it("omits last time line when no previous log", () => {
     const ex = { name: "Присед", sets: "4", reps: "8", weight: "60" };
-    const result = formatExercise(1, ex, "ru", null);
+    const result = formatExercise(1, ex as never, "ru", new Map());
     expect(result).not.toContain("Прошлый раз");
   });
 
   it("formats weight-only previous log", () => {
     const ex = { name: "Жим", sets: "3", reps: "10", weight: "40" };
-    const result = formatExercise(1, ex, "ru", { weight: 40, sets: null, reps: null });
+    const result = withLast(ex, { weight: 40, sets: null, reps: null });
     expect(result).toContain("40 кг");
   });
 
   it("formats per-set reps list without sets multiplier", () => {
     const ex = { name: "Жим", sets: "3", reps: "10/10/10", weight: "40" };
-    const result = formatExercise(1, ex, "ru", { weight: 40, sets: 3, reps: "10/10/10" });
+    const result = withLast(ex, { weight: 40, sets: 3, reps: "10/10/10" });
     const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
     expect(lastLine).toContain("10/10/10");
     expect(lastLine).not.toContain("3×");
@@ -89,23 +95,111 @@ describe("formatExercise", () => {
 
   it("formats varying per-set reps list", () => {
     const ex = { name: "Тяга", sets: "3", reps: "8/7/6", weight: "60" };
-    const result = formatExercise(1, ex, "ru", { weight: 60, sets: 3, reps: "8/7/6" });
+    const result = withLast(ex, { weight: 60, sets: 3, reps: "8/7/6" });
     expect(result).toContain("8/7/6");
   });
 
   it("still formats ranges with sets multiplier", () => {
     const ex = { name: "Присед", sets: "3", reps: "8-10", weight: "60" };
-    const result = formatExercise(1, ex, "ru", { weight: 60, sets: 3, reps: "8-10" });
+    const result = withLast(ex, { weight: 60, sets: 3, reps: "8-10" });
     const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
     expect(lastLine).toContain("3×8-10");
   });
 
   it("shows bodyweight instead of 0 kg", () => {
     const ex = { name: "Отжимания", sets: "3", reps: "15", weight: "0" };
-    const result = formatExercise(1, ex, "ru", { weight: 0, sets: 3, reps: "15" });
+    const result = withLast(ex, { weight: 0, sets: 3, reps: "15" });
     const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
     expect(lastLine).toContain("вес тела");
     expect(lastLine).not.toContain("0 кг");
+  });
+
+  it("renders superset with children letters and planned details", () => {
+    const ex = {
+      name: "Грудь+спина",
+      type: "superset",
+      children: [
+        { name: "Жим лёжа", sets: "3", reps: "8", weight: "60" },
+        { name: "Тяга в наклоне", sets: "3", reps: "10", weight: "40" },
+      ],
+    };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("суперсет");
+    expect(result).toContain("A1. Жим лёжа");
+    expect(result).toContain("A2. Тяга в наклоне");
+    expect(result).toContain("3×8");
+  });
+
+  it("renders superset with per-child previous logs", () => {
+    const map = new Map<string, { weight: number; sets: number; reps: string }>();
+    map.set("жим лёжа", { weight: 60, sets: 3, reps: "8" });
+    const ex = {
+      name: "Грудь+спина",
+      type: "superset",
+      children: [
+        { name: "Жим лёжа", sets: "3", reps: "8", weight: "60" },
+        { name: "Тяга в наклоне", sets: "3", reps: "10", weight: "40" },
+      ],
+    };
+    const result = formatExercise(1, ex as never, "ru", map);
+    const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
+    expect(lastLine).toContain("60 кг");
+  });
+
+  it("renders cardio with planned metrics", () => {
+    const ex = {
+      name: "Бег",
+      type: "cardio",
+      distance: "5 км",
+      duration: "30 мин",
+      pace: "5:30/км",
+      heart_rate: "140-160",
+    };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("Бег");
+    expect(result).toContain("Дистанция: 5 км");
+    expect(result).toContain("Пульс: 140-160");
+  });
+
+  it("renders circuit with rounds goal", () => {
+    const ex = { name: "Круг на всё тело", type: "circuit", rounds: "МАКС", duration: "20 мин" };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("МАКС раундов");
+    expect(result).toContain("за 20 мин");
+  });
+});
+
+describe("formatSingleExercise", () => {
+  it("uses batched child logs and localizes cardio metrics", () => {
+    const exercise = {
+      name: "Mixed superset",
+      type: "superset",
+      sets: "3",
+      children: [
+        { name: "Bench press", reps: "8" },
+        { name: "Run", type: "cardio", distance: "1 km" },
+      ],
+    };
+    const lastLogs = new Map([
+      ["run", {
+        weight: null,
+        sets: null,
+        reps: null,
+        rounds: null,
+        duration_sec: 300,
+        distance_km: 1,
+        pace: "5:00",
+        heart_rate: 145,
+      }],
+    ]);
+
+    const result = formatSingleExercise(0, 1, exercise as never, "en", lastLogs);
+
+    expect(result).toContain("A2. Run");
+    expect(result).toContain("1 km");
+    expect(result).toContain("pace 5:00");
+    expect(result).toContain("heart rate 145");
+    expect(result).not.toContain("пульс");
   });
 });
 

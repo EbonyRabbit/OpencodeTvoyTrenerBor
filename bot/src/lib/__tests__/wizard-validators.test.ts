@@ -11,6 +11,14 @@ import {
   parseCount,
   parseDate,
   parsePauseReason,
+  parseDurationSec,
+  parseDistanceKm,
+  parsePace,
+  parseHeartRate,
+  parseRounds,
+  roundsValue,
+  heartRateValue,
+  AMRAP_ROUNDS_SENTINEL,
   repsListMatchesSets,
 } from "../wizard-validators.js";
 
@@ -357,5 +365,136 @@ describe("parsePauseReason", () => {
   it("returns null for unknown reasons", () => {
     expect(parsePauseReason("unknown")).toBeNull();
     expect(parsePauseReason("6")).toBeNull();
+  });
+});
+
+describe("parseDurationSec", () => {
+  it("parses plain minutes", () => {
+    expect(parseDurationSec("20")).toBe("1200");
+    expect(parseDurationSec("20 мин")).toBe("1200");
+  });
+
+  it("parses mm:ss format", () => {
+    expect(parseDurationSec("15:00")).toBe("900");
+    expect(parseDurationSec("1:30")).toBe("90");
+  });
+
+  it("parses h:mm:ss format", () => {
+    expect(parseDurationSec("1:10:00")).toBe("4200");
+  });
+
+  it("parses composite units", () => {
+    expect(parseDurationSec("1 ч 20 мин")).toBe("4800");
+    expect(parseDurationSec("90 сек")).toBe("90");
+  });
+
+  it("rejects invalid values", () => {
+    expect(parseDurationSec("abc")).toBeNull();
+    expect(parseDurationSec("0")).toBeNull();
+    expect(parseDurationSec("-5")).toBeNull();
+  });
+});
+
+describe("parseDistanceKm", () => {
+  it("parses km values", () => {
+    expect(parseDistanceKm("5")).toBe("5");
+    expect(parseDistanceKm("5 км")).toBe("5");
+    expect(parseDistanceKm("1.2")).toBe("1.2");
+    expect(parseDistanceKm("500 м")).toBe("0.5");
+  });
+
+  it("rejects invalid values", () => {
+    expect(parseDistanceKm("abc")).toBeNull();
+    expect(parseDistanceKm("0")).toBeNull();
+  });
+});
+
+describe("parsePace", () => {
+  it("parses mm:ss pace", () => {
+    expect(parsePace("5:30")).toBe("5:30");
+    expect(parsePace("5:30/км")).toBe("5:30");
+  });
+
+  it("parses plain number pace", () => {
+    expect(parsePace("5.5")).toBe("5.5");
+    expect(parsePace("6")).toBe("6");
+  });
+
+  it("rejects invalid values", () => {
+    expect(parsePace("abc")).toBeNull();
+    expect(parsePace("5:99")).toBeNull();
+  });
+});
+
+describe("parseHeartRate", () => {
+  it("parses single value", () => {
+    expect(parseHeartRate("145")).toBe("145");
+    expect(parseHeartRate("145 bpm")).toBe("145");
+  });
+
+  it("parses ranges", () => {
+    expect(parseHeartRate("130-150")).toBe("130-150");
+    expect(parseHeartRate("130 – 150")).toBe("130-150");
+  });
+
+  it("rejects invalid values", () => {
+    expect(parseHeartRate("abc")).toBeNull();
+    expect(parseHeartRate("10")).toBeNull();
+    expect(parseHeartRate("300")).toBeNull();
+  });
+});
+
+describe("heartRateValue", () => {
+  it("converts single values", () => {
+    expect(heartRateValue("145")).toBe(145);
+    expect(heartRateValue(undefined)).toBeNull();
+  });
+
+  it("stores range midpoint", () => {
+    expect(heartRateValue("130-150")).toBe(140);
+    expect(heartRateValue("130 – 150")).toBe(140);
+    expect(heartRateValue("130-131")).toBe(131);
+  });
+
+  it("rejects invalid inputs", () => {
+    expect(heartRateValue("abc")).toBeNull();
+    expect(heartRateValue("300")).toBeNull();
+    expect(heartRateValue("150-130")).toBeNull();
+    expect(heartRateValue("10")).toBeNull();
+  });
+});
+
+describe("parseRounds", () => {
+  it("parses numbers", () => {
+    expect(parseRounds("3")).toBe("3");
+    expect(parseRounds("0")).toBe("0");
+  });
+
+  it("parses MAX variants", () => {
+    expect(parseRounds("МАКС")).toBe("МАКС");
+    expect(parseRounds("макс")).toBe("МАКС");
+    expect(parseRounds("max")).toBe("МАКС");
+  });
+
+  it("rejects invalid values", () => {
+    expect(parseRounds("abc")).toBeNull();
+    expect(parseRounds("3.5")).toBeNull();
+  });
+});
+
+describe("roundsValue", () => {
+  it("converts numbers", () => {
+    expect(roundsValue("3")).toBe(3);
+    expect(roundsValue("0")).toBe(0);
+    expect(roundsValue(undefined)).toBeNull();
+  });
+
+  it("maps МАКС to AMRAP sentinel", () => {
+    expect(roundsValue("МАКС")).toBe(AMRAP_ROUNDS_SENTINEL);
+  });
+
+  it("rejects invalid values", () => {
+    expect(roundsValue("abc")).toBeNull();
+    expect(roundsValue("-1")).toBeNull();
   });
 });

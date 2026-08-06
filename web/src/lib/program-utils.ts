@@ -25,6 +25,10 @@ export type ParsedDay = {
   exercises?: ParsedExercise[];
 };
 
+export type ExerciseType = "strength" | "cardio" | "superset" | "circuit";
+
+export const EXERCISE_TYPES: ExerciseType[] = ["strength", "cardio", "superset", "circuit"];
+
 export type ParsedExercise = {
   block?: string;
   name: string;
@@ -34,6 +38,13 @@ export type ParsedExercise = {
   rpe?: string;
   rest?: string;
   notes?: string;
+  type?: ExerciseType;
+  children?: ParsedExercise[];
+  duration?: string;
+  rounds?: string;
+  distance?: string;
+  pace?: string;
+  heart_rate?: string;
 };
 
 const DEFAULT_COLUMNS = ["Блок", "Упражнение", "Подходы", "Повторы", "Вес", "RPE", "Отдых", "Заметки"];
@@ -85,10 +96,13 @@ function isValidDay(value: unknown): value is ParsedDay {
   return true;
 }
 
-function isValidExercise(value: unknown): value is ParsedExercise {
+function isValidExercise(value: unknown, isChild = false): value is ParsedExercise {
   if (value === null || typeof value !== "object") return false;
   const e = value as Record<string, unknown>;
   if (typeof e.name !== "string" || e.name.trim() === "") return false;
+  if (e.type !== undefined && !EXERCISE_TYPES.includes(e.type as ExerciseType)) return false;
+  const type = (e.type ?? "strength") as ExerciseType;
+  if (isChild && (type === "superset" || type === "circuit")) return false;
   if (e.block !== undefined && typeof e.block !== "string") return false;
   if (e.sets !== undefined && typeof e.sets !== "string") return false;
   if (e.reps !== undefined && typeof e.reps !== "string") return false;
@@ -96,7 +110,48 @@ function isValidExercise(value: unknown): value is ParsedExercise {
   if (e.rpe !== undefined && typeof e.rpe !== "string") return false;
   if (e.rest !== undefined && typeof e.rest !== "string") return false;
   if (e.notes !== undefined && typeof e.notes !== "string") return false;
+  if (e.duration !== undefined && typeof e.duration !== "string") return false;
+  if (e.rounds !== undefined && typeof e.rounds !== "string") return false;
+  if (e.distance !== undefined && typeof e.distance !== "string") return false;
+  if (e.pace !== undefined && typeof e.pace !== "string") return false;
+  if (e.heart_rate !== undefined && typeof e.heart_rate !== "string") return false;
+  if (e.children !== undefined) {
+    if (!Array.isArray(e.children)) return false;
+    for (const child of e.children) {
+      if (!isValidExercise(child, true)) return false;
+    }
+  }
   return true;
+}
+
+export function isCompositeExercise(exercise: ParsedExercise): boolean {
+  return exercise.type === "superset" || exercise.type === "circuit";
+}
+
+const COMPOSITE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+export function getCompositeLetters(exercises: ParsedExercise[]): Map<number, string> {
+  const map = new Map<number, string>();
+  let n = 0;
+  exercises.forEach((ex, i) => {
+    if (isCompositeExercise(ex)) {
+      map.set(i, n < COMPOSITE_LETTERS.length ? COMPOSITE_LETTERS[n] : `G${n + 1}`);
+      n++;
+    }
+  });
+  return map;
+}
+
+export function flattenLoggableExercises(exercises: ParsedExercise[]): ParsedExercise[] {
+  const result: ParsedExercise[] = [];
+  for (const ex of exercises) {
+    if (ex.type === "superset" && ex.children && ex.children.length > 0) {
+      result.push(...ex.children);
+    } else {
+      result.push(ex);
+    }
+  }
+  return result;
 }
 
 const MAX_CONTENT_BYTES = 512 * 1024; // 512 KB
@@ -140,6 +195,11 @@ export function getCellValue(exercise: ParsedExercise, column: string): string {
     "RPE": exercise.rpe,
     "Отдых": exercise.rest,
     "Заметки": exercise.notes,
+    "Дистанция": exercise.distance,
+    "Время": exercise.duration,
+    "Темп": exercise.pace,
+    "Пульс": exercise.heart_rate,
+    "Раунды": exercise.rounds,
   };
   return map[column] ?? "—";
 }

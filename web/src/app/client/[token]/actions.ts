@@ -7,13 +7,61 @@ import { TIMEZONE_LIST, LANGUAGE_LABELS } from "@/lib/clients";
 // import { type PhotoType } from "@/types/supabase"; // DISABLED: photo storage removed
 
 type ExerciseLog = {
+  type: "strength" | "cardio" | "circuit";
   exercise: string;
   sets: number | null;
   reps: string | null;
   weight: number | null;
   rpe: number | null;
+  rounds: number | null;
+  distance_km: number | null;
+  duration_sec: number | null;
+  heart_rate: number | null;
+  pace: string | null;
   comment: string | null;
 };
+
+function isNumberInRange(value: number | null, min: number, max: number, integer = false): boolean {
+  return value === null || (
+    Number.isFinite(value) &&
+    value >= min &&
+    value <= max &&
+    (!integer || Number.isInteger(value))
+  );
+}
+
+function validateExerciseLog(ex: ExerciseLog): string | null {
+  if (ex.type !== "strength" && ex.type !== "cardio" && ex.type !== "circuit") {
+    return "Некорректный тип упражнения";
+  }
+  if (!ex.exercise?.trim() || ex.exercise.length > 300) return "Некорректное название упражнения";
+  if (ex.reps !== null && ex.reps.length > 500) return `${ex.exercise}: слишком длинное значение повторов`;
+  if (ex.pace !== null) {
+    const timePace = ex.pace.match(/^(\d{1,3}):(\d{2})$/);
+    const numericPace = Number(ex.pace);
+    const validTimePace = timePace !== null && Number(timePace[1]) <= 599 && Number(timePace[2]) <= 59;
+    const validNumericPace = !timePace && Number.isFinite(numericPace) && numericPace > 0 && numericPace <= 30;
+    if (ex.pace.length > 20 || (!validTimePace && !validNumericPace)) {
+      return `${ex.exercise}: некорректный темп`;
+    }
+  }
+  if (ex.comment !== null && ex.comment.length > 2000) return `${ex.exercise}: комментарий слишком длинный`;
+  if (!isNumberInRange(ex.sets, 0, 100, true)) return `${ex.exercise}: некорректное число подходов`;
+  if (!isNumberInRange(ex.weight, 0, 1000)) return `${ex.exercise}: некорректный вес`;
+  if (!isNumberInRange(ex.rpe, 1, 10, true)) return `${ex.exercise}: RPE должен быть от 1 до 10`;
+  if (!isNumberInRange(ex.rounds, -1, 99, true)) return `${ex.exercise}: некорректное число раундов`;
+  if (!isNumberInRange(ex.distance_km, 0.001, 500)) return `${ex.exercise}: некорректная дистанция`;
+  if (!isNumberInRange(ex.duration_sec, 1, 86400, true)) return `${ex.exercise}: некорректное время`;
+  if (!isNumberInRange(ex.heart_rate, 30, 250, true)) return `${ex.exercise}: некорректный пульс`;
+
+  if (ex.type === "cardio" && (
+    ex.distance_km === null || ex.duration_sec === null || ex.heart_rate === null || ex.pace === null
+  )) return `${ex.exercise}: заполните дистанцию, время, темп и пульс`;
+  if (ex.type === "circuit" && (ex.rounds === null || ex.duration_sec === null)) {
+    return `${ex.exercise}: заполните раунды и время`;
+  }
+  return null;
+}
 
 export async function logWorkoutFromWeb(
   date: string,
@@ -29,6 +77,19 @@ export async function logWorkoutFromWeb(
     if (!exercises || exercises.length === 0) {
       return { error: "Нет упражнений для сохранения" };
     }
+    if (exercises.length > 100 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { error: "Некорректные данные тренировки" };
+    }
+    if (week !== null && (!Number.isInteger(week) || week < 1 || week > 1000)) {
+      return { error: "Некорректный номер недели" };
+    }
+    if (dayOrder !== null && (!Number.isInteger(dayOrder) || dayOrder < 1 || dayOrder > 7)) {
+      return { error: "Некорректный тренировочный день" };
+    }
+    for (const exercise of exercises) {
+      const validationError = validateExerciseLog(exercise);
+      if (validationError) return { error: validationError };
+    }
 
     const rows = exercises.map((ex) => ({
       client_id: clientId,
@@ -40,15 +101,24 @@ export async function logWorkoutFromWeb(
       reps: ex.reps,
       weight: ex.weight,
       rpe: ex.rpe,
+      rounds: ex.rounds,
+      distance_km: ex.distance_km,
+      duration_sec: ex.duration_sec,
+      heart_rate: ex.heart_rate,
+      pace: ex.pace,
       comment: ex.comment,
     }));
 
     const { error } = await supabaseAdmin.from("workout_logs").insert(rows);
-    if (error) return { error: error.message };
+    if (error) {
+      console.error(`[WORKOUT_WEB] Insert failed for ${clientId}:`, error.message);
+      return { error: "Не удалось сохранить тренировку" };
+    }
 
     return {};
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  } catch (error) {
+    console.error("[WORKOUT_WEB] Unexpected insert error:", error);
+    return { error: "Произошла ошибка" };
   }
 }
 

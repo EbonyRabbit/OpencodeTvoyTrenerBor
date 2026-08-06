@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getParsedContent, type ParsedDay } from "@/lib/program-utils";
+import { getParsedContent, flattenLoggableExercises, type ParsedDay } from "@/lib/program-utils";
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
@@ -16,6 +16,11 @@ type WorkoutLogRow = {
   reps: string | null;
   weight: number | null;
   rpe: number | null;
+  rounds: number | null;
+  distance_km: number | null;
+  duration_sec: number | null;
+  heart_rate: number | null;
+  pace: string | null;
   comment: string | null;
 };
 
@@ -45,6 +50,11 @@ export type HistoryEntry = {
   sets: number | null;
   reps: string | null;
   rpe: number | null;
+  rounds: number | null;
+  distance_km: number | null;
+  duration_sec: number | null;
+  heart_rate: number | null;
+  pace: string | null;
   comment: string | null;
   date: string;
 };
@@ -156,7 +166,7 @@ export default async function HistoryPage() {
 
   const { data: logs, error: logsError } = await supabaseAdmin
     .from("workout_logs")
-    .select("date, week, day_order, exercise, sets, reps, weight, rpe, comment")
+    .select("date, week, day_order, exercise, sets, reps, weight, rpe, rounds, distance_km, duration_sec, heart_rate, pace, comment")
     .eq("client_id", clientId)
     .order("date", { ascending: true })
     .order("created_at", { ascending: true });
@@ -201,7 +211,7 @@ export default async function HistoryPage() {
       }
 
       const names = new Set<string>();
-      for (const ex of day.exercises ?? []) {
+      for (const ex of flattenLoggableExercises(day.exercises ?? [])) {
         const name = normalizeName(ex.name);
         if (!name) continue;
         names.add(name);
@@ -312,6 +322,11 @@ export default async function HistoryPage() {
       sets: log.sets,
       reps: log.reps,
       rpe: log.rpe,
+      rounds: log.rounds,
+      distance_km: log.distance_km,
+      duration_sec: log.duration_sec,
+      heart_rate: log.heart_rate,
+      pace: log.pace,
       comment: log.comment,
       date: log.date,
     });

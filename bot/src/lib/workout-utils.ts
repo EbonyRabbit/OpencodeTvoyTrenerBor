@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin.js";
 import type { Client } from "./clients.js";
-import { getParsedContent, type ParsedExercise, type ParsedDay } from "./program-utils.js";
+import { getParsedContent, flattenLoggableExercises, getCompositeLetters, type ParsedExercise, type ParsedDay } from "./program-utils.js";
 import { t, type Language } from "../i18n/index.js";
 import { DEFAULT_TIMEZONE } from "./constants.js";
 
@@ -223,19 +223,15 @@ function matchDayForToday(
   }) ?? null;
 }
 
-function formatExerciseDetailLine(ex: ParsedExercise): string {
-  const parts: string[] = [];
-  if (ex.sets && ex.reps) parts.push(`${ex.sets}×${ex.reps}`);
-  if (ex.weight) parts.push(ex.weight);
-  if (ex.rpe) parts.push(`RPE ${ex.rpe}`);
-  if (parts.length === 0) return "";
-  return `   ${parts.join(", ")}`;
-}
-
 export interface PreviousLog {
   weight: number | null;
   sets: number | null;
   reps: string | null;
+  rounds: number | null;
+  duration_sec: number | null;
+  distance_km: number | null;
+  pace: string | null;
+  heart_rate: number | null;
 }
 
 const PSEUDO_EXERCISE = /^\[/;
@@ -299,7 +295,7 @@ export async function getPreviousWorkoutLogs(
 
   const { data, error } = await supabaseAdmin
     .from("workout_logs")
-    .select("exercise, date, sets, reps, weight")
+    .select("exercise, date, sets, reps, weight, rounds, duration_sec, distance_km, pace, heart_rate")
     .eq("client_id", client.id)
     .lt("date", todayStr)
     .or(orFilter)
@@ -320,6 +316,11 @@ export async function getPreviousWorkoutLogs(
       weight: row.weight,
       sets: row.sets,
       reps: row.reps,
+      rounds: row.rounds,
+      duration_sec: row.duration_sec,
+      distance_km: row.distance_km,
+      pace: row.pace,
+      heart_rate: row.heart_rate,
     });
   }
 
@@ -327,7 +328,29 @@ export async function getPreviousWorkoutLogs(
   return result;
 }
 
-function formatPreviousLog(log: PreviousLog): string {
+function formatPreviousLog(log: PreviousLog, lang: Language): string {
+  const parts: string[] = [];
+
+  if (log.distance_km != null && log.distance_km > 0) {
+    parts.push(t("workout.metric_distance", lang, { distance: log.distance_km }));
+  }
+  if (log.duration_sec != null && log.duration_sec > 0) {
+    parts.push(formatDuration(log.duration_sec, lang));
+  }
+  if (log.pace) {
+    parts.push(t("workout.metric_pace", lang, { pace: log.pace }));
+  }
+  if (log.rounds != null) {
+    parts.push(log.rounds === -1
+      ? t("workout.metric_rounds_max", lang)
+      : t("workout.metric_rounds", lang, { rounds: log.rounds }));
+  }
+  if (log.heart_rate != null) {
+    parts.push(t("workout.metric_heart_rate", lang, { heart_rate: log.heart_rate }));
+  }
+
+  if (parts.length > 0) return parts.join(" · ");
+
   const weight =
     log.weight != null && log.weight > 0 ? `${log.weight} кг` : log.weight === 0 ? "вес тела" : null;
   const perSetList = log.reps != null && String(log.reps).includes("/");
@@ -343,22 +366,90 @@ function formatPreviousLog(log: PreviousLog): string {
   return [weight, setsReps].filter(Boolean).join(" ");
 }
 
-export function formatExercise(
-  index: number,
-  ex: ParsedExercise,
+export function formatDuration(totalSeconds: number, lang: Language = "ru"): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return m > 0
+    ? t("workout.metric_duration_minutes", lang, { minutes: m })
+    : t("workout.metric_duration_seconds", lang, { seconds: s });
+}
+
+function formatPlannedDetail(ex: ParsedExercise, lang: Language): string {
+  const parts: string[] = [];
+  if (ex.type === "cardio") {
+    if (ex.distance) parts.push(t("workout.planned_distance", lang, { distance: ex.distance }));
+    if (ex.duration) parts.push(t("workout.planned_duration", lang, { duration: ex.duration }));
+    if (ex.pace) parts.push(t("workout.planned_pace", lang, { pace: ex.pace }));
+    if (ex.heart_rate) parts.push(t("workout.planned_heart_rate", lang, { heart_rate: ex.heart_rate }));
+    return parts.join(" · ");
+  }
+  if (ex.type === "circuit") {
+    if (ex.rounds) parts.push(t("workout.planned_rounds", lang, { rounds: ex.rounds }));
+    if (ex.duration) parts.push(t("workout.planned_duration_prefix", lang, { duration: ex.duration }));
+    return parts.join(" ");
+  }
+  if (ex.sets && ex.reps) parts.push(`${ex.sets}×${ex.reps}`);
+  if (ex.weight) parts.push(ex.weight);
+  if (ex.rpe) parts.push(`RPE ${ex.rpe}`);
+  return parts.join(", ");
+}
+
+function formatChildLine(
+  letter: string,
+  child: ParsedExercise,
   lang: Language,
   last?: PreviousLog | null,
 ): string {
   const lines: string[] = [];
+  lines.push(`${letter}. ${child.name}`);
+  const detail = formatPlannedDetail(child, lang);
+  if (detail) lines.push(`   ${detail}`);
+  const lastDetail = last ? formatPreviousLog(last, lang) : "";
+  if (lastDetail) {
+    lines.push(`   ${t("workout.exercise_last", lang, { detail: lastDetail })}`);
+  }
+  if (child.rest) {
+    lines.push(`   ${t("workout.exercise_rest", lang, { rest: child.rest })}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatExercise(
+  index: number,
+  ex: ParsedExercise,
+  lang: Language,
+  lastLogs: ReadonlyMap<string, PreviousLog>,
+  compositeLetter = "A",
+): string {
+  const lines: string[] = [];
+
+  if (ex.type === "superset" && ex.children?.length) {
+    const name = ex.name ? t("workout.superset_label", lang, { name: ex.name }) : t("workout.superset_bare", lang);
+    lines.push(t("workout.exercise_item", lang, { index, name }));
+    for (let i = 0; i < ex.children.length; i++) {
+      const child = ex.children[i];
+      const last = lastLogs.get(child.name.trim().toLowerCase());
+      lines.push(formatChildLine(`${compositeLetter}${i + 1}`, child, lang, last));
+    }
+    if (ex.rest) {
+      lines.push(t("workout.exercise_rest", lang, { rest: ex.rest }));
+    }
+    if (ex.notes) {
+      lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+    }
+    return lines.join("\n");
+  }
 
   lines.push(t("workout.exercise_item", lang, { index, name: ex.name }));
 
-  const detailLine = formatExerciseDetailLine(ex);
-  if (detailLine) lines.push(detailLine);
+  const detail = formatPlannedDetail(ex, lang);
+  if (detail) lines.push(`   ${detail}`);
 
-  const lastDetail = last ? formatPreviousLog(last) : "";
+  const lastDetail = lastLogs.get(ex.name.trim().toLowerCase());
   if (lastDetail) {
-    lines.push(t("workout.exercise_last", lang, { detail: lastDetail }));
+    lines.push(`   ${t("workout.exercise_last", lang, { detail: formatPreviousLog(lastDetail, lang) })}`);
   }
 
   if (ex.rest) {
@@ -377,10 +468,12 @@ export async function formatWorkoutMessage(
   lang: Language,
   client: Client,
 ): Promise<string> {
+  const flattened = flattenLoggableExercises(workout.exercises);
   const lastLogs = await getPreviousWorkoutLogs(
     client,
-    workout.exercises.map((ex) => ex.name),
+    flattened.map((ex) => ex.name),
   );
+  const compositeLetters = getCompositeLetters(workout.exercises);
 
   const lines: string[] = [];
 
@@ -401,22 +494,58 @@ export async function formatWorkoutMessage(
   lines.push(t("workout.exercises_header", lang));
 
   for (let i = 0; i < workout.exercises.length; i++) {
-    const name = workout.exercises[i].name.trim().toLowerCase();
-    lines.push(formatExercise(i + 1, workout.exercises[i], lang, lastLogs.get(name)));
+    lines.push(formatExercise(i + 1, workout.exercises[i], lang, lastLogs, compositeLetters.get(i) ?? "A"));
     lines.push("");
   }
 
   return lines.join("\n").trim();
 }
 
-export async function formatSingleExercise(
+export function formatSingleExercise(
   index: number,
   total: number,
   ex: ParsedExercise,
   lang: Language,
-  client: Client,
-): Promise<string> {
+  lastLogs: ReadonlyMap<string, PreviousLog>,
+  compositeLetter = "A",
+): string {
   const lines: string[] = [];
+
+  if (ex.type === "superset" && ex.children?.length) {
+    lines.push(t("workout.exercise_header", lang, { current: index + 1, total }));
+    lines.push("");
+    lines.push(ex.name ? t("workout.superset_label", lang, { name: ex.name }) : t("workout.superset_bare", lang));
+    if (ex.sets) {
+      lines.push("");
+      lines.push(t("workout.exercise_sets_reps", lang, { sets: ex.sets, reps: t("workout.superset_per_circuit", lang) }));
+    }
+
+    for (let i = 0; i < ex.children.length; i++) {
+      const child = ex.children[i];
+      lines.push("");
+      lines.push(`${compositeLetter}${i + 1}. ${child.name}`);
+      const detail = formatPlannedDetail(child, lang);
+      if (detail) lines.push(detail);
+      const last = lastLogs.get(child.name.trim().toLowerCase());
+      const lastDetail = last ? formatPreviousLog(last, lang) : "";
+      if (lastDetail) {
+        lines.push(t("workout.exercise_last", lang, { detail: lastDetail }));
+      }
+      if (child.rest) {
+        lines.push(t("workout.exercise_rest_detail", lang, { rest: child.rest }));
+      }
+    }
+
+    if (ex.rest) {
+      lines.push("");
+      lines.push(t("workout.exercise_rest_detail", lang, { rest: ex.rest }));
+    }
+    if (ex.notes) {
+      lines.push("");
+      lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+    }
+    return lines.join("\n");
+  }
 
   lines.push(t("workout.exercise_header", lang, { current: index + 1, total }));
   lines.push("");
@@ -427,25 +556,38 @@ export async function formatSingleExercise(
     lines.push(t("workout.exercise_block", lang, { block: ex.block }));
   }
 
-  if (ex.sets && ex.reps) {
-    lines.push(t("workout.exercise_sets_reps", lang, { sets: ex.sets, reps: ex.reps }));
-  }
+  if (ex.type === "cardio") {
+    const cardioLines = formatPlannedDetail(ex, lang);
+    if (cardioLines) {
+      lines.push("");
+      lines.push(cardioLines);
+    }
+  } else if (ex.type === "circuit") {
+    const circuitLine = formatPlannedDetail(ex, lang);
+    if (circuitLine) {
+      lines.push("");
+      lines.push(circuitLine);
+    }
+  } else {
+    if (ex.sets && ex.reps) {
+      lines.push(t("workout.exercise_sets_reps", lang, { sets: ex.sets, reps: ex.reps }));
+    }
 
-  if (ex.weight) {
-    lines.push(t("workout.exercise_weight", lang, { weight: ex.weight }));
-  }
+    if (ex.weight) {
+      lines.push(t("workout.exercise_weight", lang, { weight: ex.weight }));
+    }
 
-  if (ex.rpe) {
-    lines.push(t("workout.exercise_rpe", lang, { rpe: ex.rpe }));
+    if (ex.rpe) {
+      lines.push(t("workout.exercise_rpe", lang, { rpe: ex.rpe }));
+    }
   }
 
   if (ex.rest) {
     lines.push(t("workout.exercise_rest_detail", lang, { rest: ex.rest }));
   }
 
-  const lastLogs = await getPreviousWorkoutLogs(client, [ex.name]);
   const last = lastLogs.get(ex.name.trim().toLowerCase());
-  const lastDetail = last ? formatPreviousLog(last) : "";
+  const lastDetail = last ? formatPreviousLog(last, lang) : "";
   if (lastDetail) {
     lines.push("");
     lines.push(t("workout.exercise_last", lang, { detail: lastDetail }));
@@ -488,7 +630,9 @@ export async function isTodayWorkoutCompleted(
       .filter((name): name is string => Boolean(name) && !isPseudoName(name)),
   );
 
-  return effective.exercises.every((ex) =>
+  const targets = flattenLoggableExercises(effective.exercises);
+
+  return targets.every((ex) =>
     loggedNames.has(ex.name.trim().toLowerCase()),
   );
 }

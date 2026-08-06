@@ -4,6 +4,7 @@ import {
   getTodayWorkout,
   isTodayWorkoutCompleted,
   formatSingleExercise,
+  getPreviousWorkoutLogs,
   type TodayWorkout,
 } from "../lib/workout-utils.js";
 import { t, type Language } from "../i18n/index.js";
@@ -16,6 +17,7 @@ import { handleResumeCallback } from "./resume.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
+import { getCompositeLetters, flattenLoggableExercises } from "../lib/program-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { markAsSent } from "../cron/dedup.js";
 
@@ -158,12 +160,19 @@ export async function showExercise(
     return;
   }
 
-  const text = await formatSingleExercise(
+  const compositeLetters = getCompositeLetters(effectiveWorkout.exercises);
+  const currentExercise = effectiveWorkout.exercises[index];
+  const lastLogs = await getPreviousWorkoutLogs(
+    ctx.client,
+    flattenLoggableExercises([currentExercise]).map((ex) => ex.name),
+  );
+  const text = formatSingleExercise(
     index,
     effectiveWorkout.exercises.length,
-    effectiveWorkout.exercises[index],
+    currentExercise,
     ctx.language,
-    ctx.client,
+    lastLogs,
+    compositeLetters.get(index) ?? "A",
   );
   const keyboard = buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language);
 
@@ -339,6 +348,11 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
     reps: null,
     weight: null,
     rpe: null,
+    rounds: null,
+    distance_km: null,
+    duration_sec: null,
+    heart_rate: null,
+    pace: null,
     comment: reason,
   });
 

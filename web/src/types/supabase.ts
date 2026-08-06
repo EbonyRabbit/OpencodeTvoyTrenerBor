@@ -846,9 +846,14 @@ export type Database = {
           created_at: string
           date: string
           day_order: number | null
+          distance_km: number | null
+          duration_sec: number | null
           exercise: string
+          heart_rate: number | null
           id: string
+          pace: string | null
           reps: string | null
+          rounds: number | null
           rpe: number | null
           sets: number | null
           updated_at: string
@@ -861,9 +866,14 @@ export type Database = {
           created_at?: string
           date: string
           day_order?: number | null
+          distance_km?: number | null
+          duration_sec?: number | null
           exercise: string
+          heart_rate?: number | null
           id?: string
+          pace?: string | null
           reps?: string | null
+          rounds?: number | null
           rpe?: number | null
           sets?: number | null
           updated_at?: string
@@ -876,9 +886,14 @@ export type Database = {
           created_at?: string
           date?: string
           day_order?: number | null
+          distance_km?: number | null
+          duration_sec?: number | null
           exercise?: string
+          heart_rate?: number | null
           id?: string
+          pace?: string | null
           reps?: string | null
+          rounds?: number | null
           rpe?: number | null
           sets?: number | null
           updated_at?: string

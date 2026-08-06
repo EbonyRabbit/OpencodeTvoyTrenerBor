@@ -7,8 +7,16 @@ permission:
     "*": deny
     "python *": allow
     "rg *": allow
-    "npx tsc --noEmit": allow
+    "npx tsc --noEmit*": allow
+    "npx vitest run*": allow
+    "npx vitest*": allow
+    "cd * && npx vitest run*": allow
+    "cd * && npx tsc --noEmit*": allow
     "git diff*": allow
+    "git status*": allow
+    "git log*": allow
+    "git ls-files*": allow
+    "git rev-parse*": allow
   glob: allow
   grep: allow
   read: allow

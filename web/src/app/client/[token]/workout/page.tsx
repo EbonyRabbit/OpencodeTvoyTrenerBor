@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getParsedContent, type ParsedDay } from "@/lib/program-utils";
+import { getParsedContent, flattenLoggableExercises, type ParsedDay } from "@/lib/program-utils";
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { WorkoutForm } from "./workout-form";
@@ -207,13 +207,14 @@ export default async function WorkoutPage() {
   }
 
   const loggedNames = new Set(
-    (logs ?? []).map((l) => l.exercise?.trim().toLowerCase()).filter(Boolean),
+    (logs ?? [])
+      .map((l) => l.exercise?.trim().toLowerCase())
+      .filter((name): name is string => Boolean(name) && !name.startsWith("[")),
   );
+  const targets = flattenLoggableExercises(matchedDay.exercises);
   const workoutCompleted =
-    matchedDay.exercises.length > 0 &&
-    matchedDay.exercises.every((ex) =>
-      loggedNames.has(ex.name.trim().toLowerCase()),
-    );
+    targets.length > 0 &&
+    targets.every((ex) => loggedNames.has(ex.name.trim().toLowerCase()));
 
   return (
     <div>

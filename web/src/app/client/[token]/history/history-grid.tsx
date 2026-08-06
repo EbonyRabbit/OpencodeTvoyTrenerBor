@@ -15,6 +15,26 @@ function formatWeight(entry: HistoryEntry): string | null {
   return entry.weight > 0 ? `${entry.weight} кг` : "вес тела";
 }
 
+function formatDuration(entry: HistoryEntry): string | null {
+  if (entry.duration_sec == null || entry.duration_sec <= 0) return null;
+  const total = entry.duration_sec;
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return m > 0 ? `${m} мин` : `${s} сек`;
+}
+
+function formatMetrics(entry: HistoryEntry): string[] {
+  const metrics: string[] = [];
+  if (entry.rounds != null) metrics.push(entry.rounds === -1 ? "МАКС раундов" : `${entry.rounds} раунд.`);
+  if (entry.distance_km != null && entry.distance_km > 0) metrics.push(`${entry.distance_km} км`);
+  if (entry.duration_sec != null && entry.duration_sec > 0) metrics.push(formatDuration(entry)!);
+  if (entry.pace) metrics.push(`темп ${entry.pace}`);
+  if (entry.heart_rate != null) metrics.push(`пульс ${entry.heart_rate}`);
+  return metrics;
+}
+
 export function HistoryGrid({
   days,
   weekCount,
@@ -164,8 +184,9 @@ function formatDate(entry: HistoryEntry): string | null {
 }
 
 function EntryLine({ entry }: { entry: HistoryEntry }) {
-  const weight = formatWeight(entry);
-  const setsReps = formatSetsReps(entry);
+  const metrics = formatMetrics(entry);
+  const weight = metrics.length > 0 ? null : formatWeight(entry);
+  const setsReps = metrics.length > 0 ? null : formatSetsReps(entry);
   const date = formatDate(entry);
   return (
     <div className="flex flex-col gap-0.5">
@@ -173,7 +194,7 @@ function EntryLine({ entry }: { entry: HistoryEntry }) {
         <div className="text-[11px] text-muted-foreground">{date}</div>
       )}
       <div className="font-medium">
-        {[weight, setsReps].filter(Boolean).join(" ") || "—"}
+        {metrics.length > 0 ? metrics.join(" · ") : [weight, setsReps].filter(Boolean).join(" ") || "—"}
       </div>
       {entry.rpe != null && (
         <div className="text-xs text-muted-foreground">RPE {entry.rpe}</div>

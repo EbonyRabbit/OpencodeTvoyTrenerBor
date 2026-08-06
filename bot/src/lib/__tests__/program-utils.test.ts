@@ -5,6 +5,9 @@ import {
   getTotalWeeks,
   getCurrentWeek,
   getWorkoutDaysCount,
+  isCompositeExercise,
+  flattenLoggableExercises,
+  type ParsedExercise,
 } from "../program-utils.js";
 
 describe("getParsedContent", () => {
@@ -142,5 +145,156 @@ describe("getWorkoutDaysCount", () => {
   it("returns 0 for week with no days", () => {
     const parsed = { weeks: [{ week_number: 1 }] };
     expect(getWorkoutDaysCount(parsed, 1)).toBe(0);
+  });
+});
+
+describe("flattenLoggableExercises", () => {
+  it("returns empty array for empty input", () => {
+    expect(flattenLoggableExercises([])).toEqual([]);
+  });
+
+  it("keeps plain exercises as-is", () => {
+    const exercises: ParsedExercise[] = [{ name: "Жим" }, { name: "Присед" }];
+    expect(flattenLoggableExercises(exercises)).toEqual(exercises);
+  });
+
+  it("expands superset into its children", () => {
+    const superset: ParsedExercise = {
+      name: "Суперсет A",
+      type: "superset",
+      sets: "3",
+      children: [{ name: "Жим лёжа" }, { name: "Тяга в наклоне" }],
+    };
+    const result = flattenLoggableExercises([superset, { name: "Берпи" }]);
+    expect(result.map((e) => e.name)).toEqual(["Жим лёжа", "Тяга в наклоне", "Берпи"]);
+  });
+
+  it("keeps superset itself if it has no children", () => {
+    const superset: ParsedExercise = { name: "Суперсет A", type: "superset" };
+    expect(flattenLoggableExercises([superset])).toEqual([superset]);
+  });
+
+  it("keeps circuit and cardio as single units", () => {
+    const circuit: ParsedExercise = {
+      name: "AMRAP 20 мин",
+      type: "circuit",
+      children: [{ name: "Присед" }],
+    };
+    const cardio: ParsedExercise = { name: "Бег", type: "cardio", distance: "5 км" };
+    expect(flattenLoggableExercises([circuit, cardio])).toEqual([circuit, cardio]);
+  });
+});
+
+describe("isCompositeExercise", () => {
+  it("returns true for superset and circuit", () => {
+    expect(isCompositeExercise({ name: "A", type: "superset" })).toBe(true);
+    expect(isCompositeExercise({ name: "A", type: "circuit" })).toBe(true);
+  });
+
+  it("returns false for strength, cardio and default", () => {
+    expect(isCompositeExercise({ name: "A", type: "strength" })).toBe(false);
+    expect(isCompositeExercise({ name: "A", type: "cardio" })).toBe(false);
+    expect(isCompositeExercise({ name: "A" })).toBe(false);
+  });
+});
+
+describe("getParsedContent (composites)", () => {
+  it("accepts a valid superset with children", () => {
+    const input = {
+      weeks: [
+        {
+          week_number: 1,
+          days: [
+            {
+              day_name: "День 1",
+              day_order: 1,
+              exercises: [
+                {
+                  name: "Суперсет A",
+                  type: "superset",
+                  sets: "3",
+                  children: [
+                    { name: "Жим лёжа", reps: "8", weight: "60 кг", rpe: "8" },
+                    { name: "Тяга в наклоне", reps: "10", weight: "40 кг", rpe: "7" },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(getParsedContent(input)).toEqual(input);
+  });
+
+  it("accepts a valid circuit with cardio children", () => {
+    const input = {
+      weeks: [
+        {
+          week_number: 1,
+          days: [
+            {
+              day_name: "День 1",
+              day_order: 1,
+              exercises: [
+                {
+                  name: "AMRAP 20 мин",
+                  type: "circuit",
+                  duration: "20 мин",
+                  rounds: "МАКС",
+                  children: [
+                    { name: "Приседания", reps: "20", weight: "60 кг" },
+                    { name: "Берпи", reps: "10" },
+                    { name: "Бег", type: "cardio", distance: "500 м" },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(getParsedContent(input)).toEqual(input);
+  });
+
+  it("rejects unknown exercise type", () => {
+    const input = {
+      weeks: [
+        {
+          week_number: 1,
+          days: [
+            { day_name: "День 1", day_order: 1, exercises: [{ name: "X", type: "emom" }] },
+          ],
+        },
+      ],
+    };
+    expect(getParsedContent(input)).toBeNull();
+  });
+
+  it("rejects composite nested inside composite", () => {
+    const input = {
+      weeks: [
+        {
+          week_number: 1,
+          days: [
+            {
+              day_name: "День 1",
+              day_order: 1,
+              exercises: [
+                {
+                  name: "Суперсет",
+                  type: "superset",
+                  children: [
+                    { name: "Жим", type: "strength" },
+                    { name: "Вложенный круг", type: "circuit", children: [{ name: "Берпи" }] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(getParsedContent(input)).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { InlineKeyboard, type Bot } from "grammy";
 import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { t, type Language } from "../i18n/index.js";
-import { getTodayDateStr } from "../lib/workout-utils.js";
+import { getTodayDateStr, getTodayISODay } from "../lib/workout-utils.js";
 import { markAsSent } from "./dedup.js";
 import { logBotEvent } from "./logger.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
@@ -12,7 +12,6 @@ const MSG_DELAY_MS = 50;
 const BATCH_SIZE = 200;
 
 const timeFormatterCache = new Map<string, Intl.DateTimeFormat>();
-const weekdayFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
 function getClientTimeParts(tz: string): { hour: number; minute: number } {
   let fmt = timeFormatterCache.get(tz);
@@ -32,22 +31,6 @@ function getClientTimeParts(tz: string): { hour: number; minute: number } {
   return { hour, minute };
 }
 
-const DAY_MAP: Record<string, number> = {
-  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
-};
-
-function getDayOfWeekInTimezone(tz: string): number {
-  let fmt = weekdayFormatterCache.get(tz);
-  if (!fmt) {
-    fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      weekday: "short",
-    });
-    weekdayFormatterCache.set(tz, fmt);
-  }
-  return DAY_MAP[fmt.format(new Date())] ?? -1;
-}
-
 function parseMeasurementTime(timeStr: string): { hour: number; minute: number } | null {
   if (!timeStr) return null;
   const parts = timeStr.split(":");
@@ -57,9 +40,11 @@ function parseMeasurementTime(timeStr: string): { hour: number; minute: number }
   if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
   const roundedMinute = Math.round(minute / 15) * 15;
-  const adjustedHour = roundedMinute >= 60 ? (hour + 1) % 24 : hour;
-  const adjustedMinute = roundedMinute >= 60 ? 0 : roundedMinute;
-  return { hour: adjustedHour, minute: adjustedMinute };
+  if (roundedMinute >= 60) {
+    if (hour === 23) return { hour: 23, minute: 45 };
+    return { hour: hour + 1, minute: 0 };
+  }
+  return { hour, minute: roundedMinute };
 }
 
 function buildReminderKeyboard(lang: Language): InlineKeyboard {
@@ -112,16 +97,16 @@ export async function runMeasurementReminder(bot: Bot<MyContext>): Promise<void>
 
       const tz = client.timezone || DEFAULT_TIMEZONE;
 
-      let dayOfWeek: number;
+      let isoDay: number;
       try {
-        dayOfWeek = getDayOfWeekInTimezone(tz);
+        isoDay = getTodayISODay(tz);
       } catch {
         console.warn(`[MEASUREMENT_REMINDER] Invalid timezone "${tz}" for client ${client.id}`);
         continue;
       }
 
-      if (dayOfWeek < 0 || dayOfWeek > 6) continue;
-      if (dayOfWeek !== Number(client.measurement_day)) continue;
+      if (isoDay < 1 || isoDay > 7) continue;
+      if (isoDay !== Number(client.measurement_day)) continue;
 
       const target = parseMeasurementTime(client.measurement_time);
       if (!target) continue;

@@ -90,11 +90,17 @@ export async function getWorkoutPlan(
   };
 }
 
-function getTodayISODay(timezone: string): number {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    timeZone: timezone,
-  });
+const isoDayFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+export function getTodayISODay(timezone: string): number {
+  let formatter = isoDayFormatterCache.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      timeZone: timezone,
+    });
+    isoDayFormatterCache.set(timezone, formatter);
+  }
   const dayName = formatter.format(new Date()).toLowerCase();
   const dayMap: Record<string, number> = {
     monday: 1, tuesday: 2, wednesday: 3, thursday: 4,

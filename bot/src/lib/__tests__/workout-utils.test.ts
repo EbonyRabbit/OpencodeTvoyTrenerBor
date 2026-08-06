@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   mockFrom: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName } from "../workout-utils.js";
+import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -406,5 +406,44 @@ describe("isPseudoName", () => {
   it("rejects regular exercise names", () => {
     expect(isPseudoName("Присед")).toBe(false);
     expect(isPseudoName("Бег в скобках [тест]")).toBe(false);
+  });
+});
+
+describe("getTodayISODay", () => {
+  const system = new Date("2026-08-06T20:00:00Z");
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(system);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns 1 for Monday in a fixed timezone", () => {
+    vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));
+    expect(getTodayISODay("Europe/Moscow")).toBe(1);
+  });
+
+  it("returns 4 for Thursday in Europe/Moscow", () => {
+    expect(getTodayISODay("Europe/Moscow")).toBe(4);
+  });
+
+  it("returns 4 for Thursday where UTC-7 is still same day", () => {
+    expect(getTodayISODay("America/Los_Angeles")).toBe(4);
+  });
+
+  it("returns 5 for Friday where UTC+9 already crossed midnight", () => {
+    expect(getTodayISODay("Asia/Tokyo")).toBe(5);
+  });
+
+  it("returns 7 for Sunday", () => {
+    vi.setSystemTime(new Date("2026-08-09T12:00:00Z"));
+    expect(getTodayISODay("Europe/Moscow")).toBe(7);
+  });
+
+  it("throws for an invalid timezone", () => {
+    expect(() => getTodayISODay("Not/AZone")).toThrow();
   });
 });

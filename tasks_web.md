@@ -598,7 +598,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **12.4** | Запустить миграции | Применить все миграции из `supabase/migrations/` (13 файлов) на продакшен через Supabase CLI `db push` | ✅ |
 | **12.5** | Исправить middleware | Next.js 16 использует `proxy.ts` (не `middleware.ts`). Файл уже корректный. | ⏭️ not needed |
 | **12.6** | Деплой бота | Бот развёрнут на **Render** (не Railway): `tvoi-trener-bot.onrender.com`, `/health` → 200 | ✅ |
-| **12.7** | Env vars бота | Переменные из 12.2 заданы на Render (webhook работает, бот жив), **кроме** `CLIENT_PORTAL_URL` — задан только локально в `bot/.env.local` (gitignored), на Render добавить вручную, иначе `/myweb` ответит «портал не настроен» | ⏳ (добавить CLIENT_PORTAL_URL на Render) |
+| **12.7** | Env vars бота | Переменные из 12.2 заданы на Render (webhook работает, бот жив). `CLIENT_PORTAL_URL` добавлен на Render в рамках 12.19 (вместе с `PAYMENT_BASE_URL`). Верификация 06.08.2026: `/health` → 200, webhook `https://tvoi-trener-bot.onrender.com/webhook` (pending=0), продакшен `client_tokens` генерируются и используются (`last_used_at` 05.08.2026), портал `https://opencode-tvoy-trener-bor.vercel.app` → 200. Для видимости отсутствия env на проде добавлен startup-warning `bot/src/startup-warnings.ts` (+7 тестов, 205/205 unit ✅). | ✅ |
 | **12.8** | Проверить деплой бота | `GET /health` → `{"ok":true}`; webhook принимает апдейты (`pending_update_count: 0`) | ✅ |
 | **12.9** | Создать Vercel проект | Веб развёрнут: `https://opencode-tvoy-trener-bor.vercel.app` (root directory = `web/`) | ✅ |
 | **12.10** | Настроить Vercel env vars | Переменные из 12.3 заданы (страницы рендерятся, база отвечает) | ✅ |

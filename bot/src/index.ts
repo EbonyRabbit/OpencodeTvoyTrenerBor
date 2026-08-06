@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { createApp } from "./app.js";
 import { bot } from "./bot.js";
 import { startScheduler, stopScheduler } from "./cron/scheduler.js";
+import { startupWarnings } from "./startup-warnings.js";
 
 const { server } = createApp({
   bot,
@@ -34,6 +35,10 @@ async function main(): Promise<void> {
 
   if (!config.publicUrl) {
     console.warn("Local webhook URL will not work with Telegram. Use ngrok or cloudflare tunnel.");
+  }
+
+  for (const warning of startupWarnings(config)) {
+    console.warn(warning);
   }
 
   await bot.api.setWebhook(webhookUrl, {

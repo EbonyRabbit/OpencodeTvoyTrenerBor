@@ -610,7 +610,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **12.13** | Тест бота в продакшене | `/health` OK; проверить команды `/start`, `/menu` — вручную в Telegram | ⏳ |
 | **12.14** | Тест веба в продакшене | Страницы открываются; залогиниться в админку — вручную | ⏳ |
 | **12.15** | Тест end-to-end | Полный цикл: бот → веб → замеры → чек-ин (вручную) | ⏳ |
-| **12.16** | Ротировать GitHub PAT | ⚠️ В `git remote` URL зашит PAT. Создать новый минимальный PAT, сменить remote | ⏳ |
+| **12.16** | Ротировать GitHub PAT | Частично: remote переведён на URL без PAT (`git remote set-url` выполнен, PAT удалён из `.git/config`; репо публичное — fetch работает анонимно). ⏳ Осталось вручную: создать новый fine-grained PAT (репо, `Contents: read/write`, expiry ≤ 90 дней) → `git add tasks_web.md && git commit` (этот файл ещё не закоммичен) → один интерактивный push (osxkeychain сейчас пуст — запросит креды) → проверить другие клоны/машины (в т.ч. Sourcetree → Repo Settings → Remote) на URL со старым PAT → отозвать старый PAT в GitHub UI и убедиться, что он даёт 401 → `git fetch origin` как финальное подтверждение | ⏳ (остался ручной шаг: новый PAT + интерактивный push + отзыв старого) |
 | **12.17** | Отключить GAS | Удалить триггер `sendDueMessages` в Google Apps Script | ⏳ |
 | **12.18** | Остановить Worker | Деактивировать Cloudflare Worker (не удалять сразу) | ⏳ |
 

@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { formatPrice } from "@/lib/format-price";
 import { UUID_REGEX, sanitizeText, isValidContact, formatContact } from "@/lib/validation";
-import { DEDUP_ERROR_MESSAGE } from "@/lib/purchase";
+import { DEDUP_ERROR_MESSAGE, parseTelegramId, buildPurchaseCoachMessage, TELEGRAM_USERNAME_REGEX } from "@/lib/purchase";
 import type { BuyProgram } from "./buy-form";
 
 const NAME_MAX_LENGTH = 200;
@@ -84,9 +84,12 @@ export async function createPurchaseRequest(
     }
 
     const tgRaw = input.telegramId?.trim() ?? "";
-    const telegramId = /^\d{5,15}$/.test(tgRaw) ? Number(tgRaw) : null;
+    const telegramId = parseTelegramId(tgRaw);
+    if (tgRaw !== "" && telegramId === null) {
+      return { error: "Telegram ID — только цифры (от 5 до 15)." };
+    }
     const usernameRaw = input.telegramUsername?.trim() ?? "";
-    const telegramUsername = /^[A-Za-z0-9_]{3,32}$/.test(usernameRaw) ? usernameRaw : null;
+    const telegramUsername = TELEGRAM_USERNAME_REGEX.test(usernameRaw) ? usernameRaw : null;
 
     const now = Date.now();
     dedupKey = `${ip}:${programId}:${contact}`;
@@ -162,7 +165,12 @@ export async function createPurchaseRequest(
         action: "purchase_request:coach_notification_failed",
         status: "error",
         telegram_id: telegramId,
-        details: JSON.stringify({ program_id: program.id, contact, reason }),
+        details: JSON.stringify({
+          program_id: program.id,
+          contact,
+          telegram_username: telegramUsername ?? null,
+          reason,
+        }),
       });
       if (logErr) {
         console.error("[PURCHASE] Failed to log notification failure:", logErr.message);
@@ -170,17 +178,19 @@ export async function createPurchaseRequest(
     };
 
     if (coachChatId) {
-      const priceLine = program.price && program.price > 0
-        ? `\nЦена: ${formatPrice(program.price)}`
-        : "";
-      const tgLine = telegramId ? `\nTG ID: ${telegramId}` : "";
-      const nickLine = telegramUsername
-        ? `\n🔗 @${telegramUsername} (https://t.me/${telegramUsername})`
-        : "";
-
       const sent = await sendTelegramMessage(
         coachChatId,
-        `🛒 Заявка на покупку\n\nПрограмма: ${program.title}${priceLine}\nДлительность: ${program.duration_weeks} нед.\n\n👤 Имя: ${name}\n📱 Контакт: ${formatContact(contact)}${nickLine}${tgLine}\n\nПодтвердите оплату в панели управления.`,
+        buildPurchaseCoachMessage({
+          programTitle: program.title,
+          price: program.price,
+          durationWeeks: program.duration_weeks,
+          name,
+          contact,
+          telegramUsername,
+          telegramId,
+          formatContact,
+          formatPrice,
+        }),
       );
       if (!sent) {
         console.error("[PURCHASE] Coach notification failed");

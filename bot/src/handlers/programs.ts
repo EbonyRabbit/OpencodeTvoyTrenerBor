@@ -2,6 +2,7 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
+import { buildBuyUrl, buildProgramRequestCoachMessage } from "../lib/program-links.js";
 import { InlineKeyboard } from "grammy";
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
@@ -98,13 +99,15 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
         `${t("programs.request_button", lang)} — ${program.title}`,
       );
       if (config.paymentBaseUrl) {
-const buyLabel = truncateButtonLabel(
-        `${t("programs.buy_button", lang)} — ${program.title}`,
-      );
-      const usernameParam = buyerUsername
-        ? `&u=${encodeURIComponent(buyerUsername)}`
-        : "";
-      const buyUrl = `${config.paymentBaseUrl}/buy/${program.id}?tg=${buyerTelegramId}${usernameParam}`;
+        const buyLabel = truncateButtonLabel(
+          `${t("programs.buy_button", lang)} — ${program.title}`,
+        );
+        const buyUrl = buildBuyUrl(
+          config.paymentBaseUrl,
+          program.id,
+          buyerTelegramId,
+          buyerUsername,
+        );
         keyboard.row()
           .url(buyLabel, buyUrl)
           .text(requestLabel, `program_request:${program.id}`);
@@ -157,22 +160,12 @@ export async function handleProgramRequestCallback(ctx: MyContext, programId: st
       const { findClientByTelegramId } = await import("../lib/clients.js");
       const client = await findClientByTelegramId(ctx.from.id);
       const clientName = client?.name ?? "Неизвестный клиент";
-      const tgLink = ctx.from.username
-        ? `https://t.me/${ctx.from.username}`
-        : null;
-      const coachMsg = [
-        "📩 Запрос от клиента",
-        "",
-        `👤 ${clientName}`,
-        ctx.from.username
-          ? `🔗 @${ctx.from.username} (${tgLink})`
-          : null,
-        `🆔 TG ID: ${ctx.from.id}`,
-        "",
-        `Хочет: ${programTitle}`,
-        "",
-        "Свяжитесь с клиентом в Telegram.",
-      ].filter(Boolean).join("\n");
+      const coachMsg = buildProgramRequestCoachMessage({
+        clientName,
+        telegramId: ctx.from.id,
+        username: ctx.from.username ?? null,
+        programTitle,
+      });
       try {
         await bot.api.sendMessage(String(coachChatId), coachMsg);
       } catch (sendErr) {

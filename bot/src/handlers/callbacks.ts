@@ -150,7 +150,8 @@ registerCallback("measurements_defer_set", async (ctx, params) => {
   const lang = ctx.client.language === "en" ? "en" : "ru";
   const [y, m, d] = deferDate.split("-").map(Number);
   const dateLabel = `${d}.${m}.${y}`;
-  await ctx.answerCallbackQuery({ text: t("measure.deferred", lang, { date: dateLabel }), show_alert: true }).catch(() => {});
+  await ctx.answerCallbackQuery().catch(() => {});
+  await ctx.reply(t("measure.deferred", lang, { date: dateLabel })).catch(() => {});
 });
 // registerCallback("photo_history", async (ctx) => { await ctx.answerCallbackQuery().catch(() => {}); await showPhotoHistory(ctx); }); // DISABLED: photo storage removed
 registerCallback("resume", async (ctx, strategy) => { await handleResumeCallback(ctx, strategy); });

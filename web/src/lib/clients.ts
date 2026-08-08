@@ -111,16 +111,8 @@ export const WEEKDAY_OPTIONS = [
 
 export const CHECKIN_DAY_OPTIONS = WEEKDAY_OPTIONS;
 
-export function roundTimeToQuarter(time: string): string {
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return time;
-  const [hStr, mStr] = time.split(":");
-  const hour = Number(hStr);
-  let minute = Number(mStr);
-  const rounded = Math.round(minute / 15) * 15;
-  if (rounded >= 60) {
-    if (hour === 23) return "23:45";
-    return `${String(hour + 1).padStart(2, "0")}:00`;
-  }
-  minute = rounded;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+export function isQuarterTime(time: string): boolean {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return false;
+  const minute = Number(time.slice(3, 5));
+  return minute % 15 === 0;
 }

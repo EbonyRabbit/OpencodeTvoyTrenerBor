@@ -33,6 +33,10 @@ const TIME_HOURS: readonly string[] = Array.from(
   (_, h) => `${String(h).padStart(2, "0")}:00`,
 );
 
+const QUARTER_MINUTES = ["00", "15", "30", "45"] as const;
+
+const TIME_PREFIXES = ["morning", "measure_time", "checkin_time"] as const;
+
 const WEEKDAYS_ISO = [1, 2, 3, 4, 5, 6, 7];
 
 const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -79,6 +83,11 @@ function shortTz(value: string): string {
   return parts[parts.length - 1] ?? value;
 }
 
+function timeLabel(value: string | null | undefined, lang: Language): string {
+  if (!value) return t("settings.value_none", lang);
+  return value.slice(0, 5);
+}
+
 function panelText(client: Client): string {
   const lang = clientLang(client);
   const lines = [
@@ -89,19 +98,19 @@ function panelText(client: Client): string {
       value: client.timezone ?? t("settings.value_none", lang),
     }),
     t("settings.morning_time", lang, {
-      value: client.morning_time ?? t("settings.value_none", lang),
+      value: timeLabel(client.morning_time, lang),
     }),
     t("settings.measure_day", lang, {
       value: measureDayLabel(client.measurement_day, lang),
     }),
     t("settings.measure_time", lang, {
-      value: client.measurement_time ?? t("settings.value_none", lang),
+      value: timeLabel(client.measurement_time, lang),
     }),
     t("settings.checkin_day", lang, {
       value: weekdayLabel(client.checkin_day, lang),
     }),
     t("settings.checkin_time", lang, {
-      value: client.checkin_time ?? t("settings.value_none", lang),
+      value: timeLabel(client.checkin_time, lang),
     }),
     "",
     `${t("settings.train_days", lang)}:`,
@@ -117,11 +126,11 @@ function panelKeyboard(client: Client): Btn[][] {
   const rows: Btn[][] = [
     [{ text: t("settings.lang", lang, { value: langLabel(lang) }), callback_data: "settings_lang" }],
     [{ text: t("settings.timezone", lang, { value: client.timezone ?? t("settings.value_none", lang) }), callback_data: "settings_tz" }],
-    [{ text: t("settings.morning_time", lang, { value: client.morning_time ?? t("settings.value_none", lang) }), callback_data: "settings_morning" }],
+    [{ text: t("settings.morning_time", lang, { value: timeLabel(client.morning_time, lang) }), callback_data: "settings_morning" }],
     [{ text: t("settings.measure_day", lang, { value: measureDayLabel(client.measurement_day, lang) }), callback_data: "settings_measure_day" }],
-    [{ text: t("settings.measure_time", lang, { value: client.measurement_time ?? t("settings.value_none", lang) }), callback_data: "settings_measure_time" }],
+    [{ text: t("settings.measure_time", lang, { value: timeLabel(client.measurement_time, lang) }), callback_data: "settings_measure_time" }],
     [{ text: t("settings.checkin_day", lang, { value: weekdayLabel(client.checkin_day, lang) }), callback_data: "settings_checkin_day" }],
-    [{ text: t("settings.checkin_time", lang, { value: client.checkin_time ?? t("settings.value_none", lang) }), callback_data: "settings_checkin_time" }],
+    [{ text: t("settings.checkin_time", lang, { value: timeLabel(client.checkin_time, lang) }), callback_data: "settings_checkin_time" }],
   ];
   const footer: Btn[] = [];
   if (client.program_id) {
@@ -159,13 +168,13 @@ function tzKeyboard(lang: Language): Btn[][] {
   return rows;
 }
 
-function timeKeyboard(lang: Language, prefix: string): Btn[][] {
+function timeHourKeyboard(lang: Language, prefix: string): Btn[][] {
   const rows: Btn[][] = [];
   for (let i = 0; i < TIME_HOURS.length; i += 6) {
     rows.push(
       TIME_HOURS.slice(i, i + 6).map((tm) => ({
-        text: tm,
-        callback_data: `${prefix}_set:${tm}`,
+        text: tm.slice(0, 2),
+        callback_data: `${prefix}_hour:${tm.slice(0, 2)}`,
       })),
     );
   }
@@ -173,6 +182,17 @@ function timeKeyboard(lang: Language, prefix: string): Btn[][] {
     { text: t("settings.off", lang), callback_data: `${prefix}_off` },
     { text: t("settings.back", lang), callback_data: "settings_back" },
   ]);
+  return rows;
+}
+
+function timeMinuteKeyboard(lang: Language, prefix: string, hour: string): Btn[][] {
+  const rows: Btn[][] = [
+    QUARTER_MINUTES.map((mm) => ({
+      text: `${hour}:${mm}`,
+      callback_data: `${prefix}_set:${hour}:${mm}`,
+    })),
+  ];
+  rows.push([{ text: t("settings.back", lang), callback_data: `${prefix}_hours` }]);
   return rows;
 }
 
@@ -239,11 +259,11 @@ async function openEditor(ctx: MyContext, which: string): Promise<void> {
   const editors: Record<string, { text: string; keyboard: Btn[][] }> = {
     lang: { text: t("settings.edit_lang", lang), keyboard: langKeyboard(lang) },
     tz: { text: t("settings.edit_tz", lang), keyboard: tzKeyboard(lang) },
-    morning: { text: t("settings.edit_morning", lang), keyboard: timeKeyboard(lang, "settings_morning") },
+    morning: { text: t("settings.edit_morning", lang), keyboard: timeHourKeyboard(lang, "settings_morning") },
     measure_day: { text: t("settings.edit_measure_day", lang), keyboard: measureDayKeyboard(lang) },
-    measure_time: { text: t("settings.edit_measure_time", lang), keyboard: timeKeyboard(lang, "settings_measure_time") },
+    measure_time: { text: t("settings.edit_measure_time", lang), keyboard: timeHourKeyboard(lang, "settings_measure_time") },
     checkin_day: { text: t("settings.edit_checkin_day", lang), keyboard: weekdayKeyboard(lang, "settings_checkin_day") },
-    checkin_time: { text: t("settings.edit_checkin_time", lang), keyboard: timeKeyboard(lang, "settings_checkin_time") },
+    checkin_time: { text: t("settings.edit_checkin_time", lang), keyboard: timeHourKeyboard(lang, "settings_checkin_time") },
   };
   const editor = editors[which];
   if (!editor) return;
@@ -329,6 +349,43 @@ export async function handleSettingsCallback(
     return;
   }
 
+  const timePrefixMatch = data.match(/^settings_(morning|measure_time|checkin_time)_hour:(\d{2})$/);
+  if (timePrefixMatch) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const [, prefix, hour] = timePrefixMatch;
+    if (!/^([01]\d|2[0-3])$/.test(hour)) return;
+    const lang = clientLang(client);
+    const editorTexts: Record<string, string> = {
+      morning: "settings.edit_morning",
+      measure_time: "settings.edit_measure_time",
+      checkin_time: "settings.edit_checkin_time",
+    };
+    await editOrSend(
+      ctx,
+      t(editorTexts[prefix], lang) + `\n\n${hour}:00 — ${hour}:45`,
+      timeMinuteKeyboard(lang, `settings_${prefix}`, hour),
+    );
+    return;
+  }
+
+  const timeHoursBack = data.match(/^settings_(morning|measure_time|checkin_time)_hours$/);
+  if (timeHoursBack) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const [, prefix] = timeHoursBack;
+    const lang = clientLang(client);
+    const titleTexts: Record<string, string> = {
+      morning: "settings.edit_morning",
+      measure_time: "settings.edit_measure_time",
+      checkin_time: "settings.edit_checkin_time",
+    };
+    await editOrSend(
+      ctx,
+      t(titleTexts[prefix], lang),
+      timeHourKeyboard(lang, `settings_${prefix}`),
+    );
+    return;
+  }
+
   if (data === "settings_days") {
     await handleScheduleStart(ctx);
     return;
@@ -373,7 +430,7 @@ export async function handleSettingsCallback(
 
   if (data.startsWith("settings_morning_set:")) {
     const tm = data.slice("settings_morning_set:".length);
-    if (!TIME_HOURS.includes(tm)) {
+    if (!/^([01]\d|2[0-3]):(00|15|30|45)$/.test(tm)) {
       await ctx.answerCallbackQuery().catch(() => {});
       return;
     }
@@ -388,7 +445,7 @@ export async function handleSettingsCallback(
 
   if (data.startsWith("settings_measure_time_set:")) {
     const tm = data.slice("settings_measure_time_set:".length);
-    if (!TIME_HOURS.includes(tm)) {
+    if (!/^([01]\d|2[0-3]):(00|15|30|45)$/.test(tm)) {
       await ctx.answerCallbackQuery().catch(() => {});
       return;
     }
@@ -423,7 +480,7 @@ export async function handleSettingsCallback(
 
   if (data.startsWith("settings_checkin_time_set:")) {
     const tm = data.slice("settings_checkin_time_set:".length);
-    if (!TIME_HOURS.includes(tm)) {
+    if (!/^([01]\d|2[0-3]):(00|15|30|45)$/.test(tm)) {
       await ctx.answerCallbackQuery().catch(() => {});
       return;
     }

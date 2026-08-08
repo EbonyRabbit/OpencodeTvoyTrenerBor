@@ -190,6 +190,7 @@ export function SettingsForm({
             <Input
               id="settings-morning"
               type="time"
+              step={900}
               value={morningTime}
               onChange={(e) => setMorningTime(e.target.value)}
               className="h-9"
@@ -220,6 +221,7 @@ export function SettingsForm({
             <Input
               id="settings-meas-time"
               type="time"
+              step={900}
               value={measurementTime}
               onChange={(e) => setMeasurementTime(e.target.value)}
               className="h-9"
@@ -250,6 +252,7 @@ export function SettingsForm({
             <Input
               id="settings-checkin-time"
               type="time"
+              step={900}
               value={checkinTime}
               onChange={(e) => setCheckinTime(e.target.value)}
               className="h-9"

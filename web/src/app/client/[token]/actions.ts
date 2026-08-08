@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getTodayDateStr } from "@/lib/date-utils";
-import { TIMEZONE_LIST, LANGUAGE_LABELS, roundTimeToQuarter } from "@/lib/clients";
+import { TIMEZONE_LIST, LANGUAGE_LABELS, isQuarterTime } from "@/lib/clients";
 // import { type PhotoType } from "@/types/supabase"; // DISABLED: photo storage removed
 
 type ExerciseLog = {
@@ -403,14 +403,14 @@ export async function updateClientSettings(
     }
 
     if (data.morning_time !== null && data.morning_time !== "") {
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.morning_time)) {
-        return { error: "Некорректное время утреннего напоминания" };
+      if (!isQuarterTime(data.morning_time)) {
+        return { error: "Время утреннего напоминания должно быть с шагом 15 минут (00, 15, 30, 45)" };
       }
     }
 
     if (data.measurement_time !== null && data.measurement_time !== "") {
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.measurement_time)) {
-        return { error: "Некорректное время напоминания замеров" };
+      if (!isQuarterTime(data.measurement_time)) {
+        return { error: "Время напоминания замеров должно быть с шагом 15 минут (00, 15, 30, 45)" };
       }
     }
 
@@ -427,8 +427,8 @@ export async function updateClientSettings(
     }
 
     if (data.checkin_time !== null && data.checkin_time !== "") {
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.checkin_time)) {
-        return { error: "Некорректное время чек-ина" };
+      if (!isQuarterTime(data.checkin_time)) {
+        return { error: "Время чек-ина должно быть с шагом 15 минут (00, 15, 30, 45)" };
       }
     }
 
@@ -451,10 +451,10 @@ export async function updateClientSettings(
         language: data.language,
         timezone: data.timezone || null,
         morning_time: data.morning_time || null,
-        measurement_time: data.measurement_time ? roundTimeToQuarter(data.measurement_time) : null,
+        measurement_time: data.measurement_time || null,
         measurement_day: data.measurement_day ?? null,
         checkin_day: data.checkin_day ?? null,
-        checkin_time: data.checkin_time ? roundTimeToQuarter(data.checkin_time) : null,
+        checkin_time: data.checkin_time || null,
         training_days: data.training_days ?? null,
       })
       .eq("id", clientId);

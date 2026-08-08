@@ -706,6 +706,7 @@ export function ClientActions({
               <Input
                 id="edit-morning"
                 type="time"
+                step={900}
                 value={editForm.morning_time}
                 onChange={(e) => setEditForm((f) => ({ ...f, morning_time: e.target.value }))}
               />
@@ -732,6 +733,7 @@ export function ClientActions({
               <Input
                 id="edit-meas-time"
                 type="time"
+                step={900}
                 value={editForm.measurement_time}
                 onChange={(e) => setEditForm((f) => ({ ...f, measurement_time: e.target.value }))}
               />
@@ -758,6 +760,7 @@ export function ClientActions({
               <Input
                 id="edit-checkin-time"
                 type="time"
+                step={900}
                 value={editForm.checkin_time}
                 onChange={(e) => setEditForm((f) => ({ ...f, checkin_time: e.target.value }))}
               />

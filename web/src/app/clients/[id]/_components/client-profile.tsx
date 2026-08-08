@@ -131,14 +131,21 @@ function AccessBadge({
 }
 
 function CheckinScore({ label, value }: { label: string; value: number | null }) {
+  const isStress = label === "Стресс";
   const color =
     value === null
       ? "text-muted-foreground"
-      : value >= 7
-        ? "text-green-600"
-        : value >= 4
-          ? "text-yellow-600"
-          : "text-red-600";
+      : isStress
+        ? value <= 3
+          ? "text-green-600"
+          : value <= 6
+            ? "text-yellow-600"
+            : "text-red-600"
+        : value >= 7
+          ? "text-green-600"
+          : value >= 4
+            ? "text-yellow-600"
+            : "text-red-600";
 
   return (
     <div className="flex items-center justify-between py-0.5 text-sm">

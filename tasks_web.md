@@ -866,7 +866,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **16.12** | Веб-портал | `client/[token]/settings/*` + `actions.ts`: `measurement_day` 1-31, поля `checkin_day`/`checkin_time`, валидация, типы | ✅ |
 | **16.13** | Админка | `clients/[id]/_components/client-actions.tsx` + `actions.ts` + `page.tsx` + `client-profile.tsx`: день замеров 1-31, поля чек-ина в edit-форме и профиле | ✅ |
 | **16.14** | Верификация + gate | bot tsc + vitest (223/223); web tsc + vitest (34/34) + next build; ревью `@code-reviewer` 9.9 ≥9.5; TASKS.md; коммит+push | ✅ |
-| **16.15** | E2E прод | Проверить в проде: дефолты портала/админки, крон в `bot_logs` (`cron:measurement_reminder` месяц, `cron:checkin_reminder`), defer выбранным числом, восстановить дефолты | |
+| **16.15** | E2E прод | Миграция применена (колонки+дефолты ✅). Бэкфилл: единственный активный клиент получил `checkin_day=7/10:00`, `measurement_day=1` ✅. Vercel: новый код развёрнут (поля чек-ина в HTML портала ✅). GitHub-статус: Railway-failure pre-existing (бот жив на Render, `/health` 200). Естес. срабатывание кронов заблокировано guards (check-in 06.08 в 7-дн окне → авто-чек-ин ~13.08; замеры 04–06.08 → след. 01.09). **Ожидает юзера**: подтвердить деплой 2c37b71 в Render Dashboard + defer-флоу в Telegram (шаги ниже) | 🚧 |
 
 ### Файлы для создания/изменения
 

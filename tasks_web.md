@@ -866,7 +866,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **16.12** | Веб-портал | `client/[token]/settings/*` + `actions.ts`: `measurement_day` 1-31, поля `checkin_day`/`checkin_time`, валидация, типы | ✅ |
 | **16.13** | Админка | `clients/[id]/_components/client-actions.tsx` + `actions.ts` + `page.tsx` + `client-profile.tsx`: день замеров 1-31, поля чек-ина в edit-форме и профиле | ✅ |
 | **16.14** | Верификация + gate | bot tsc + vitest (223/223); web tsc + vitest (34/34) + next build; ревью `@code-reviewer` 9.9 ≥9.5; TASKS.md; коммит+push | ✅ |
-| **16.15** | E2E прод | Миграция применена (колонки+дефолты ✅). Бэкфилл: единственный активный клиент получил `checkin_day=7/10:00`, `measurement_day=1` ✅. Vercel: новый код развёрнут (поля чек-ина в HTML портала ✅). GitHub-статус: Railway-failure pre-existing (бот жив на Render, `/health` 200). Естес. срабатывание кронов заблокировано guards (check-in 06.08 в 7-дн окне → авто-чек-ин ~13.08; замеры 04–06.08 → след. 01.09). **Ожидает юзера**: подтвердить деплой 2c37b71 в Render Dashboard + defer-флоу в Telegram (шаги ниже) | 🚧 |
+| **16.15** | E2E прод | Миграция применена (колонки+дефолты ✅). Бэкфилл: единственный активный клиент получил `checkin_day=7/10:00`, `measurement_day=1` ✅. Vercel: новый код развёрнут (поля чек-ина в HTML портала ✅). GitHub-статус: Railway-failure pre-existing (бот жив на Render, `/health` 200). Естес. срабатывание кронов заблокировано guards (check-in 06.08 в 7-дн окне → авто-чек-ин ~13.08; замеры 04–06.08 → след. 01.09). E2E-тест юзером: временно удалены данные клиента, крон `cron:measurement_reminder`/`cron:checkin_reminder` отправили напоминания ✅, defer-флоу в Telegram (перенос на 09.08) подтверждён в БД `measurement_defer_date=2026-08-09` ✅ | ✅ |
 
 ### Файлы для создания/изменения
 
@@ -891,3 +891,67 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (MEASUREMENT_DAY_LABELS 1-31, чек-ин) |
 | `web/src/app/clients/[id]/actions.ts` | Изменение (валидация 1-31 + чек-ин) |
 | `web/src/app/clients/[id]/page.tsx` | Изменение (select checkin_*) |
+
+## Фаза 17: Перенос тренировки на другой день недели
+
+### Контекст
+
+Кнопка «Перенести» в вечернем опросе («Тренировка сегодня была?») сейчас только
+пишет маркер `[EVENING_POSTPONE]` в `workout_logs` и отвечает «перенесём на
+следующий день» — **тренировка никуда не переносится**, следующий день по
+расписанию остаётся без изменений, пропущенная тренировка просто теряется.
+
+Цель — реальный перенос в пределах **текущей недели**:
+- Клиент жмёт «Перенести» → видит дни недели (вт–вс до конца недели),
+  занятые дни помечены, перенос возможен только на свободный день.
+- Отдельная опция «Изменить всё расписание недели» — перевыбор всех
+  тренировочных дней недели заново (мультивыбор пн–вс).
+- В день, с которого тренировка перенесена, тренировка не показывается
+  (и вечерний опрос не приходит).
+- Перенос на следующую неделю не имеет смысла (там уже другой микроцикл).
+
+### Осознанные решения
+
+| Решение | Выбор |
+|---------|-------|
+| Хранение | Колонка `program_schedule.training_days INTEGER[] NULL` — оверрайд списка дней **только для недели**; `NULL` = глобальные `clients.training_days` |
+| Перенос пн→вт | Изменение списка недели `[1,3,5] → [2,3,5]`; `day_order` дня плана определяется позицией в эффективном списке (`matchDayForToday` уже так работает) |
+| Занятость дней | Обычные `training_days` недели + дни, куда уже сделаны переносы (в списке недели) |
+| Ограничение | Только дни **после сегодня и до `end_date`** текущей недели |
+| Опция «Изменить расписание недели» | Перевыбор всех дней заново (тоглы пн–вс, кол-во = число тренировок недели); переиспользуем редактор из `training-days.ts`, но пишем в `program_schedule.training_days` |
+| Вечерний опрос в перенесённый день | Не отправляется автоматически: `getTodayWorkout` по новой маске не найдёт тренировку в этот день |
+| Авто-показ в новом дне | Утреннее напоминание/`/today`/`/my-program` подхватывают перенесённую тренировку автоматически через `getTodayWorkout` |
+| Веб-портал | `web/src/app/client/[token]/workout/page.tsx` и `client/[token]/page.tsx` (adherence) получают недельный оверрайд, чтобы показывать ту же картину |
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **17.1** | Миграция БД | `supabase/migrations/20260808xxxxxx_add_week_training_days.sql`: `ALTER TABLE program_schedule ADD COLUMN training_days INTEGER[] NULL` | ⬜ |
+| **17.2** | Типы бота | `bot/src/lib/types.ts`: `training_days` в `ProgramScheduleRow/Insert/Update` (клиенты, схема program_schedule) | ⬜ |
+| **17.3** | Типы веба | `web/src/types/supabase.ts`: `training_days` в `program_schedule.Row/Insert/Update` | ⬜ |
+| **17.4** | Бот: эффективная маска недели | `bot/src/lib/workout-utils.ts`: `getEffectiveTrainingDays(client, weekRow)` → `weekRow.training_days ?? client.training_days`; использование в `getTodayWorkout` (селект `training_days` из строки недели) | ⬜ |
+| **17.5** | Бот: флоу переноса | `evening-poll.ts` + `handlers/callbacks.ts` + state machine: «Перенести» → список дней вт–Вс (занятые помечены, alert при нажатии) → колбэк выбора → update `program_schedule.training_days` | ⬜ |
+| **17.6** | Бот: перевыбор недели | Опция «📅 Изменить всё расписание недели» → мультитора (как `training-days.ts` sched_toggle) → сохранение в неделю | ⬜ |
+| **17.7** | Бот: i18n | `i18n/index.ts` ru/en: заголовок выбора дня, «занято», подтверждение, панель изменения расписания, отмена | ⬜ |
+| **17.8** | Веб-портал | `client/[token]/workout/page.tsx` + `client/[token]/page.tsx`: учитывать недельный оверрайд (запрос `program_schedule` текущей недели `training_days`) | ⬜ |
+| **17.9** | Тесты | Бот: unit `effectiveTrainingDays`/`matchDayForToday` с оверрайдом, перенос в неделе; Web: adherence с оверрайдом недели | ⬜ |
+| **17.10** | Верификация + gate | bot tsc + vitest; web tsc + vitest + next build; ревью `@code-reviewer` ≥9.5; коммит+push | ⬜ |
+| **17.11** | E2E прод | Миграция `db push`; тест на проде: перенос тренировки в Telegram, проверка расписания недели, вечерний опрос в старый день не приходит | ⬜ |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/…_add_week_training_days.sql` | Новый |
+| `bot/src/lib/types.ts` | Изменение (program_schedule.training_days) |
+| `bot/src/lib/workout-utils.ts` + `.test.ts` | Изменение (getEffectiveTrainingDays, use in getTodayWorkout) |
+| `bot/src/handlers/evening-poll.ts` | Изменение (флоу переноса вместо ответа-заглушки) |
+| `bot/src/handlers/callbacks.ts` | Изменение (колбэки переноса + перевыбора) |
+| `bot/src/handlers/training-days.ts` | Изменение (переиспользование редактора для недели) |
+| `bot/src/i18n/index.ts` | Изменение (ru/en) |
+| `bot/src/state/machine.ts` | Изменение (при необходимости новые шаги флоу) |
+| `web/src/types/supabase.ts` | Изменение (program_schedule) |
+| `web/src/app/client/[token]/workout/page.tsx` | Изменение (недельная маска) |
+| `web/src/app/client/[token]/page.tsx` | Изменение (adherence с недельной маской) |
+| `web/src/lib/adherence.ts` (при необходимости) | Изменение (недельный оверрайд) |

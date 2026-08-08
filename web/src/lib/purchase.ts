@@ -42,7 +42,7 @@ export function buildPurchaseCoachMessage({
   formatContact: (value: string) => string;
   formatPrice: (price: number) => string;
 }): string {
-  const priceLine = price && price > 0 ? `\nЦена: ${formatPrice(price)}` : "";
+  const priceLine = price != null && price > 0 ? `\nЦена: ${formatPrice(price)}` : "";
   const tgLine = telegramId !== null && telegramId !== undefined
     ? `\nTG ID: ${telegramId}`
     : "";

@@ -102,4 +102,9 @@ describe("buildPurchaseCoachMessage", () => {
     const msg = buildPurchaseCoachMessage({ ...base, telegramId: null });
     expect(msg).not.toContain("TG ID:");
   });
+
+  it("shows tg id line when id is 0", () => {
+    const msg = buildPurchaseCoachMessage({ ...base, telegramId: 0 });
+    expect(msg).toContain("TG ID: 0");
+  });
 });

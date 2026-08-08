@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CLIENT_STATUS_LABELS, type ClientRow } from "@/lib/clients";
 import { ConsentScreen } from "./_components/consent-screen";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 
 async function getClientData(clientId: string): Promise<(ClientRow & { program_title: string | null }) | null> {
   const { data: client, error } = await supabaseAdmin
@@ -40,8 +41,6 @@ const NAV_ITEMS = [
   { href: "/checkin", label: "Чек-ин" },
   { href: "/settings", label: "Настройки" },
 ] as const;
-
-const PRIVACY_POLICY_VERSION = "2026-07-16";
 
 export default async function ClientPortalLayout({
   children,

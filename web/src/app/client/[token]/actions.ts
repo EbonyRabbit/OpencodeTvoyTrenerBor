@@ -467,7 +467,7 @@ export async function updateClientSettings(
   }
 }
 
-const PRIVACY_POLICY_VERSION = "2026-07-16";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 
 export async function acceptConsent(): Promise<{ error?: string }> {
   try {

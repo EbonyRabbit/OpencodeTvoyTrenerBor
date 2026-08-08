@@ -3,31 +3,13 @@ import {
   findClientByTelegramId,
   findClientByConnectCode,
   connectClientToTelegram,
-  type Client,
 } from "../lib/clients.js";
-import { t, applyClientLanguage, type Language } from "../i18n/index.js";
+import { t, applyClientLanguage } from "../i18n/index.js";
 import { InlineKeyboard } from "grammy";
-import { startTrainingDaysSetup } from "./training-days.js";
+import { runAfterConnect } from "./connect-flow.js";
+import { sendConsentPrompt } from "./consent.js";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
-
-function buildConnectedMessage(client: Client, lang: Language): string {
-  const lines = [t("greeting.hello", lang, { name: client.name ?? t("greeting.default_name", lang) })];
-
-  if (!client.program_id) {
-    lines.push(t("client.no_program", lang));
-  } else {
-    lines.push(t("menu.title", lang));
-    lines.push(t("menu.today", lang));
-    lines.push(t("menu.myprogram", lang));
-  }
-
-  return lines.join("\n");
-}
-
-function needsScheduleSetup(client: Client): boolean {
-  return !!client.program_id && (client.training_days ?? []).length === 0;
-}
 
 export async function startHandler(ctx: MyContext): Promise<void> {
   const telegramId = ctx.from?.id;
@@ -65,13 +47,9 @@ export async function startHandler(ctx: MyContext): Promise<void> {
       ctx.client = client;
 
       if (!client.client_consent_given) {
-        const { sendConsentPrompt } = await import("./consent.js");
         await sendConsentPrompt(ctx);
       } else {
-        await ctx.reply(buildConnectedMessage(client, ctx.language));
-        if (needsScheduleSetup(client)) {
-          await startTrainingDaysSetup(ctx);
-        }
+        await runAfterConnect(ctx);
       }
     } catch (err) {
       console.error(`[START] Connect error for ${telegramId}:`, err);
@@ -98,13 +76,9 @@ export async function startHandler(ctx: MyContext): Promise<void> {
       ctx.client = client;
 
       if (!client.client_consent_given) {
-        const { sendConsentPrompt } = await import("./consent.js");
         await sendConsentPrompt(ctx);
       } else {
-        await ctx.reply(buildConnectedMessage(client, ctx.language));
-        if (needsScheduleSetup(client)) {
-          await startTrainingDaysSetup(ctx);
-        }
+        await runAfterConnect(ctx);
       }
       return;
     }

@@ -53,6 +53,31 @@ describe("progress menu i18n", () => {
   });
 });
 
+describe("consent i18n", () => {
+  it("has Russian consent translations", () => {
+    expect(t("client.consent_title", "ru")).toContain("Согласие");
+    expect(t("client.consent_text", "ru", { privacyUrl: "https://x/privacy" })).toContain("https://x/privacy");
+    expect(t("client.consent_text", "ru", { privacyUrl: "https://x/privacy" })).not.toContain("{{privacyUrl}}");
+    expect(t("client.consent_accept", "ru")).toBe("✅ Принимаю согласие");
+    expect(t("client.consent_accepted", "ru")).toContain("Согласие принято");
+    expect(t("client.consent_required", "ru")).toContain("кнопку");
+  });
+
+  it("has English consent translations with the privacy link", () => {
+    expect(t("client.consent_title", "en")).toBe("📋 Consent to data processing");
+    expect(t("client.consent_text", "en", { privacyUrl: "https://x/privacy" })).toContain("https://x/privacy");
+    expect(t("client.consent_text", "en", { privacyUrl: "https://x/privacy" })).not.toContain("{{privacyUrl}}");
+    expect(t("client.consent_accept", "en")).toBe("✅ I accept");
+    expect(t("client.consent_accepted", "en")).toContain("Consent accepted");
+    expect(t("client.consent_required", "en")).toContain("button");
+  });
+
+  it("does not leak raw placeholders in consent_text", () => {
+    expect(t("client.consent_text", "ru", { privacyUrl: "https://x/privacy" })).not.toContain("{{");
+    expect(t("client.consent_text", "en", { privacyUrl: "https://x/privacy" })).not.toContain("{{");
+  });
+});
+
 describe("applyClientLanguage", () => {
   it("sets language to 'ru' for Russian client", () => {
     const ctx = { language: "en" as const };

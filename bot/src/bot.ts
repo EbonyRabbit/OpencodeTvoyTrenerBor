@@ -18,6 +18,7 @@ import { myWebHandler } from "./handlers/my-web.js";
 import { settingsHandler, handleSettingsCallback } from "./handlers/settings.js";
 import { scheduleHandler } from "./handlers/training-days.js";
 import { progressHandler } from "./handlers/progress.js";
+import { handleConsentAccept } from "./handlers/consent.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
@@ -201,6 +202,10 @@ bot.on("callback_query:data", async (ctx, next) => {
   if (data === "programs_open") {
     ctx.answerCallbackQuery().catch(() => {});
     await programsHandler(ctx);
+    return;
+  }
+  if (data === "consent_accept") {
+    await handleConsentAccept(ctx);
     return;
   }
   if (data?.startsWith("settings_")) {

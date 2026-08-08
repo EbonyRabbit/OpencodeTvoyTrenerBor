@@ -28,10 +28,10 @@ export default async function BuyPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tg?: string | string[] }>;
+  searchParams: Promise<{ tg?: string | string[]; u?: string | string[] }>;
 }) {
   const { id } = await params;
-  const { tg } = await searchParams;
+  const { tg, u } = await searchParams;
 
   if (!UUID_REGEX.test(id)) {
     notFound();
@@ -54,12 +54,19 @@ export default async function BuyPage({
 
   const tgRaw = typeof tg === "string" ? tg.trim() : "";
   const telegramId = /^\d{5,15}$/.test(tgRaw) ? Number(tgRaw) : null;
-  const initialContact = telegramId !== null ? String(telegramId) : "";
+  const uRaw = typeof u === "string" ? u.trim() : "";
+  const telegramUsername = /^[A-Za-z0-9_]{3,32}$/.test(uRaw) ? uRaw : null;
+  const initialContact = telegramUsername ?? (telegramId !== null ? String(telegramId) : "");
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-4 py-10">
-        <BuyForm program={program} initialContact={initialContact} telegramId={telegramId} />
+        <BuyForm
+          program={program}
+          initialContact={initialContact}
+          telegramId={telegramId}
+          telegramUsername={telegramUsername}
+        />
       </main>
     </div>
   );

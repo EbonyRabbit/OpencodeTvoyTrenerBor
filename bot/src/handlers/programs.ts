@@ -89,6 +89,7 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
     const lines: string[] = [t("programs.title", lang), ""];
     const keyboard = new InlineKeyboard();
     const buyerTelegramId = ctx.from.id;
+    const buyerUsername = ctx.from.username ?? null;
 
     programs.forEach((program, i) => {
       lines.push(formatProgram(i + 1, program, lang));
@@ -97,10 +98,13 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
         `${t("programs.request_button", lang)} — ${program.title}`,
       );
       if (config.paymentBaseUrl) {
-        const buyLabel = truncateButtonLabel(
-          `${t("programs.buy_button", lang)} — ${program.title}`,
-        );
-        const buyUrl = `${config.paymentBaseUrl}/buy/${program.id}?tg=${buyerTelegramId}`;
+const buyLabel = truncateButtonLabel(
+        `${t("programs.buy_button", lang)} — ${program.title}`,
+      );
+      const usernameParam = buyerUsername
+        ? `&u=${encodeURIComponent(buyerUsername)}`
+        : "";
+      const buyUrl = `${config.paymentBaseUrl}/buy/${program.id}?tg=${buyerTelegramId}${usernameParam}`;
         keyboard.row()
           .url(buyLabel, buyUrl)
           .text(requestLabel, `program_request:${program.id}`);
@@ -162,12 +166,13 @@ export async function handleProgramRequestCallback(ctx: MyContext, programId: st
         `👤 ${clientName}`,
         ctx.from.username
           ? `🔗 @${ctx.from.username} (${tgLink})`
-          : `🆔 TG ID: ${ctx.from.id}`,
+          : null,
+        `🆔 TG ID: ${ctx.from.id}`,
         "",
         `Хочет: ${programTitle}`,
         "",
         "Свяжитесь с клиентом в Telegram.",
-      ].join("\n");
+      ].filter(Boolean).join("\n");
       try {
         await bot.api.sendMessage(String(coachChatId), coachMsg);
       } catch (sendErr) {

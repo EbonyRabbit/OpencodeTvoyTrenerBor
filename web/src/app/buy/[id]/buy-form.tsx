@@ -20,10 +20,12 @@ export function BuyForm({
   program,
   initialContact,
   telegramId,
+  telegramUsername,
 }: {
   program: BuyProgram;
   initialContact: string;
   telegramId: number | null;
+  telegramUsername: string | null;
 }) {
   const [name, setName] = useState("");
   const [contact, setContact] = useState(initialContact);
@@ -42,6 +44,7 @@ export function BuyForm({
         name,
         contact,
         telegramId: telegramId !== null ? String(telegramId) : null,
+        telegramUsername,
       });
       if (result.error && result.error !== DEDUP_ERROR_MESSAGE) {
         setError(result.error);

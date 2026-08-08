@@ -48,6 +48,7 @@ export type PurchaseRequestInput = {
   name: string;
   contact: string;
   telegramId?: string | null;
+  telegramUsername?: string | null;
 };
 
 export async function createPurchaseRequest(
@@ -84,6 +85,8 @@ export async function createPurchaseRequest(
 
     const tgRaw = input.telegramId?.trim() ?? "";
     const telegramId = /^\d{5,15}$/.test(tgRaw) ? Number(tgRaw) : null;
+    const usernameRaw = input.telegramUsername?.trim() ?? "";
+    const telegramUsername = /^[A-Za-z0-9_]{3,32}$/.test(usernameRaw) ? usernameRaw : null;
 
     const now = Date.now();
     dedupKey = `${ip}:${programId}:${contact}`;
@@ -137,6 +140,7 @@ export async function createPurchaseRequest(
       program_title: program.title,
       name,
       contact,
+      telegram_username: telegramUsername ?? null,
     });
 
     const { error: logError } = await supabaseAdmin.from("bot_logs").insert({
@@ -170,10 +174,13 @@ export async function createPurchaseRequest(
         ? `\nЦена: ${formatPrice(program.price)}`
         : "";
       const tgLine = telegramId ? `\nTG ID: ${telegramId}` : "";
+      const nickLine = telegramUsername
+        ? `\n🔗 @${telegramUsername} (https://t.me/${telegramUsername})`
+        : "";
 
       const sent = await sendTelegramMessage(
         coachChatId,
-        `🛒 Заявка на покупку\n\nПрограмма: ${program.title}${priceLine}\nДлительность: ${program.duration_weeks} нед.\n\n👤 Имя: ${name}\n📱 Контакт: ${formatContact(contact)}${tgLine}\n\nПодтвердите оплату в панели управления.`,
+        `🛒 Заявка на покупку\n\nПрограмма: ${program.title}${priceLine}\nДлительность: ${program.duration_weeks} нед.\n\n👤 Имя: ${name}\n📱 Контакт: ${formatContact(contact)}${nickLine}${tgLine}\n\nПодтвердите оплату в панели управления.`,
       );
       if (!sent) {
         console.error("[PURCHASE] Coach notification failed");

@@ -15,7 +15,7 @@ export function parseBuyParams(tgRaw: string, uRaw: string): {
 }
 
 export function parseTelegramId(raw: string): number | null {
-  const trimmed = (raw ?? "").trim();
+  const trimmed = String(raw ?? "").trim();
   if (trimmed === "") return null;
   if (!TELEGRAM_ID_REGEX.test(trimmed)) return null;
   return Number(trimmed);
@@ -43,7 +43,9 @@ export function buildPurchaseCoachMessage({
   formatPrice: (price: number) => string;
 }): string {
   const priceLine = price && price > 0 ? `\nЦена: ${formatPrice(price)}` : "";
-  const tgLine = telegramId ? `\nTG ID: ${telegramId}` : "";
+  const tgLine = telegramId !== null && telegramId !== undefined
+    ? `\nTG ID: ${telegramId}`
+    : "";
   const contactIsSameUser =
     telegramUsername != null &&
     contact.replace(/^@/, "").toLowerCase() === telegramUsername.toLowerCase();

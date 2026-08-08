@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { UUID_REGEX } from "@/lib/validation";
+import { parseBuyParams } from "@/lib/purchase";
 import { BuyForm, type BuyProgram } from "./buy-form";
 
 export async function generateMetadata({
@@ -52,11 +53,11 @@ export default async function BuyPage({
     notFound();
   }
 
-  const tgRaw = typeof tg === "string" ? tg.trim() : "";
-  const telegramId = /^\d{5,15}$/.test(tgRaw) ? Number(tgRaw) : null;
-  const uRaw = typeof u === "string" ? u.trim() : "";
-  const telegramUsername = /^[A-Za-z0-9_]{3,32}$/.test(uRaw) ? uRaw : null;
-  const initialContact = telegramUsername ?? "";
+  const buyParams = parseBuyParams(
+    typeof tg === "string" ? tg : "",
+    typeof u === "string" ? u : "",
+  );
+  const initialContact = buyParams.telegramUsername ?? "";
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
@@ -64,8 +65,8 @@ export default async function BuyPage({
         <BuyForm
           program={program}
           initialContact={initialContact}
-          telegramId={telegramId}
-          telegramUsername={telegramUsername}
+          telegramId={buyParams.telegramId}
+          telegramUsername={buyParams.telegramUsername}
         />
       </main>
     </div>

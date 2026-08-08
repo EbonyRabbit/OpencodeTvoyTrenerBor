@@ -42,4 +42,43 @@ describe("buildProgramRequestCoachMessage", () => {
     expect(msg).toContain("🆔 TG ID: 123456789");
     expect(msg).not.toContain("@");
   });
+
+  it("keeps blank separator lines (no collapsed message)", () => {
+    const msg = buildProgramRequestCoachMessage({
+      clientName: "Иван",
+      telegramId: 123456789,
+      username: null,
+      programTitle: "Сушка",
+    });
+    expect(msg).toBe(
+      "📩 Запрос от клиента\n" +
+        "\n" +
+        "👤 Иван\n" +
+        "🆔 TG ID: 123456789\n" +
+        "\n" +
+        "Хочет: Сушка\n" +
+        "\n" +
+        "Свяжитесь с клиентом в Telegram.",
+    );
+  });
+
+  it("builds exact message with username link", () => {
+    const msg = buildProgramRequestCoachMessage({
+      clientName: "Иван",
+      telegramId: 123456789,
+      username: "iurii",
+      programTitle: "Сушка",
+    });
+    expect(msg).toBe(
+      "📩 Запрос от клиента\n" +
+        "\n" +
+        "👤 Иван\n" +
+        "🔗 @iurii (https://t.me/iurii)\n" +
+        "🆔 TG ID: 123456789\n" +
+        "\n" +
+        "Хочет: Сушка\n" +
+        "\n" +
+        "Свяжитесь с клиентом в Telegram.",
+    );
+  });
 });

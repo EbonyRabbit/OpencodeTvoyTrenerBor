@@ -4,6 +4,7 @@ import {
   parseBuyParams,
   buildPurchaseCoachMessage,
 } from "./purchase";
+import { formatPrice as realFormatPrice } from "./format-price";
 
 const fc = (v: string) => (/^\+?\d/.test(v) ? v : `@${v}`);
 const fp = (p: number) => `${p} ₽`;
@@ -80,6 +81,16 @@ describe("buildPurchaseCoachMessage", () => {
     });
     expect(msg).toContain("📱 Контакт: +79161234567");
     expect(msg).toContain("🔗 @iurii (https://t.me/iurii)");
+  });
+
+  it("formats price with real ru-RU formatter (NBSP grouping)", () => {
+    const msg = buildPurchaseCoachMessage({
+      ...base,
+      price: 15000,
+      telegramId: null,
+      formatPrice: realFormatPrice,
+    });
+    expect(msg).toContain(`Цена: 15\u00A0000`);
   });
 
   it("omits price line when price is null", () => {

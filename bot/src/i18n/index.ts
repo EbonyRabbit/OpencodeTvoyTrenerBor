@@ -24,6 +24,11 @@ const resources = {
         no_program: "Программа ещё не назначена.\nОжидайте — тренер скоро свяжется с вами.",
         program_not_found: "Программа не найдена в системе.\nСвяжитесь с тренером для уточнения.",
         purchased: "Оплачено: {{title}}",
+        consent_title: "📋 Согласие на обработку данных",
+        consent_text: "Для использования сервиса необходимо согласие на обработку персональных данных (152-ФЗ).\n\nМы собираем: параметры тела, фото прогресса, данные о тренировках и самочувствии.\n\nПолитика конфиденциальности: твой-тренер.ру/privacy",
+        consent_accept: "✅ Принимаю согласие",
+        consent_accepted: "Спасибо! Согласие принято.",
+        consent_required: "Чтобы продолжить, нажмите кнопку ниже:",
       },
       menu: {
         title: "Доступные команды:",
@@ -448,6 +453,11 @@ const resources = {
         no_program: "Program not yet assigned.\nPlease wait — your coach will contact you soon.",
         program_not_found: "Program not found in the system.\nPlease contact your coach for details.",
         purchased: "Purchased: {{title}}",
+        consent_title: "📋 Consent to data processing",
+        consent_text: "To use the service you need to consent to the processing of personal data.\n\nWe collect: body measurements, progress photos, workout and wellbeing data.",
+        consent_accept: "✅ I accept",
+        consent_accepted: "Thank you! Consent accepted.",
+        consent_required: "To continue, tap the button below:",
       },
       menu: {
         title: "Available commands:",

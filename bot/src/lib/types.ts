@@ -42,6 +42,11 @@ export interface Database {
           legacy_id: string | null;
           purchase_date: string | null;
           purchased_program_id: string | null;
+          client_consent_given: boolean;
+          client_consent_given_at: string | null;
+          client_consent_ip: string | null;
+          client_consent_user_agent: string | null;
+          client_consent_version: string | null;
           created_at: string;
           updated_at: string;
         };

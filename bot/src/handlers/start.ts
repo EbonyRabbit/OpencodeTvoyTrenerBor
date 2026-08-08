@@ -63,9 +63,15 @@ export async function startHandler(ctx: MyContext): Promise<void> {
       applyClientLanguage(ctx, client.language);
       await connectClientToTelegram(client.id, telegramId);
       ctx.client = client;
-      await ctx.reply(buildConnectedMessage(client, ctx.language));
-      if (needsScheduleSetup(client)) {
-        await startTrainingDaysSetup(ctx);
+
+      if (!client.client_consent_given) {
+        const { sendConsentPrompt } = await import("./consent.js");
+        await sendConsentPrompt(ctx);
+      } else {
+        await ctx.reply(buildConnectedMessage(client, ctx.language));
+        if (needsScheduleSetup(client)) {
+          await startTrainingDaysSetup(ctx);
+        }
       }
     } catch (err) {
       console.error(`[START] Connect error for ${telegramId}:`, err);
@@ -90,9 +96,15 @@ export async function startHandler(ctx: MyContext): Promise<void> {
 
     if (client.status === "active" && client.payment_status === "paid") {
       ctx.client = client;
-      await ctx.reply(buildConnectedMessage(client, ctx.language));
-      if (needsScheduleSetup(client)) {
-        await startTrainingDaysSetup(ctx);
+
+      if (!client.client_consent_given) {
+        const { sendConsentPrompt } = await import("./consent.js");
+        await sendConsentPrompt(ctx);
+      } else {
+        await ctx.reply(buildConnectedMessage(client, ctx.language));
+        if (needsScheduleSetup(client)) {
+          await startTrainingDaysSetup(ctx);
+        }
       }
       return;
     }

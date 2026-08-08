@@ -29,6 +29,7 @@ export function BuyForm({
 }) {
   const [name, setName] = useState("");
   const [contact, setContact] = useState(initialContact);
+  const [tgId, setTgId] = useState(telegramId !== null ? String(telegramId) : "");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +44,7 @@ export function BuyForm({
         programId: program.id,
         name,
         contact,
-        telegramId: telegramId !== null ? String(telegramId) : null,
+        telegramId: tgId.trim() !== "" ? tgId.trim() : null,
         telegramUsername,
       });
       if (result.error && result.error !== DEDUP_ERROR_MESSAGE) {
@@ -129,6 +130,24 @@ export function BuyForm({
             />
             <p className="text-xs text-muted-foreground">
               Напишите @username или номер телефона — тренер свяжется с вами.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="buy-tgid" className="text-xs text-muted-foreground">
+              Telegram ID (для карточки клиента)
+            </label>
+            <Input
+              id="buy-tgid"
+              value={tgId}
+              onChange={(e) => setTgId(e.target.value)}
+              placeholder="123456789"
+              maxLength={15}
+              inputMode="numeric"
+              className="h-10"
+            />
+            <p className="text-xs text-muted-foreground">
+              Заполняется автоматически при переходе из бота. Можно узнать через @userinfobot.
             </p>
           </div>
 

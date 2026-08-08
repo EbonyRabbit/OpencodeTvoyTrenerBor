@@ -56,7 +56,7 @@ export default async function BuyPage({
   const telegramId = /^\d{5,15}$/.test(tgRaw) ? Number(tgRaw) : null;
   const uRaw = typeof u === "string" ? u.trim() : "";
   const telegramUsername = /^[A-Za-z0-9_]{3,32}$/.test(uRaw) ? uRaw : null;
-  const initialContact = telegramUsername ?? (telegramId !== null ? String(telegramId) : "");
+  const initialContact = telegramUsername ?? "";
 
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">

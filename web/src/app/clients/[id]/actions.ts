@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifySession } from "@/lib/dal";
 import { generateSchedule } from "@/lib/plan-adjustment";
 import type { Database, PaymentStatus } from "@/types/supabase";
-import { TIMEZONE_LIST, LANGUAGE_LABELS } from "@/lib/clients";
+import { TIMEZONE_LIST, LANGUAGE_LABELS, roundTimeToQuarter } from "@/lib/clients";
 import { sendTelegramMessage } from "@/lib/telegram";
 import type { ActivityEvent } from "./activity-types";
 import { ACTIVITY_PAGE_SIZE } from "./activity-types";
@@ -425,6 +425,8 @@ export async function updateClient(
     morning_time?: string | null;
     measurement_time?: string | null;
     measurement_day?: number | null;
+    checkin_day?: number | null;
+    checkin_time?: string | null;
     training_days?: number[] | null;
   },
 ): Promise<{ error?: string }> {
@@ -477,7 +479,7 @@ export async function updateClient(
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.measurement_time)) {
           return { error: "Некорректное время напоминания замеров" };
         }
-        update.measurement_time = data.measurement_time;
+        update.measurement_time = roundTimeToQuarter(data.measurement_time);
       } else {
         update.measurement_time = null;
       }
@@ -485,12 +487,34 @@ export async function updateClient(
 
     if (data.measurement_day !== undefined) {
       if (data.measurement_day !== null) {
-        if (!Number.isInteger(data.measurement_day) || data.measurement_day < 1 || data.measurement_day > 7) {
-          return { error: "День замеров должен быть от 1 до 7" };
+        if (!Number.isInteger(data.measurement_day) || data.measurement_day < 1 || data.measurement_day > 31) {
+          return { error: "День замеров должен быть числом от 1 до 31" };
         }
         update.measurement_day = data.measurement_day;
       } else {
         update.measurement_day = null;
+      }
+    }
+
+    if (data.checkin_day !== undefined) {
+      if (data.checkin_day !== null) {
+        if (!Number.isInteger(data.checkin_day) || data.checkin_day < 1 || data.checkin_day > 7) {
+          return { error: "День чек-ина должен быть от 1 до 7" };
+        }
+        update.checkin_day = data.checkin_day;
+      } else {
+        update.checkin_day = null;
+      }
+    }
+
+    if (data.checkin_time !== undefined) {
+      if (data.checkin_time !== null && data.checkin_time !== "") {
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.checkin_time)) {
+          return { error: "Некорректное время чек-ина" };
+        }
+        update.checkin_time = roundTimeToQuarter(data.checkin_time);
+      } else {
+        update.checkin_time = null;
       }
     }
 

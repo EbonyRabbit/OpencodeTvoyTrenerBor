@@ -816,3 +816,78 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/app/client/[token]/history/page.tsx` | Изменение |
 | `web/src/app/client/[token]/history/history-grid.tsx` | Изменение |
 | `web/src/lib/adherence.ts` + `.test.ts` | Изменение (псевдо-упражнения в плане) |
+
+---
+
+## Фаза 16: Месячные замеры + еженедельный чек-ин
+
+### Контекст
+
+Сейчас напоминание замеров привязано к дню недели (`measurement_day`, ISO 1-7)
+и уходит **каждую неделю**. Чек-ин — только ручной (`/checkin`), авто-напоминаний
+и настроек чек-ина у клиента нет.
+
+Цель:
+- Замеры — **раз в месяц**: напоминание в выбранное **число месяца** (1-31)
+  в заданное время.
+- После напоминания клиент может **перенести замеры на другой день**
+  (дефер по конкретному числу), и клиент сам меняет день/время в настройках.
+- Чек-ин — **еженедельно** по конфигурируемым `checkin_day`/`checkin_time`, флоу
+  стартует сразу (без кнопки «Начать»).
+
+### Осознанные решения
+
+| Решение | Выбор |
+|---------|-------|
+| Семантика `measurement_day` | меняется: ISO-день недели (1-7) → **число месяца** (1-31) |
+| Дефолты миграции | `measurement_day=1`, `measurement_time='08:00'` — всем клиентам с заданным днём; **новым** клиентам так же по умолчанию |
+| Проверка месяца | Напоминание не уходит, если `measurements` уже есть за **текущий месяц** клиента |
+| Defer | Кнопка «⏭ Перенести на другой день» → выбор **числа** (1-31) → `measurement_defer_date` = ближайшее наступление числа (если день прошёл в этому месяце → следующий месяц); после отправки перенесённого напоминания крон чистит поле |
+| Dedup | Месячный: `measurement:{clientId}:YYYY-MM` (TTL ~45 дней) |
+| Чек-ин дефолт | `checkin_day=7` (Вс), `checkin_time='10:00'` всем активным; клиент меняет в настройках |
+| Анти-дубль чек-ина | Пропуск, если чек-ин уже есть за последние 7 дней; dedup `checkin:{clientId}:{неделя}` |
+| Автостарт чек-ина | Крон шлёт первый вопрос и `setState(checkin/wellbeing)` сразу (общий хелпер с `/checkin`) |
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **16.1** | Миграция БД | `20260807000000_add_checkin_and_measurement_defer.sql`: `checkin_day INTEGER`, `checkin_time TIME`, `measurement_defer_date DATE`; обновить дефолты существующих (`measurement_day=1`, `measurement_time='08:00'`; активные `checkin_day=7`, `checkin_time='10:00'`) | ✅ |
+| **16.2** | Типы бота | `bot/src/lib/types.ts`: новые колонки в `clients.Row/Insert/Update` | ✅ |
+| **16.3** | Типы веба | `web/src/types/supabase.ts`: новые колонки в `clients` | ✅ |
+| **16.4** | Константы веба | `web/src/lib/clients.ts`: `MEASUREMENT_DAY_OPTIONS` → 1-31 («1-е»…«31-е»), `CHECKIN_DAY_OPTIONS` (дни недели) | ✅ |
+| **16.5** | Хелпер числа месяца | `bot/src/lib/workout-utils.ts`: `getTodayDayOfMonth(tz)` (i18n-формат day) + unit-тест `workout-utils.test.ts` | ✅ |
+| **16.6** | Бот: месячное напоминание | `cron/measurement-reminder.ts`: срабатывание по числу месяца (или `measurement_defer_date=сегодня`), автоskip при замерах за месяц, daily dedup, tz-aware | ✅ |
+| **16.7** | Бот: кнопка переноса | `cron/measurement-reminder.ts` + `handlers/callbacks.ts`: кнопка «Перенести на другой день», эдитор выбора числа (1-31), колбэки `measurements_defer`/`measurements_defer_set:{n}`, запись `measurement_defer_date`, подтверждение, крон очищает поле после отправки | ✅ |
+| **16.8** | Бот: крон чек-ина | Новый `cron/checkin-reminder.ts` (+ регистр в `scheduler.ts`, guard `*/15 * * * *`): день+время, пропуск при чек-ине за 7 дней, лог `cron:checkin_reminder` | ✅ |
+| **16.9** | Бот: общий старт чек-ина | `handlers/checkin.ts`: вынести хелпер старта (первый вопрос + setState) для `/checkin` и крона | ✅ |
+| **16.10** | Бот: настройки | `handlers/settings.ts`: панель «День замера» (число месяца), «Время замера», «Чек-ин — день», «Чек-ин — время»; эдиторы и `settings_measure_day` (1-31), `settings_checkin_day` (Пн-Вс), `settings_checkin_time`; валидация | ✅ |
+| **16.11** | Бот: i18n | `i18n/index.ts` ru/en: `measure.reminder.monthly`, `measure.defer_button`, `measure.defer_choose`, `measure.deferred`, `settings.checkin_*`, переформулировка `settings.measure_day` | ✅ |
+| **16.12** | Веб-портал | `client/[token]/settings/*` + `actions.ts`: `measurement_day` 1-31, поля `checkin_day`/`checkin_time`, валидация, типы | ✅ |
+| **16.13** | Админка | `clients/[id]/_components/client-actions.tsx` + `actions.ts` + `page.tsx` + `client-profile.tsx`: день замеров 1-31, поля чек-ина в edit-форме и профиле | ✅ |
+| **16.14** | Верификация + gate | bot tsc + vitest (223/223); web tsc + vitest (34/34) + next build; ревью `@code-reviewer` 9.9 ≥9.5; TASKS.md; коммит+push | ✅ |
+| **16.15** | E2E прод | Проверить в проде: дефолты портала/админки, крон в `bot_logs` (`cron:measurement_reminder` месяц, `cron:checkin_reminder`), defer выбранным числом, восстановить дефолты | |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/20260807000000_add_checkin_and_measurement_defer.sql` | Новый |
+| `bot/src/lib/types.ts` | Изменение (clients + checkin/day/time, defer_date) |
+| `bot/src/lib/workout-utils.ts` + `.test.ts` | Изменение (+ `getTodayDayOfMonth`) |
+| `bot/src/cron/measurement-reminder.ts` | Изменение (месяц + defer) |
+| `bot/src/cron/checkin-reminder.ts` | Новый |
+| `bot/src/cron/scheduler.ts` | Изменение (регистрация checkin_reminder) |
+| `bot/src/handlers/checkin.ts` | Изменение (общий хелпер старта) |
+| `bot/src/handlers/settings.ts` | Изменение (сетки/валидации, чек-ин) |
+| `bot/src/handlers/callbacks.ts` | Изменение (defer-колбэки) |
+| `bot/src/i18n/index.ts` | Изменение (ru/en) |
+| `web/src/types/supabase.ts` | Изменение (clients) |
+| `web/src/lib/clients.ts` | Изменение (day-опции) |
+| `web/src/app/client/[token]/settings/settings-form.tsx` | Изменение |
+| `web/src/app/client/[token]/settings/page.tsx` | Изменение (select колонок) |
+| `web/src/app/client/[token]/actions.ts` | Изменение (updateClientSettings) |
+| `web/src/app/clients/[id]/_components/client-actions.tsx` | Изменение |
+| `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (MEASUREMENT_DAY_LABELS 1-31, чек-ин) |
+| `web/src/app/clients/[id]/actions.ts` | Изменение (валидация 1-31 + чек-ин) |
+| `web/src/app/clients/[id]/page.tsx` | Изменение (select checkin_*) |

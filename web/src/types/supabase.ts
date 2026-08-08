@@ -304,6 +304,7 @@ export type Database = {
           language: string
           legacy_id: string | null
           measurement_day: number | null
+          measurement_defer_date: string | null
           measurement_time: string | null
           morning_time: string | null
           name: string
@@ -311,6 +312,8 @@ export type Database = {
           program_id: string | null
           purchase_date: string | null
           purchased_program_id: string | null
+          checkin_day: number | null
+          checkin_time: string | null
           spreadsheet_id: string | null
           status: Database["public"]["Enums"]["client_status"]
           telegram_id: number | null
@@ -334,6 +337,7 @@ export type Database = {
           language?: string
           legacy_id?: string | null
           measurement_day?: number | null
+          measurement_defer_date?: string | null
           measurement_time?: string | null
           morning_time?: string | null
           name: string
@@ -341,6 +345,8 @@ export type Database = {
           program_id?: string | null
           purchase_date?: string | null
           purchased_program_id?: string | null
+          checkin_day?: number | null
+          checkin_time?: string | null
           spreadsheet_id?: string | null
           status?: Database["public"]["Enums"]["client_status"]
           telegram_id?: number | null
@@ -364,6 +370,7 @@ export type Database = {
           language?: string
           legacy_id?: string | null
           measurement_day?: number | null
+          measurement_defer_date?: string | null
           measurement_time?: string | null
           morning_time?: string | null
           name?: string
@@ -371,6 +378,8 @@ export type Database = {
           program_id?: string | null
           purchase_date?: string | null
           purchased_program_id?: string | null
+          checkin_day?: number | null
+          checkin_time?: string | null
           spreadsheet_id?: string | null
           status?: Database["public"]["Enums"]["client_status"]
           telegram_id?: number | null

@@ -109,6 +109,37 @@ export function getTodayISODay(timezone: string): number {
   return dayMap[dayName] ?? 0;
 }
 
+export function parseTimeRounded(timeStr: string): { hour: number; minute: number } | null {
+  if (!timeStr) return null;
+  const parts = timeStr.split(":");
+  if (parts.length < 2) return null;
+  const hour = parseInt(parts[0], 10);
+  const minute = parseInt(parts[1], 10);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  const roundedMinute = Math.round(minute / 15) * 15;
+  if (roundedMinute >= 60) {
+    if (hour === 23) return { hour: 23, minute: 45 };
+    return { hour: hour + 1, minute: 0 };
+  }
+  return { hour, minute: roundedMinute };
+}
+
+const isoDayOfMonthFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+export function getTodayDayOfMonth(timezone: string): number {
+  let formatter = isoDayOfMonthFormatterCache.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      timeZone: timezone,
+    });
+    isoDayOfMonthFormatterCache.set(timezone, formatter);
+  }
+  const day = parseInt(formatter.format(new Date()), 10);
+  return Number.isNaN(day) ? 0 : day;
+}
+
 export function getIsoWeekday(dateStr: string): number {
   const date = new Date(`${dateStr}T12:00:00Z`);
   if (isNaN(date.getTime())) return 0;

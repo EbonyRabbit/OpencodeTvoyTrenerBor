@@ -12,6 +12,7 @@ import { setState, clearState } from "../state/machine.js";
 import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
 import { handleEveningYes, handleEveningNo, handleEveningPostpone } from "./evening-poll.js";
 import { startMeasurements, showMeasurementHistory } from "./measurements.js";
+import { computeNextDayOfMonthDate, DEFERRED_MONTH_TTL_HOURS } from "../cron/measurement-reminder.js";
 import { handleScheduleStart, handleScheduleToggle, handleScheduleDone, handleScheduleCancel } from "./training-days.js";
 import { handleResumeCallback } from "./resume.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
@@ -103,6 +104,54 @@ registerCallback("evening_no", async (ctx) => { await handleEveningNo(ctx); });
 registerCallback("evening_postpone", async (ctx) => { await handleEveningPostpone(ctx); });
 registerCallback("measurements_start", async (ctx) => { await startMeasurements(ctx); });
 registerCallback("measurements_history", async (ctx) => { await showMeasurementHistory(ctx); });
+registerCallback("measurements_defer", async (ctx) => {
+  await ctx.answerCallbackQuery().catch(() => {});
+  const lang = ctx.client?.language === "en" ? "en" : "ru";
+  await ctx.reply(t("measure.defer_choose", lang), {
+    reply_markup: { inline_keyboard: buildDeferDayKeyboard() },
+  });
+});
+registerCallback("measurements_defer_set", async (ctx, params) => {
+  const day = Number(params);
+  if (!ctx.client || !Number.isInteger(day) || day < 1 || day > 31) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    return;
+  }
+  const tz = ctx.client.timezone || DEFAULT_TIMEZONE;
+  let deferDate: string;
+  try {
+    deferDate = computeNextDayOfMonthDate(tz, day);
+  } catch {
+    await ctx.answerCallbackQuery({ text: t("error.connection_error", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("clients")
+    .update({ measurement_defer_date: deferDate, updated_at: new Date().toISOString() })
+    .eq("id", ctx.client.id);
+  if (error) {
+    console.error(`[CALLBACK] measurements_defer_set failed for ${ctx.client.id}:`, error.message);
+    await ctx.answerCallbackQuery({ text: t("error.callback_error", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
+  const clientId = ctx.client.id;
+  // Помечаем месяц переноса заранее: штатное число в этом месяце напоминать не будем,
+  // чтобы избежать двойного напоминания (крон также продублирует эту метку при отправке).
+  const deferMark = await markAsSent(
+    `measurement:deferred:${clientId}:${deferDate.slice(0, 7)}`,
+    DEFERRED_MONTH_TTL_HOURS,
+  );
+  if (deferMark === "error") {
+    console.warn(`[CALLBACK] Failed to mark defer month for ${clientId} (will rely on cron backup)`);
+  }
+
+  const lang = ctx.client.language === "en" ? "en" : "ru";
+  const [y, m, d] = deferDate.split("-").map(Number);
+  const dateLabel = `${d}.${m}.${y}`;
+  await ctx.answerCallbackQuery({ text: t("measure.deferred", lang, { date: dateLabel }), show_alert: true }).catch(() => {});
+});
 // registerCallback("photo_history", async (ctx) => { await ctx.answerCallbackQuery().catch(() => {}); await showPhotoHistory(ctx); }); // DISABLED: photo storage removed
 registerCallback("resume", async (ctx, strategy) => { await handleResumeCallback(ctx, strategy); });
 registerCallback("sched_start", async (ctx) => { await handleScheduleStart(ctx); });
@@ -374,4 +423,17 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
   }
 
   return true;
+}
+
+function buildDeferDayKeyboard(): { text: string; callback_data: string }[][] {
+  const rows: { text: string; callback_data: string }[][] = [];
+  for (let i = 1; i <= 31; i += 6) {
+    rows.push(
+      Array.from({ length: Math.min(6, 31 - i + 1) }, (_, j) => i + j).map((day) => ({
+        text: String(day),
+        callback_data: `measurements_defer_set:${day}`,
+      })),
+    );
+  }
+  return rows;
 }

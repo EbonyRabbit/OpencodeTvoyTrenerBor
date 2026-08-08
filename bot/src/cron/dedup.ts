@@ -40,3 +40,36 @@ export async function cleanupExpired(): Promise<void> {
     console.error("[DEDUP] Cleanup error:", error.code);
   }
 }
+
+export async function deleteDedup(key: string): Promise<void> {
+  if (!key || typeof key !== "string" || key.length > MAX_KEY_LENGTH) return;
+
+  const { error } = await supabaseAdmin
+    .from("bot_dedup")
+    .delete()
+    .eq("key", key);
+
+  if (error) {
+    console.error(`[DEDUP] Delete error for key "${key.slice(0, 30)}…":`, error.code);
+  }
+}
+
+export type ExistsResult = boolean | "error";
+
+export async function isSent(key: string): Promise<ExistsResult> {
+  if (!key || typeof key !== "string" || key.length > MAX_KEY_LENGTH) return false;
+
+  const { data, error } = await supabaseAdmin
+    .from("bot_dedup")
+    .select("key")
+    .eq("key", key)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1);
+
+  if (error) {
+    console.error(`[DEDUP] Exists check error for key "${key.slice(0, 30)}…":`, error.code);
+    return "error";
+  }
+
+  return (data?.length ?? 0) > 0;
+}

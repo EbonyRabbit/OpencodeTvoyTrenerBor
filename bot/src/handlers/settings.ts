@@ -35,6 +35,8 @@ const TIME_HOURS: readonly string[] = Array.from(
 
 const WEEKDAYS_ISO = [1, 2, 3, 4, 5, 6, 7];
 
+const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+
 type Btn = { text: string; callback_data: string };
 
 function clientLang(client: Client): Language {
@@ -46,6 +48,26 @@ function langLabel(lang: Language): string {
 }
 
 function measureDayLabel(iso: number | null, lang: Language): string {
+  if (iso === null || iso < 1 || iso > 31) {
+    return t("settings.value_none", lang);
+  }
+  if (lang === "en") {
+    return `${iso}${ordinalSuffix(iso)}`;
+  }
+  return t(`settings.measure_day_value`, lang, { day: iso });
+}
+
+function ordinalSuffix(day: number): string {
+  if (day % 100 >= 11 && day % 100 <= 13) return "th";
+  switch (day % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
+}
+
+function weekdayLabel(iso: number | null, lang: Language): string {
   if (iso === null || iso < 1 || iso > 7) {
     return t("settings.value_none", lang);
   }
@@ -75,6 +97,12 @@ function panelText(client: Client): string {
     t("settings.measure_time", lang, {
       value: client.measurement_time ?? t("settings.value_none", lang),
     }),
+    t("settings.checkin_day", lang, {
+      value: weekdayLabel(client.checkin_day, lang),
+    }),
+    t("settings.checkin_time", lang, {
+      value: client.checkin_time ?? t("settings.value_none", lang),
+    }),
     "",
     `${t("settings.train_days", lang)}:`,
     formatSchedule(client.training_days, lang),
@@ -92,6 +120,8 @@ function panelKeyboard(client: Client): Btn[][] {
     [{ text: t("settings.morning_time", lang, { value: client.morning_time ?? t("settings.value_none", lang) }), callback_data: "settings_morning" }],
     [{ text: t("settings.measure_day", lang, { value: measureDayLabel(client.measurement_day, lang) }), callback_data: "settings_measure_day" }],
     [{ text: t("settings.measure_time", lang, { value: client.measurement_time ?? t("settings.value_none", lang) }), callback_data: "settings_measure_time" }],
+    [{ text: t("settings.checkin_day", lang, { value: weekdayLabel(client.checkin_day, lang) }), callback_data: "settings_checkin_day" }],
+    [{ text: t("settings.checkin_time", lang, { value: client.checkin_time ?? t("settings.value_none", lang) }), callback_data: "settings_checkin_time" }],
   ];
   const footer: Btn[] = [];
   if (client.program_id) {
@@ -148,15 +178,32 @@ function timeKeyboard(lang: Language, prefix: string): Btn[][] {
 
 function measureDayKeyboard(lang: Language): Btn[][] {
   const rows: Btn[][] = [];
-  for (let i = 0; i < WEEKDAYS_ISO.length; i += 3) {
+  for (let i = 0; i < MONTH_DAYS.length; i += 6) {
     rows.push(
-      WEEKDAYS_ISO.slice(i, i + 3).map((iso) => ({
-        text: weekdayShortLabel(iso, lang),
-        callback_data: `settings_measure_day_set:${iso}`,
+      MONTH_DAYS.slice(i, i + 6).map((day) => ({
+        text: String(day),
+        callback_data: `settings_measure_day_set:${day}`,
       })),
     );
   }
   rows.push([{ text: t("settings.back", lang), callback_data: "settings_back" }]);
+  return rows;
+}
+
+function weekdayKeyboard(lang: Language, prefix: string): Btn[][] {
+  const rows: Btn[][] = [];
+  for (let i = 0; i < WEEKDAYS_ISO.length; i += 3) {
+    rows.push(
+      WEEKDAYS_ISO.slice(i, i + 3).map((iso) => ({
+        text: weekdayShortLabel(iso, lang),
+        callback_data: `${prefix}_set:${iso}`,
+      })),
+    );
+  }
+  rows.push([
+    { text: t("settings.off", lang), callback_data: `${prefix}_off` },
+    { text: t("settings.back", lang), callback_data: "settings_back" },
+  ]);
   return rows;
 }
 
@@ -195,6 +242,8 @@ async function openEditor(ctx: MyContext, which: string): Promise<void> {
     morning: { text: t("settings.edit_morning", lang), keyboard: timeKeyboard(lang, "settings_morning") },
     measure_day: { text: t("settings.edit_measure_day", lang), keyboard: measureDayKeyboard(lang) },
     measure_time: { text: t("settings.edit_measure_time", lang), keyboard: timeKeyboard(lang, "settings_measure_time") },
+    checkin_day: { text: t("settings.edit_checkin_day", lang), keyboard: weekdayKeyboard(lang, "settings_checkin_day") },
+    checkin_time: { text: t("settings.edit_checkin_time", lang), keyboard: timeKeyboard(lang, "settings_checkin_time") },
   };
   const editor = editors[which];
   if (!editor) return;
@@ -204,7 +253,13 @@ async function openEditor(ctx: MyContext, which: string): Promise<void> {
 type SettingsPatch = Partial<
   Pick<
     Client,
-    "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day"
+    | "language"
+    | "timezone"
+    | "morning_time"
+    | "measurement_time"
+    | "measurement_day"
+    | "checkin_day"
+    | "checkin_time"
   >
 >;
 
@@ -259,7 +314,9 @@ export async function handleSettingsCallback(
     data === "settings_tz" ||
     data === "settings_morning" ||
     data === "settings_measure_day" ||
-    data === "settings_measure_time"
+    data === "settings_measure_time" ||
+    data === "settings_checkin_day" ||
+    data === "settings_checkin_time"
   ) {
     await ctx.answerCallbackQuery().catch(() => {});
     await openEditor(ctx, data.slice("settings_".length));
@@ -345,12 +402,42 @@ export async function handleSettingsCallback(
   }
 
   if (data.startsWith("settings_measure_day_set:")) {
-    const iso = Number(data.slice("settings_measure_day_set:".length));
+    const day = Number(data.slice("settings_measure_day_set:".length));
+    if (!Number.isInteger(day) || day < 1 || day > 31) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    await applyPatch(ctx, { measurement_day: day });
+    return;
+  }
+
+  if (data.startsWith("settings_checkin_day_set:")) {
+    const iso = Number(data.slice("settings_checkin_day_set:".length));
     if (!Number.isInteger(iso) || iso < 1 || iso > 7) {
       await ctx.answerCallbackQuery().catch(() => {});
       return;
     }
-    await applyPatch(ctx, { measurement_day: iso });
+    await applyPatch(ctx, { checkin_day: iso });
+    return;
+  }
+
+  if (data.startsWith("settings_checkin_time_set:")) {
+    const tm = data.slice("settings_checkin_time_set:".length);
+    if (!TIME_HOURS.includes(tm)) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    await applyPatch(ctx, { checkin_time: tm });
+    return;
+  }
+
+  if (data === "settings_checkin_time_off") {
+    await applyPatch(ctx, { checkin_time: null });
+    return;
+  }
+
+  if (data === "settings_checkin_day_off") {
+    await applyPatch(ctx, { checkin_day: null });
     return;
   }
 }

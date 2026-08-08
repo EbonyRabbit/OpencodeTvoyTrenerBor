@@ -14,12 +14,19 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Check } from "lucide-react";
 import { updateClientSettings, type ClientSettingsInput } from "../actions";
-import { TIMEZONE_LIST, LANGUAGE_LABELS, MEASUREMENT_DAY_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/clients";
+import { TIMEZONE_LIST, LANGUAGE_LABELS, MEASUREMENT_DAY_OPTIONS, CHECKIN_DAY_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/clients";
 import type { ClientRow } from "@/lib/clients";
 
 type SettingsClient = Pick<
   ClientRow,
-  "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "training_days"
+  | "language"
+  | "timezone"
+  | "morning_time"
+  | "measurement_time"
+  | "measurement_day"
+  | "checkin_day"
+  | "checkin_time"
+  | "training_days"
 >;
 
 export function SettingsForm({
@@ -37,6 +44,10 @@ export function SettingsForm({
   const [measurementDay, setMeasurementDay] = useState(
     client.measurement_day != null ? String(client.measurement_day) : "",
   );
+  const [checkinDay, setCheckinDay] = useState(
+    client.checkin_day != null ? String(client.checkin_day) : "",
+  );
+  const [checkinTime, setCheckinTime] = useState((client.checkin_time ?? "").slice(0, 5));
   const [trainingDays, setTrainingDays] = useState<(number | null)[]>(
     programDayOrders.map((_, i) => client.training_days?.[i] ?? null),
   );
@@ -52,6 +63,8 @@ export function SettingsForm({
     setMeasurementDay(
       client.measurement_day != null ? String(client.measurement_day) : "",
     );
+    setCheckinDay(client.checkin_day != null ? String(client.checkin_day) : "");
+    setCheckinTime((client.checkin_time ?? "").slice(0, 5));
     setTrainingDays(
       programDayOrders.map((_, i) => client.training_days?.[i] ?? null),
     );
@@ -91,6 +104,8 @@ export function SettingsForm({
         morning_time: morningTime || null,
         measurement_time: measurementTime || null,
         measurement_day: measurementDay ? Number(measurementDay) : null,
+        checkin_day: checkinDay ? Number(checkinDay) : null,
+        checkin_time: checkinTime || null,
         training_days: scheduleComplete ? trainingDays.map((d) => d as number) : null,
       };
 
@@ -207,6 +222,36 @@ export function SettingsForm({
               type="time"
               value={measurementTime}
               onChange={(e) => setMeasurementTime(e.target.value)}
+              className="h-9"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="settings-checkin-day" className="text-xs text-muted-foreground">
+              Чек-ин — день недели
+            </label>
+            <Select value={checkinDay} onValueChange={(v) => setCheckinDay(v ?? "")}>
+              <SelectTrigger id="settings-checkin-day" className="w-full">
+                <SelectValue placeholder="Не задан" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Не задан</SelectItem>
+                {CHECKIN_DAY_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={String(value)}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="settings-checkin-time" className="text-xs text-muted-foreground">
+              Чек-ин — время (HH:MM)
+            </label>
+            <Input
+              id="settings-checkin-time"
+              type="time"
+              value={checkinTime}
+              onChange={(e) => setCheckinTime(e.target.value)}
               className="h-9"
             />
           </div>

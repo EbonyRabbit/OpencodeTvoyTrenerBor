@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay } from "../workout-utils.js";
+import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay, getTodayDayOfMonth, parseTimeRounded } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -445,5 +445,78 @@ describe("getTodayISODay", () => {
 
   it("throws for an invalid timezone", () => {
     expect(() => getTodayISODay("Not/AZone")).toThrow();
+  });
+});
+
+describe("getTodayDayOfMonth", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-06T20:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns day of month in client timezone", () => {
+    expect(getTodayDayOfMonth("Europe/Moscow")).toBe(6);
+  });
+
+  it("returns next day where UTC+9 already crossed midnight", () => {
+    expect(getTodayDayOfMonth("Asia/Tokyo")).toBe(7);
+  });
+
+  it("returns first of month", () => {
+    vi.setSystemTime(new Date("2026-08-01T12:00:00Z"));
+    expect(getTodayDayOfMonth("Europe/Moscow")).toBe(1);
+  });
+
+  it("returns last day of month", () => {
+    vi.setSystemTime(new Date("2026-08-31T12:00:00Z"));
+    expect(getTodayDayOfMonth("Europe/Moscow")).toBe(31);
+  });
+
+  it("throws for an invalid timezone", () => {
+    expect(() => getTodayDayOfMonth("Not/AZone")).toThrow();
+  });
+});
+
+describe("parseTimeRounded", () => {
+  it("keeps exact quarter-hour", () => {
+    expect(parseTimeRounded("10:00")).toEqual({ hour: 10, minute: 0 });
+    expect(parseTimeRounded("10:15")).toEqual({ hour: 10, minute: 15 });
+    expect(parseTimeRounded("10:30")).toEqual({ hour: 10, minute: 30 });
+    expect(parseTimeRounded("10:45")).toEqual({ hour: 10, minute: 45 });
+  });
+
+  it("rounds minutes down within quarter", () => {
+    expect(parseTimeRounded("10:07")).toEqual({ hour: 10, minute: 0 });
+  });
+
+  it("rounds minutes up to next quarter", () => {
+    expect(parseTimeRounded("10:08")).toEqual({ hour: 10, minute: 15 });
+    expect(parseTimeRounded("10:53")).toEqual({ hour: 11, minute: 0 });
+  });
+
+  it("rolls over to next hour at 22:53", () => {
+    expect(parseTimeRounded("22:53")).toEqual({ hour: 23, minute: 0 });
+  });
+
+  it("clamps at end of day instead of rolling past 23:59", () => {
+    expect(parseTimeRounded("23:46")).toEqual({ hour: 23, minute: 45 });
+    expect(parseTimeRounded("23:53")).toEqual({ hour: 23, minute: 45 });
+  });
+
+  it("rounds hour-zero edge at 00:07", () => {
+    expect(parseTimeRounded("00:07")).toEqual({ hour: 0, minute: 0 });
+    expect(parseTimeRounded("00:08")).toEqual({ hour: 0, minute: 15 });
+  });
+
+  it("returns null for invalid/missing input", () => {
+    expect(parseTimeRounded("")).toBeNull();
+    expect(parseTimeRounded("abc")).toBeNull();
+    expect(parseTimeRounded("25:00")).toBeNull();
+    expect(parseTimeRounded("10:60")).toBeNull();
+    expect(parseTimeRounded("10")).toBeNull();
   });
 });

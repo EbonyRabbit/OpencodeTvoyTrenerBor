@@ -51,8 +51,8 @@ export async function createClient(formData: {
       connect_code: null,
       spreadsheet_id: null,
       morning_time: null,
-      measurement_time: null,
-      measurement_day: null,
+      // measurement_time / measurement_day не передаём:
+      // дефолты 08:00 и 1-е число проставляет БД (миграция Фазы 16)
       training_days: null,
       access_start_date: null,
       access_end_date: null,

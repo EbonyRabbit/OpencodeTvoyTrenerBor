@@ -20,6 +20,7 @@ import {
   PAYMENT_STATUS_VARIANTS,
   LANGUAGE_LABELS,
   MEASUREMENT_DAY_OPTIONS,
+  CHECKIN_DAY_OPTIONS,
 } from "@/lib/clients";
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
@@ -29,7 +30,7 @@ import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { Database, Json } from "@/types/supabase";
 
-type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "training_days" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
+type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "checkin_day" | "checkin_time" | "training_days" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
 type CheckinRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress" | "nutrition_adherence" | "missed_workouts" | "complaints">;
 type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
@@ -39,6 +40,10 @@ type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["
 
 const MEASUREMENT_DAY_LABELS: Record<number, string> = Object.fromEntries(
   MEASUREMENT_DAY_OPTIONS.map((o) => [o.value, o.label])
+) as Record<number, string>;
+
+const WEEKDAY_LABELS: Record<number, string> = Object.fromEntries(
+  CHECKIN_DAY_OPTIONS.map((o) => [o.value, o.label])
 ) as Record<number, string>;
 
 function formatDate(date: string | null): string {
@@ -253,6 +258,8 @@ export function ClientProfile({
           <InfoRow label="Утро (напоминание)" value={formatTime(client.morning_time)} />
           <InfoRow label="Замеры — день" value={client.measurement_day != null ? (MEASUREMENT_DAY_LABELS[client.measurement_day] ?? String(client.measurement_day)) : "—"} />
           <InfoRow label="Замеры — время" value={formatTime(client.measurement_time)} />
+          <InfoRow label="Чек-ин — день" value={client.checkin_day != null ? WEEKDAY_LABELS[client.checkin_day] ?? String(client.checkin_day) : "—"} />
+          <InfoRow label="Чек-ин — время" value={formatTime(client.checkin_time)} />
           <InfoRow label="Код подключения" value={client.connect_code ?? "—"} />
           <InfoRow label="ID в Google Sheets" value={client.spreadsheet_id ?? "—"} />
         </SectionCard>
@@ -603,6 +610,8 @@ export function ClientProfile({
         clientMorningTime={client.morning_time}
         clientMeasurementTime={client.measurement_time}
         clientMeasurementDay={client.measurement_day}
+        clientCheckinDay={client.checkin_day}
+        clientCheckinTime={client.checkin_time}
         clientTrainingDays={client.training_days}
         programDayOrders={programDayOrders}
       />

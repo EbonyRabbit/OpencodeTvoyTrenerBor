@@ -13,7 +13,7 @@ import {
   togglePayment,
   updateClient,
 } from "../actions";
-import { TIMEZONE_LIST, MEASUREMENT_DAY_OPTIONS, LANGUAGE_LABELS, WEEKDAY_OPTIONS } from "@/lib/clients";
+import { TIMEZONE_LIST, MEASUREMENT_DAY_OPTIONS, CHECKIN_DAY_OPTIONS, LANGUAGE_LABELS, WEEKDAY_OPTIONS } from "@/lib/clients";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,6 +46,8 @@ export function ClientActions({
   clientMorningTime,
   clientMeasurementTime,
   clientMeasurementDay,
+  clientCheckinDay,
+  clientCheckinTime,
   clientTrainingDays,
   programDayOrders,
 }: {
@@ -60,6 +62,8 @@ export function ClientActions({
   clientMorningTime: string | null;
   clientMeasurementTime: string | null;
   clientMeasurementDay: number | null;
+  clientCheckinDay: number | null;
+  clientCheckinTime: string | null;
   clientTrainingDays?: number[] | null;
   programDayOrders?: number[];
 }) {
@@ -95,6 +99,8 @@ export function ClientActions({
     morning_time: string;
     measurement_time: string;
     measurement_day: string;
+    checkin_day: string;
+    checkin_time: string;
     training_days: (number | null)[];
   }>({
     name: "",
@@ -103,6 +109,8 @@ export function ClientActions({
     morning_time: "",
     measurement_time: "",
     measurement_day: "",
+    checkin_day: "",
+    checkin_time: "",
     training_days: [],
   });
 
@@ -292,10 +300,12 @@ export function ClientActions({
       morning_time: (clientMorningTime ?? "").slice(0, 5),
       measurement_time: (clientMeasurementTime ?? "").slice(0, 5),
       measurement_day: clientMeasurementDay != null ? String(clientMeasurementDay) : "",
+      checkin_day: clientCheckinDay != null ? String(clientCheckinDay) : "",
+      checkin_time: (clientCheckinTime ?? "").slice(0, 5),
       training_days: (programDayOrders ?? []).map((_, i) => clientTrainingDays?.[i] ?? null),
     });
     setShowEditDialog(true);
-  }, [clientName, clientLanguage, clientTimezone, clientMorningTime, clientMeasurementTime, clientMeasurementDay, clientTrainingDays, programDayOrders]);
+  }, [clientName, clientLanguage, clientTimezone, clientMorningTime, clientMeasurementTime, clientMeasurementDay, clientCheckinDay, clientCheckinTime, clientTrainingDays, programDayOrders]);
 
   const handleUpdateTrainingDay = useCallback((index: number, value: number | null) => {
     setEditForm((f) => {
@@ -322,6 +332,8 @@ export function ClientActions({
         morning_time: string | null;
         measurement_time: string | null;
         measurement_day: number | null;
+        checkin_day: number | null;
+        checkin_time: string | null;
         training_days: number[] | null;
       } = {
         name: editForm.name,
@@ -330,6 +342,8 @@ export function ClientActions({
         morning_time: editForm.morning_time || null,
         measurement_time: editForm.measurement_time || null,
         measurement_day: editForm.measurement_day ? Number(editForm.measurement_day) : null,
+        checkin_day: editForm.checkin_day ? Number(editForm.checkin_day) : null,
+        checkin_time: editForm.checkin_time || null,
         training_days:
           programDayOrders && programDayOrders.length > 0
             ? editForm.training_days.map((d) => d as number)
@@ -720,6 +734,32 @@ export function ClientActions({
                 type="time"
                 value={editForm.measurement_time}
                 onChange={(e) => setEditForm((f) => ({ ...f, measurement_time: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-checkin-day" className="text-sm font-medium">Чек-ин — день недели</label>
+              <Select
+                value={editForm.checkin_day}
+                onValueChange={(v) => setEditForm((f) => ({ ...f, checkin_day: v ?? "" }))}
+              >
+                <SelectTrigger id="edit-checkin-day" className="w-full">
+                  <SelectValue placeholder="Не задан" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Не задан</SelectItem>
+                  {CHECKIN_DAY_OPTIONS.map(({ value, label }) => (
+                    <SelectItem key={value} value={String(value)}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="edit-checkin-time" className="text-sm font-medium">Чек-ин — время (HH:MM)</label>
+              <Input
+                id="edit-checkin-time"
+                type="time"
+                value={editForm.checkin_time}
+                onChange={(e) => setEditForm((f) => ({ ...f, checkin_time: e.target.value }))}
               />
             </div>
 

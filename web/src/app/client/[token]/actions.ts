@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getTodayDateStr } from "@/lib/date-utils";
-import { TIMEZONE_LIST, LANGUAGE_LABELS } from "@/lib/clients";
+import { TIMEZONE_LIST, LANGUAGE_LABELS, roundTimeToQuarter } from "@/lib/clients";
 // import { type PhotoType } from "@/types/supabase"; // DISABLED: photo storage removed
 
 type ExerciseLog = {
@@ -379,6 +379,8 @@ export type ClientSettingsInput = {
   morning_time: string | null;
   measurement_time: string | null;
   measurement_day: number | null;
+  checkin_day: number | null;
+  checkin_time: string | null;
   training_days: number[] | null;
 };
 
@@ -413,8 +415,20 @@ export async function updateClientSettings(
     }
 
     if (data.measurement_day !== null) {
-      if (!Number.isInteger(data.measurement_day) || data.measurement_day < 1 || data.measurement_day > 7) {
-        return { error: "День замеров должен быть от 1 до 7" };
+      if (!Number.isInteger(data.measurement_day) || data.measurement_day < 1 || data.measurement_day > 31) {
+        return { error: "День замеров должен быть числом от 1 до 31" };
+      }
+    }
+
+    if (data.checkin_day !== null) {
+      if (!Number.isInteger(data.checkin_day) || data.checkin_day < 1 || data.checkin_day > 7) {
+        return { error: "День чек-ина должен быть от 1 до 7" };
+      }
+    }
+
+    if (data.checkin_time !== null && data.checkin_time !== "") {
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.checkin_time)) {
+        return { error: "Некорректное время чек-ина" };
       }
     }
 
@@ -437,8 +451,10 @@ export async function updateClientSettings(
         language: data.language,
         timezone: data.timezone || null,
         morning_time: data.morning_time || null,
-        measurement_time: data.measurement_time || null,
+        measurement_time: data.measurement_time ? roundTimeToQuarter(data.measurement_time) : null,
         measurement_day: data.measurement_day ?? null,
+        checkin_day: data.checkin_day ?? null,
+        checkin_time: data.checkin_time ? roundTimeToQuarter(data.checkin_time) : null,
         training_days: data.training_days ?? null,
       })
       .eq("id", clientId);

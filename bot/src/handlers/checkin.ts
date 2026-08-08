@@ -90,21 +90,30 @@ export async function startCheckin(ctx: MyContext): Promise<void> {
     return;
   }
 
+  await beginCheckin(ctx.from.id, client, (text) => ctx.reply(text));
+}
+
+export async function beginCheckin(
+  telegramId: number,
+  client: Pick<Client, "language">,
+  send: (text: string) => Promise<unknown>,
+): Promise<boolean> {
   const lang = (client.language || "ru") as Language;
 
   try {
-    await setState(ctx.from.id, {
+    await setState(telegramId, {
       action: "checkin",
       step: "wellbeing",
       data: {},
     });
   } catch (err) {
-    console.error(`[CHECKIN] setState failed for ${ctx.from.id}:`, err);
-    await ctx.reply(t("error.service_unavailable", lang));
-    return;
+    console.error(`[CHECKIN] setState failed for ${telegramId}:`, err);
+    await send(t("error.service_unavailable", lang));
+    return false;
   }
 
-  await ctx.reply(`${t("checkin.title", lang)}\n\n${getStepPrompt("wellbeing", lang)}`);
+  await send(`${t("checkin.title", lang)}\n\n${getStepPrompt("wellbeing", lang)}`);
+  return true;
 }
 
 export async function handleCheckinInput(ctx: MyContext): Promise<void> {

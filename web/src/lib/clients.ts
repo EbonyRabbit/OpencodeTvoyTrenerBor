@@ -91,15 +91,13 @@ export const TIMEZONE_LIST = [
   "America/Chicago",
 ] as const;
 
-export const MEASUREMENT_DAY_OPTIONS = [
-  { value: 1, label: "Понедельник" },
-  { value: 2, label: "Вторник" },
-  { value: 3, label: "Среда" },
-  { value: 4, label: "Четверг" },
-  { value: 5, label: "Пятница" },
-  { value: 6, label: "Суббота" },
-  { value: 7, label: "Воскресенье" },
-] as const;
+export const MEASUREMENT_DAY_OPTIONS: readonly { value: number; label: string }[] = Array.from(
+  { length: 31 },
+  (_, i) => ({
+    value: i + 1,
+    label: `${i + 1}-е число`,
+  }),
+);
 
 export const WEEKDAY_OPTIONS = [
   { value: 1, label: "Понедельник" },
@@ -110,3 +108,19 @@ export const WEEKDAY_OPTIONS = [
   { value: 6, label: "Суббота" },
   { value: 7, label: "Воскресенье" },
 ] as const;
+
+export const CHECKIN_DAY_OPTIONS = WEEKDAY_OPTIONS;
+
+export function roundTimeToQuarter(time: string): string {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return time;
+  const [hStr, mStr] = time.split(":");
+  const hour = Number(hStr);
+  let minute = Number(mStr);
+  const rounded = Math.round(minute / 15) * 15;
+  if (rounded >= 60) {
+    if (hour === 23) return "23:45";
+    return `${String(hour + 1).padStart(2, "0")}:00`;
+  }
+  minute = rounded;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}

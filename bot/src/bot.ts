@@ -204,6 +204,9 @@ bot.on("callback_query:data", async (ctx, next) => {
     await programsHandler(ctx);
     return;
   }
+  // consent_accept must bypass guardActiveClient: clients without a program/
+  // inactive/pending payment must still be able to give consent (handleConsentAccept
+  // resolves the client itself, outside callbackRouter).
   if (data === "consent_accept") {
     await handleConsentAccept(ctx);
     return;

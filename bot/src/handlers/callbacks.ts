@@ -11,7 +11,6 @@ import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
 import { handleEveningYes, handleEveningNo, handleEveningPostpone } from "./evening-poll.js";
-import { handleConsentAccept } from "./consent.js";
 import { startMeasurements, showMeasurementHistory } from "./measurements.js";
 import { computeNextDayOfMonthDate, DEFERRED_MONTH_TTL_HOURS } from "../cron/measurement-reminder.js";
 import { handleScheduleStart, handleScheduleToggle, handleScheduleDone, handleScheduleCancel } from "./training-days.js";
@@ -103,7 +102,6 @@ registerCallback("wizard_skip", handleWizardSkip);
 registerCallback("evening_yes", async (ctx) => { await handleEveningYes(ctx); });
 registerCallback("evening_no", async (ctx) => { await handleEveningNo(ctx); });
 registerCallback("evening_postpone", async (ctx) => { await handleEveningPostpone(ctx); });
-registerCallback("consent_accept", handleConsentAccept);
 registerCallback("measurements_start", async (ctx) => { await startMeasurements(ctx); });
 registerCallback("measurements_history", async (ctx) => { await showMeasurementHistory(ctx); });
 registerCallback("measurements_defer", async (ctx) => {

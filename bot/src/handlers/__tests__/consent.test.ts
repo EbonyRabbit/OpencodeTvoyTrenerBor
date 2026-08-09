@@ -10,6 +10,7 @@ vi.mock("../../config.js", () => ({
     nodeEnv: "test",
     port: 3001,
     webhookPath: "/webhook",
+    publicUrl: "",
   },
 }));
 

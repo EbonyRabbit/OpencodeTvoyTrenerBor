@@ -42,8 +42,6 @@ export async function handleConsentAccept(ctx: MyContext): Promise<void> {
     return;
   }
 
-  await ctx.answerCallbackQuery().catch(() => {});
-
   const clientId = ctx.client?.id;
   if (!clientId) {
     const { findClientByTelegramId } = await import("../lib/clients.js");
@@ -64,6 +62,7 @@ export async function handleConsentAccept(ctx: MyContext): Promise<void> {
   applyClientLanguage(ctx, client.language);
 
   if (client.client_consent_given) {
+    await ctx.answerCallbackQuery().catch(() => {});
     await sendAcceptedReply(ctx);
     return;
   }
@@ -81,10 +80,14 @@ export async function handleConsentAccept(ctx: MyContext): Promise<void> {
 
   if (error) {
     console.error(`[CONSENT] Update error for ${ctx.from.id}:`, error.message);
-    await ctx.reply(t("error.service_unavailable", ctx.language));
+    await ctx.answerCallbackQuery({
+      text: t("error.service_unavailable", ctx.language),
+      show_alert: true,
+    }).catch(() => {});
     return;
   }
 
+  await ctx.answerCallbackQuery().catch(() => {});
   client.client_consent_given = true;
   await sendAcceptedReply(ctx);
   await runAfterConnect(ctx);

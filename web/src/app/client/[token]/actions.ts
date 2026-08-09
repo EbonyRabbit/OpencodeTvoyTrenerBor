@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { TIMEZONE_LIST, LANGUAGE_LABELS, isQuarterTime } from "@/lib/clients";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 // import { type PhotoType } from "@/types/supabase"; // DISABLED: photo storage removed
 
 type ExerciseLog = {
@@ -466,8 +467,6 @@ export async function updateClientSettings(
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }
 }
-
-import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 
 export async function acceptConsent(): Promise<{ error?: string }> {
   try {

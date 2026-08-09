@@ -403,11 +403,11 @@ export async function handleSettingsCallback(
   }
 
   if (data === "settings_days") {
-    await ctx.answerCallbackQuery().catch(() => {});
     const tz = client.timezone || DEFAULT_TIMEZONE;
     const todayStr = getTodayDateStr(tz);
     const weekRow = await getCurrentWeekRow(client, todayStr);
-    if (weekRow?.training_days) {
+    if (weekRow?.training_days && weekRow.training_days.length > 0) {
+      await ctx.answerCallbackQuery().catch(() => {});
       await startTrainingDaysSetup(ctx, { id: weekRow.id, trainingDays: weekRow.training_days });
     } else {
       await handleScheduleStart(ctx);

@@ -183,6 +183,16 @@ export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promis
     return false;
   }
 
+  if (weekRow.start_date) {
+    const targetDate = new Date(`${weekRow.start_date}T12:00:00Z`);
+    targetDate.setUTCDate(targetDate.getUTCDate() + (targetIso - 1));
+    const targetDateStr = targetDate.toISOString().slice(0, 10);
+    if (targetDateStr <= todayStr) {
+      await ctx.answerCallbackQuery({ text: t("evening.postpone_expired", lang), show_alert: true }).catch(() => {});
+      return false;
+    }
+  }
+
   const newDays = replaceTrainingDay(occupied, todayIso, targetIso);
 
   const { error } = await supabaseAdmin

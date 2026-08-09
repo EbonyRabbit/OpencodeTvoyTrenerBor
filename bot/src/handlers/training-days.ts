@@ -100,6 +100,11 @@ async function sendEditor(
   });
 }
 
+export function finalizeSchedule(selected: number[], weekId: string | null): number[] {
+  if (weekId) return [...selected];
+  return [...selected].sort((a, b) => a - b);
+}
+
 async function saveSchedule(ctx: MyContext, trainingDays: number[]): Promise<boolean> {
   if (!ctx.client || !ctx.from?.id) return false;
 
@@ -255,7 +260,7 @@ export async function handleScheduleDone(ctx: MyContext): Promise<void> {
     return;
   }
 
-  const { sched_orders: orders, sched_selected: selected } = readScheduleData(ctx.state);
+  const { sched_orders: orders, sched_selected: selected, sched_week_id: weekId } = readScheduleData(ctx.state);
 
   if (orders.length === 0) {
     await ctx.answerCallbackQuery({ text: t("schedule.expired", ctx.language), show_alert: true }).catch(() => {});
@@ -273,7 +278,7 @@ export async function handleScheduleDone(ctx: MyContext): Promise<void> {
     return;
   }
 
-  const trainingDays = [...selected].sort((a, b) => a - b);
+  const trainingDays = finalizeSchedule(selected, weekId);
 
   const saved = await saveSchedule(ctx, trainingDays);
   if (!saved) {

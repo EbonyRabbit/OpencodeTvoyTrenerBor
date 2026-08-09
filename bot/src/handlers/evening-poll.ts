@@ -1,8 +1,7 @@
 import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
-import { type Client } from "../lib/clients.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
-import { getTodayWorkout, getTodayDateStr, getTodayISODay } from "../lib/workout-utils.js";
+import { getTodayWorkout, getTodayDateStr, getTodayISODay, getCurrentWeekRow } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import {
   getEffectiveTrainingDays,
@@ -11,35 +10,8 @@ import {
   dayAvailability,
 } from "../lib/postpone-utils.js";
 import { weekdayShortLabel, startTrainingDaysSetup } from "./training-days.js";
-import { setState, clearState } from "../state/machine.js";
 
 export { DEFAULT_TIMEZONE };
-
-interface CurrentWeekRow {
-  id: string;
-  week_number: number;
-  start_date: string | null;
-  end_date: string | null;
-  training_days: number[] | null;
-}
-
-async function getCurrentWeekRow(client: Client, todayStr: string): Promise<CurrentWeekRow | null> {
-  const { data, error } = await supabaseAdmin
-    .from("program_schedule")
-    .select("id, week_number, start_date, end_date, training_days")
-    .eq("client_id", client.id);
-
-  if (error) {
-    console.error(`[EVENING] Schedule query error for ${client.id}:`, error.message);
-    return null;
-  }
-
-  return (
-    (data ?? []).find(
-      (w) => w.start_date && w.end_date && todayStr >= w.start_date && todayStr <= w.end_date,
-    ) ?? null
-  );
-}
 
 async function handleEveningResponse(
   ctx: MyContext,
@@ -122,22 +94,12 @@ export async function handleEveningPostpone(ctx: MyContext): Promise<boolean> {
   }
 
   const occupied = getEffectiveTrainingDays(client, weekRow) ?? [];
-
-  try {
-    await setState(ctx.from.id, {
-      action: "postpone",
-      step: "pick",
-      data: {
-        week_id: weekRow.id,
-        week_number: weekRow.week_number,
-        postpone_occupied: occupied,
-      },
-    });
-  } catch (err) {
-    console.warn(`[EVENING] setState failed for ${ctx.from.id}:`, err);
+  if (!occupied.includes(todayIso)) {
+    await ctx.answerCallbackQuery({ text: t("evening.postpone_occupied_alert", lang), show_alert: true }).catch(() => {});
+    return false;
   }
 
-  const available = availablePostponeDays(todayIso, weekRow.end_date);
+  const available = availablePostponeDays(todayStr, weekRow.end_date);
 
   if (available.length === 0) {
     await ctx.answerCallbackQuery({ text: t("evening.postpone_no_days", lang), show_alert: true }).catch(() => {});
@@ -170,7 +132,7 @@ export function buildPostponeKeyboard(
         text: taken
           ? `⛔ ${weekdayShortLabel(iso, lang)} · ${t("evening.postpone_taken", lang)}`
           : `✅ ${weekdayShortLabel(iso, lang)}`,
-        callback_data: `postpone_move:${iso}`,
+        callback_data: taken ? `postpone_taken:${iso}` : `postpone_move:${iso}`,
       },
     ]);
   }
@@ -196,15 +158,19 @@ export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promis
     return false;
   }
 
-  const stateData = (ctx.state?.data ?? {}) as Partial<{ week_id: string }>;
   const weekRow = await getCurrentWeekRow(client, todayStr);
-  if (!weekRow || (stateData.week_id && weekRow.id !== stateData.week_id)) {
+  if (!weekRow) {
     await ctx.answerCallbackQuery({ text: t("evening.postpone_expired", lang), show_alert: true }).catch(() => {});
     return false;
   }
 
   const occupied = getEffectiveTrainingDays(client, weekRow) ?? [];
-  const available = availablePostponeDays(todayIso, weekRow.end_date);
+  if (!occupied.includes(todayIso)) {
+    await ctx.answerCallbackQuery({ text: t("evening.postpone_expired", lang), show_alert: true }).catch(() => {});
+    return false;
+  }
+
+  const available = availablePostponeDays(todayStr, weekRow.end_date);
   const availability = dayAvailability(targetIso, available, occupied);
 
   if (!availability.ok) {
@@ -230,10 +196,18 @@ export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promis
     return false;
   }
 
-  try {
-    await clearState(ctx.from.id);
-  } catch (err) {
-    console.warn(`[EVENING] clearState failed for ${ctx.from.id}:`, err);
+  const postponeLog = {
+    client_id: client.id,
+    date: todayStr,
+    week: weekRow.week_number,
+    day_order: null,
+    exercise: "[EVENING_POSTPONE]",
+    comment: `Moved training to weekday ${targetIso}`,
+  } as never;
+
+  const { error: logError } = await supabaseAdmin.from("workout_logs").insert(postponeLog);
+  if (logError) {
+    console.warn(`[EVENING] Postpone log insert failed for ${client.id}:`, logError.message);
   }
 
   const dayName = t(`schedule.day_fullnames.${String(targetIso)}`, lang);
@@ -268,17 +242,21 @@ export async function handlePostponeWeek(ctx: MyContext): Promise<boolean> {
     id: weekRow.id,
     trainingDays: getEffectiveTrainingDays(client, weekRow) ?? [],
   });
+
+  await ctx
+    .editMessageText(`${t("evening.poll_question", lang)}\n\n${t("evening.postpone_editor_open", lang)}`)
+    .catch(() => {});
+
+  return true;
+}
+
+export async function handlePostponeTaken(ctx: MyContext): Promise<boolean> {
+  const lang = (ctx.client?.language || "ru") as Language;
+  await ctx.answerCallbackQuery({ text: t("evening.postpone_occupied_alert", lang), show_alert: true }).catch(() => {});
   return true;
 }
 
 export async function handlePostponeCancel(ctx: MyContext): Promise<boolean> {
   await ctx.answerCallbackQuery().catch(() => {});
-  if (ctx.from?.id) {
-    try {
-      await clearState(ctx.from.id);
-    } catch (err) {
-      console.warn(`[EVENING] clearState failed for ${ctx.from.id}:`, err);
-    }
-  }
   return true;
 }

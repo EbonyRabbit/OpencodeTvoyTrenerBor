@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   getEffectiveTrainingDays,
-  weekdayOfDate,
   availablePostponeDays,
   replaceTrainingDay,
   dayAvailability,
@@ -29,35 +28,34 @@ describe("getEffectiveTrainingDays", () => {
   });
 });
 
-describe("weekdayOfDate", () => {
-  it("maps Sunday to 7", () => {
-    expect(weekdayOfDate("2026-08-09")).toBe(7);
-  });
-
-  it("maps Monday to 1", () => {
-    expect(weekdayOfDate("2026-08-03")).toBe(1);
-  });
-
-  it("treats null as Sunday (end of week)", () => {
-    expect(weekdayOfDate(null)).toBe(7);
-  });
-});
-
 describe("availablePostponeDays", () => {
   it("lists days after today up to end of week", () => {
-    expect(availablePostponeDays(1, "2026-08-09")).toEqual([2, 3, 4, 5, 6, 7]);
+    // 2026-08-03 = Monday
+    expect(availablePostponeDays("2026-08-03", "2026-08-09")).toEqual([2, 3, 4, 5, 6, 7]);
   });
 
   it("returns nothing on Sunday", () => {
-    expect(availablePostponeDays(7, "2026-08-09")).toEqual([]);
+    expect(availablePostponeDays("2026-08-09", "2026-08-09")).toEqual([]);
   });
 
   it("stops at the week end date", () => {
-    expect(availablePostponeDays(4, "2026-08-07")).toEqual([5]);
+    // 2026-08-04 = Tuesday; end Friday 2026-08-07
+    expect(availablePostponeDays("2026-08-04", "2026-08-07")).toEqual([3, 4, 5]);
   });
 
   it("does not list days before today", () => {
-    expect(availablePostponeDays(3, "2026-08-09")).toEqual([4, 5, 6, 7]);
+    // 2026-08-05 = Wednesday
+    expect(availablePostponeDays("2026-08-05", "2026-08-09")).toEqual([4, 5, 6, 7]);
+  });
+
+  it("works for weeks starting mid-week", () => {
+    // week Wed 2026-08-05 .. Tue 2026-08-11; today = Sat 2026-08-08
+    expect(availablePostponeDays("2026-08-08", "2026-08-11")).toEqual([7, 1, 2]);
+  });
+
+  it("falls back to the end of the current ISO week when endDate is null", () => {
+    // Monday 2026-08-03, no endDate -> up to Sunday
+    expect(availablePostponeDays("2026-08-03", null)).toEqual([2, 3, 4, 5, 6, 7]);
   });
 });
 

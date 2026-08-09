@@ -1,13 +1,5 @@
 import type { Client } from "./clients.js";
 
-export interface WeekOverrideRow {
-  id: string;
-  week_number: number;
-  start_date: string | null;
-  end_date: string | null;
-  training_days: number[] | null;
-}
-
 export function getEffectiveTrainingDays(
   client: Client,
   weekRow: { training_days: number[] | null } | null,
@@ -15,20 +7,41 @@ export function getEffectiveTrainingDays(
   return weekRow?.training_days ?? client.training_days;
 }
 
-export function weekdayOfDate(dateStr: string | null): number {
-  if (!dateStr) return 7;
-  const date = new Date(`${dateStr}T12:00:00Z`);
-  if (isNaN(date.getTime())) return 7;
+const MS_PER_DAY = 86_400_000;
+
+function isoDayOfUTC(date: Date): number {
   const iso = date.getUTCDay();
   return iso === 0 ? 7 : iso;
 }
 
-export function availablePostponeDays(todayIso: number, endDate: string | null): number[] {
-  const lastIso = endDate ? weekdayOfDate(endDate) : 7;
+function parseUTCDate(dateStr: string): Date {
+  return new Date(`${dateStr}T12:00:00Z`);
+}
+
+export function availablePostponeDays(todayStr: string, endDate: string | null): number[] {
+  const start = parseUTCDate(todayStr);
+  if (isNaN(start.getTime())) return [];
+
+  const todayIso = isoDayOfUTC(start);
+  const end = endDate
+    ? parseUTCDate(endDate)
+    : new Date(start.getTime() + (7 - todayIso) * MS_PER_DAY);
+
+  if (isNaN(end.getTime()) || end < start) return [];
+
   const days: number[] = [];
-  for (let iso = todayIso + 1; iso <= 7 && iso <= lastIso; iso++) {
-    days.push(iso);
+  const seen = new Set<number>();
+  const cursor = new Date(start.getTime() + MS_PER_DAY);
+
+  while (cursor <= end) {
+    const iso = isoDayOfUTC(cursor);
+    if (!seen.has(iso)) {
+      seen.add(iso);
+      days.push(iso);
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
+
   return days;
 }
 

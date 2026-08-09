@@ -7,6 +7,9 @@ import {
   weekdayShortLabel,
   handleScheduleStart,
 } from "./training-days.js";
+import { getTodayDateStr } from "../lib/workout-utils.js";
+import { DEFAULT_TIMEZONE } from "../lib/constants.js";
+import { getEffectiveTrainingDays } from "../lib/postpone-utils.js";
 
 // ⚠️ MUST stay in sync with web/src/lib/clients.ts (TIMEZONE_LIST)
 const TIMEZONE_LIST = [
@@ -88,7 +91,7 @@ function timeLabel(value: string | null | undefined, lang: Language): string {
   return value.slice(0, 5);
 }
 
-function panelText(client: Client): string {
+function panelText(client: Client, trainingDays: number[] | null): string {
   const lang = clientLang(client);
   const lines = [
     t("settings.title", lang),
@@ -114,7 +117,7 @@ function panelText(client: Client): string {
     }),
     "",
     `${t("settings.train_days", lang)}:`,
-    formatSchedule(client.training_days, lang),
+    formatSchedule(trainingDays, lang),
     "",
     t("settings.choose", lang),
   ];
@@ -248,8 +251,33 @@ async function editOrSend(
   }
 }
 
+async function effectiveDays(client: Client): Promise<number[] | null> {
+  if (!client.program_id) return client.training_days;
+
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+
+  const { data, error } = await supabaseAdmin
+    .from("program_schedule")
+    .select("start_date, end_date, training_days")
+    .eq("client_id", client.id);
+
+  if (error) {
+    console.error(`[SETTINGS] Schedule query error for ${client.id}:`, error.message);
+    return client.training_days;
+  }
+
+  const currentWeekRow =
+    (data ?? []).find(
+      (w) => w.start_date && w.end_date && todayStr >= w.start_date && todayStr <= w.end_date,
+    ) ?? null;
+
+  return getEffectiveTrainingDays(client, currentWeekRow);
+}
+
 async function renderPanel(ctx: MyContext, client: Client): Promise<void> {
-  await editOrSend(ctx, panelText(client), panelKeyboard(client));
+  const trainingDays = await effectiveDays(client);
+  await editOrSend(ctx, panelText(client, trainingDays), panelKeyboard(client));
 }
 
 async function openEditor(ctx: MyContext, which: string): Promise<void> {
@@ -317,7 +345,8 @@ export async function settingsHandler(ctx: MyContext): Promise<void> {
     await ctx.reply(t("greeting.session_expired", ctx.language));
     return;
   }
-  await ctx.reply(panelText(client), {
+  const trainingDays = await effectiveDays(client);
+  await ctx.reply(panelText(client, trainingDays), {
     reply_markup: { inline_keyboard: panelKeyboard(client) },
   });
 }

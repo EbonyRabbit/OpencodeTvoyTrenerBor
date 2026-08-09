@@ -20,6 +20,37 @@ export type TodayWorkout = WorkoutPlan & {
   exercises: ParsedExercise[];
 };
 
+export interface CurrentWeekRow {
+  id: string;
+  week_number: number;
+  start_date: string | null;
+  end_date: string | null;
+  is_deload: boolean;
+  focus: string | null;
+  training_days: number[] | null;
+}
+
+export async function getCurrentWeekRow(
+  client: Client,
+  todayStr: string,
+): Promise<CurrentWeekRow | null> {
+  const { data, error } = await supabaseAdmin
+    .from("program_schedule")
+    .select("id, week_number, start_date, end_date, is_deload, focus, training_days")
+    .eq("client_id", client.id);
+
+  if (error) {
+    console.error(`[WORKOUT] Schedule query error for ${client.id}:`, error.message);
+    return null;
+  }
+
+  return (
+    (data ?? []).find(
+      (w) => w.start_date && w.end_date && todayStr >= w.start_date && todayStr <= w.end_date,
+    ) ?? null
+  );
+}
+
 interface WorkoutSender {
   reply: (text: string, options?: Record<string, unknown>) => Promise<unknown>;
   language: Language;
@@ -182,20 +213,7 @@ export async function getTodayWorkout(client: Client, lang: Language = "ru"): Pr
   const todayName = getTodayDayName(tz);
   const todayStr = getTodayDateStr(tz);
 
-  const { data: schedule, error: scheduleError } = await supabaseAdmin
-    .from("program_schedule")
-    .select("week_number, start_date, end_date, is_deload, focus, training_days")
-    .eq("client_id", client.id);
-
-  if (scheduleError) {
-    console.error(`[WORKOUT] Schedule query error for ${client.id}:`, scheduleError.message);
-    return null;
-  }
-
-  const currentWeekRow = (schedule ?? []).find((w) => {
-    if (!w.start_date || !w.end_date) return false;
-    return todayStr >= w.start_date && todayStr <= w.end_date;
-  });
+  const currentWeekRow = await getCurrentWeekRow(client, todayStr);
 
   if (!currentWeekRow) return null;
 

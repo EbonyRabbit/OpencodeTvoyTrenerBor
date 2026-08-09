@@ -23,6 +23,7 @@ interface ScheduleRow {
   end_date: string | null;
   is_deload: boolean;
   focus: string | null;
+  training_days: number[] | null;
 }
 
 export async function myStatsHandler(ctx: MyContext): Promise<void> {
@@ -109,7 +110,7 @@ async function getMonthWorkoutPlan(
   const [{ data: schedule }, { data: program }] = await Promise.all([
     supabaseAdmin
       .from("program_schedule")
-      .select("week_number, start_date, end_date, is_deload, focus")
+      .select("week_number, start_date, end_date, is_deload, focus, training_days")
       .eq("client_id", client.id),
     supabaseAdmin
       .from("programs")
@@ -204,9 +205,10 @@ export function countMonth(
         .filter((v): v is number => v != null),
     );
     const storedOrder = storedOrders.size === 1 ? [...storedOrders][0] : null;
+    const weekDaysList = week.training_days ?? trainingDays;
     const usedOrder =
       storedOrder ??
-      dayOrderForDate(date, trainingDays) ??
+      dayOrderForDate(date, weekDaysList) ??
       plan.dayOrderByDate.get(week.week_number)?.get(date) ??
       null;
 

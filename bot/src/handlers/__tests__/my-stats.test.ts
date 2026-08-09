@@ -125,4 +125,24 @@ describe("countMonth", () => {
     );
     expect(result.rpeValues).toEqual([7]);
   });
+
+  it("uses the per-week training_days override when deriving day order", () => {
+    const weekOverridePlan: MonthPlan = {
+      schedule: [
+        {
+          week_number: 1,
+          start_date: "2026-08-03",
+          end_date: "2026-08-09",
+          is_deload: false,
+          focus: null,
+          training_days: [1, 6],
+        },
+      ],
+      weekDays: PLAN.weekDays,
+      dayOrderByDate: PLAN.dayOrderByDate,
+    };
+    // 2026-08-08 = Saturday (iso 6) -> day 2 (Тяга) via the week override
+    const result = countMonth([row("2026-08-08", "тяга", { week: 1 })], weekOverridePlan, null);
+    expect(result.completedCount).toBe(1);
+  });
 });

@@ -167,7 +167,6 @@ const resources = {
         btn_postpone: "Перенести",
         response_yes: "Отлично! Отмечу как выполненную 💪",
         response_no: "Без проблем, завтра новая попытка! 💪",
-        response_postpone: "Хорошо, перенесём на следующий день",
         expired: "Этот опрос уже устарел.",
         no_workout: "Сегодня не тренировочный день.",
         postpone_title: "📅 Куда перенести тренировку?",
@@ -180,6 +179,7 @@ const resources = {
         postpone_moved: "✅ Тренировка перенесена на {{day}}!",
         postpone_week_button: "📅 Изменить все дни недели",
         postpone_cancel: "❌ Отмена",
+        postpone_editor_open: "📅 Редактор расписания недели открыт 👇",
       },
       callback: {
         exercise_logging: "📝 Логирование упражнения #{{index}}...",
@@ -606,7 +606,6 @@ const resources = {
         btn_postpone: "Postpone",
         response_yes: "Great! Logged as completed 💪",
         response_no: "No worries, tomorrow's a new day! 💪",
-        response_postpone: "OK, moved to the next day",
         expired: "This poll has expired.",
         no_workout: "Today is not a workout day.",
         postpone_title: "📅 Where to move the workout?",
@@ -619,6 +618,7 @@ const resources = {
         postpone_moved: "✅ Workout moved to {{day}}!",
         postpone_week_button: "📅 Change all days of the week",
         postpone_cancel: "❌ Cancel",
+        postpone_editor_open: "📅 Week schedule editor is open 👇",
       },
       callback: {
         exercise_logging: "📝 Logging exercise #{{index}}...",

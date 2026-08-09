@@ -10,7 +10,7 @@ import {
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
-import { handleEveningYes, handleEveningNo, handleEveningPostpone, handlePostponeMove, handlePostponeWeek, handlePostponeCancel } from "./evening-poll.js";
+import { handleEveningYes, handleEveningNo, handleEveningPostpone, handlePostponeMove, handlePostponeWeek, handlePostponeCancel, handlePostponeTaken } from "./evening-poll.js";
 import { startMeasurements, showMeasurementHistory } from "./measurements.js";
 import { computeNextDayOfMonthDate, DEFERRED_MONTH_TTL_HOURS } from "../cron/measurement-reminder.js";
 import { handleScheduleStart, handleScheduleToggle, handleScheduleDone, handleScheduleCancel } from "./training-days.js";
@@ -103,6 +103,7 @@ registerCallback("evening_yes", async (ctx) => { await handleEveningYes(ctx); })
 registerCallback("evening_no", async (ctx) => { await handleEveningNo(ctx); });
 registerCallback("evening_postpone", async (ctx) => { await handleEveningPostpone(ctx); });
 registerCallback("postpone_move", async (ctx, params) => { await handlePostponeMove(ctx, params); });
+registerCallback("postpone_taken", async (ctx) => { await handlePostponeTaken(ctx); });
 registerCallback("postpone_week", async (ctx) => { await handlePostponeWeek(ctx); });
 registerCallback("postpone_cancel", async (ctx) => { await handlePostponeCancel(ctx); });
 registerCallback("measurements_start", async (ctx) => { await startMeasurements(ctx); });

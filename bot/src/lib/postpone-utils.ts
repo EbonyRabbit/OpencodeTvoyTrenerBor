@@ -23,6 +23,8 @@ export function weekdayDateInWeek(
   endDate: string | null,
   iso: number,
 ): string | null {
+  if (iso < 1 || iso > 7) return null;
+
   const start = parseUTCDate(startDate);
   if (isNaN(start.getTime())) return null;
 
@@ -31,11 +33,15 @@ export function weekdayDateInWeek(
     : new Date(start.getTime() + 6 * MS_PER_DAY);
   if (isNaN(end.getTime()) || end < start) return null;
 
+  const seen = new Set<number>();
   const cursor = new Date(start);
   while (cursor <= end) {
-    if (isoDayOfUTC(cursor) === iso) {
+    const cursorIso = isoDayOfUTC(cursor);
+    if (cursorIso === iso) {
       return cursor.toISOString().slice(0, 10);
     }
+    seen.add(cursorIso);
+    if (seen.size === 7) return null;
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 

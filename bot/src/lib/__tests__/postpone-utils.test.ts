@@ -119,6 +119,26 @@ describe("weekdayDateInWeek", () => {
   it("returns null for an invalid start date", () => {
     expect(weekdayDateInWeek("not-a-date", "2026-08-11", 3)).toBeNull();
   });
+
+  it("returns null when the window end is before its start", () => {
+    expect(weekdayDateInWeek("2026-08-05", "2026-08-04", 3)).toBeNull();
+  });
+
+  it("matches a single-day window", () => {
+    // 2026-08-05 is a Wednesday (iso 3)
+    expect(weekdayDateInWeek("2026-08-05", "2026-08-05", 3)).toBe("2026-08-05");
+  });
+
+  it("rejects an out-of-range weekday", () => {
+    expect(weekdayDateInWeek("2026-08-05", "2026-08-11", 8)).toBeNull();
+    expect(weekdayDateInWeek("2026-08-05", "2026-08-11", 0)).toBeNull();
+  });
+
+  it("stops after a full ISO cycle even on an oversized window", () => {
+    // Window longer than 7 days: the requested weekday repeats, the first
+    // occurrence is returned (positional content belongs to one weekday only)
+    expect(weekdayDateInWeek("2026-08-03", "2026-08-20", 2)).toBe("2026-08-04");
+  });
 });
 
 describe("dayAvailability", () => {

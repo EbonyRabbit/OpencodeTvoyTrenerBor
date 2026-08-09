@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin.js";
 import type { Client } from "./clients.js";
 import { getParsedContent, flattenLoggableExercises, getCompositeLetters, type ParsedExercise, type ParsedDay } from "./program-utils.js";
-import { getEffectiveTrainingDays } from "./postpone-utils.js";
+import { getEffectiveTrainingDays, weekdayDateInWeek } from "./postpone-utils.js";
 import { t, type Language } from "../i18n/index.js";
 import { DEFAULT_TIMEZONE } from "./constants.js";
 
@@ -196,10 +196,7 @@ export function dayNameToIso(dayName: string): number {
 export function plannedDateForDay(weekStartDate: string, dayName: string): string | null {
   const iso = dayNameToIso(dayName);
   if (iso < 1) return null;
-  const date = new Date(`${weekStartDate}T12:00:00Z`);
-  if (isNaN(date.getTime())) return null;
-  date.setUTCDate(date.getUTCDate() + (iso - 1));
-  return date.toISOString().slice(0, 10);
+  return weekdayDateInWeek(weekStartDate, null, iso);
 }
 
 function weekdayFullName(iso: number, lang: Language): string {

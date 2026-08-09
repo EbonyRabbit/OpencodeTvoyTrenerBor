@@ -4,6 +4,7 @@ import {
   availablePostponeDays,
   replaceTrainingDay,
   dayAvailability,
+  weekdayDateInWeek,
 } from "../postpone-utils.js";
 
 describe("getEffectiveTrainingDays", () => {
@@ -92,6 +93,31 @@ describe("replaceTrainingDay", () => {
 
   it("no-ops when the source day is absent", () => {
     expect(replaceTrainingDay([1, 3, 5], 2, 6)).toEqual([1, 3, 5]);
+  });
+});
+
+describe("weekdayDateInWeek", () => {
+  it("finds the weekday date in a Monday-anchored week", () => {
+    expect(weekdayDateInWeek("2026-08-03", "2026-08-09", 6)).toBe("2026-08-08");
+  });
+
+  it("finds the weekday date in a mid-week-anchored week", () => {
+    // Week starts Wednesday 2026-08-05; Saturday of that window is 2026-08-08
+    expect(weekdayDateInWeek("2026-08-05", "2026-08-11", 6)).toBe("2026-08-08");
+  });
+
+  it("returns null when the weekday is not inside the window", () => {
+    // Wed..Sun window contains no Monday
+    expect(weekdayDateInWeek("2026-08-05", "2026-08-09", 1)).toBeNull();
+  });
+
+  it("falls back to a 7-day window when endDate is null", () => {
+    // Wed 2026-08-05 + 6 days = Tue 2026-08-11; Monday of that window:
+    expect(weekdayDateInWeek("2026-08-05", null, 1)).toBe("2026-08-10");
+  });
+
+  it("returns null for an invalid start date", () => {
+    expect(weekdayDateInWeek("not-a-date", "2026-08-11", 3)).toBeNull();
   });
 });
 

@@ -8,6 +8,7 @@ import {
   availablePostponeDays,
   replaceTrainingDay,
   dayAvailability,
+  weekdayDateInWeek,
 } from "../lib/postpone-utils.js";
 import { weekdayShortLabel, startTrainingDaysSetup } from "./training-days.js";
 
@@ -184,10 +185,8 @@ export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promis
   }
 
   if (weekRow.start_date) {
-    const targetDate = new Date(`${weekRow.start_date}T12:00:00Z`);
-    targetDate.setUTCDate(targetDate.getUTCDate() + (targetIso - 1));
-    const targetDateStr = targetDate.toISOString().slice(0, 10);
-    if (targetDateStr <= todayStr) {
+    const targetDateStr = weekdayDateInWeek(weekRow.start_date, weekRow.end_date, targetIso);
+    if (targetDateStr === null || targetDateStr <= todayStr) {
       await ctx.answerCallbackQuery({ text: t("evening.postpone_expired", lang), show_alert: true }).catch(() => {});
       return false;
     }

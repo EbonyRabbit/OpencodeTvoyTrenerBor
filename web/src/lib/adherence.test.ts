@@ -285,3 +285,22 @@ describe("calculateAdherence (day_order fallback, no training_days)", () => {
     expect(result.totalCompleted).toBe(2);
   });
 });
+
+describe("calculateAdherence (week training_days override)", () => {
+  it("uses the per-week override for week 1 and the global days for week 2", () => {
+    const schedule = [
+      { week_number: 1, start_date: "2026-08-03", end_date: "2026-08-09", focus: null, training_days: [2, 3, 5] },
+      { week_number: 2, start_date: "2026-08-10", end_date: "2026-08-16", focus: null, training_days: null },
+    ];
+    // Tue 08-04 (day 1 -> Присед+Жим лёжа) completed; Mon 08-03 no longer a day.
+    const result = calculateAdherence(
+      schedule,
+      MON_WED_FRI_WEEK,
+      [log("2026-08-04", "Присед"), log("2026-08-04", "Жим лёжа")],
+      TRAINING_DAYS,
+      "2026-08-16",
+    );
+    expect(result.weeks[0].completed).toBe(1);
+    expect(result.weeks[0].expected).toBe(3);
+  });
+});

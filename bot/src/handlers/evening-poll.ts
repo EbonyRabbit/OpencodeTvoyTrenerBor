@@ -2,14 +2,48 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { type Client } from "../lib/clients.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
-import { getTodayWorkout, getTodayDateStr } from "../lib/workout-utils.js";
+import { getTodayWorkout, getTodayDateStr, getTodayISODay } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
+import {
+  getEffectiveTrainingDays,
+  availablePostponeDays,
+  replaceTrainingDay,
+  dayAvailability,
+} from "../lib/postpone-utils.js";
+import { weekdayShortLabel, startTrainingDaysSetup } from "./training-days.js";
+import { setState, clearState } from "../state/machine.js";
 
 export { DEFAULT_TIMEZONE };
 
+interface CurrentWeekRow {
+  id: string;
+  week_number: number;
+  start_date: string | null;
+  end_date: string | null;
+  training_days: number[] | null;
+}
+
+async function getCurrentWeekRow(client: Client, todayStr: string): Promise<CurrentWeekRow | null> {
+  const { data, error } = await supabaseAdmin
+    .from("program_schedule")
+    .select("id, week_number, start_date, end_date, training_days")
+    .eq("client_id", client.id);
+
+  if (error) {
+    console.error(`[EVENING] Schedule query error for ${client.id}:`, error.message);
+    return null;
+  }
+
+  return (
+    (data ?? []).find(
+      (w) => w.start_date && w.end_date && todayStr >= w.start_date && todayStr <= w.end_date,
+    ) ?? null
+  );
+}
+
 async function handleEveningResponse(
   ctx: MyContext,
-  response: "yes" | "no" | "postpone",
+  response: "yes" | "no",
 ): Promise<boolean> {
   if (!ctx.from?.id || !ctx.callbackQuery?.data) return false;
 
@@ -23,8 +57,8 @@ async function handleEveningResponse(
   const workout = await getTodayWorkout(client);
   if (!workout) {
     const noWorkoutMsg = t("evening.no_workout", lang);
-    await ctx.answerCallbackQuery({ text: noWorkoutMsg });
-    await ctx.editMessageText(noWorkoutMsg);
+    await ctx.answerCallbackQuery({ text: noWorkoutMsg }).catch(() => {});
+    await ctx.editMessageText(noWorkoutMsg).catch(() => {});
     return true;
   }
 
@@ -41,15 +75,15 @@ async function handleEveningResponse(
 
   if (error) {
     console.error(`[EVENING] Failed to log response for ${client.id}:`, error);
-    await ctx.answerCallbackQuery({ text: "Error" });
+    await ctx.answerCallbackQuery({ text: "Error" }).catch(() => {});
     return false;
   }
 
-  const responseKey = `evening.response_${response}` as "evening.response_yes" | "evening.response_no" | "evening.response_postpone";
+  const responseKey = `evening.response_${response}` as "evening.response_yes" | "evening.response_no";
   const confirmation = t(responseKey, lang);
 
-  await ctx.answerCallbackQuery({ text: confirmation });
-  await ctx.editMessageText(`${t("evening.poll_question", lang)}\n\n${confirmation}`);
+  await ctx.answerCallbackQuery({ text: confirmation }).catch(() => {});
+  await ctx.editMessageText(`${t("evening.poll_question", lang)}\n\n${confirmation}`).catch(() => {});
 
   return true;
 }
@@ -63,5 +97,188 @@ export async function handleEveningNo(ctx: MyContext): Promise<boolean> {
 }
 
 export async function handleEveningPostpone(ctx: MyContext): Promise<boolean> {
-  return handleEveningResponse(ctx, "postpone");
+  if (!ctx.from?.id || !ctx.callbackQuery?.id) return false;
+
+  const client = ctx.client;
+  if (!client) return false;
+
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+  const lang = (client.language || "ru") as Language;
+  const todayIso = getTodayISODay(tz);
+
+  const workout = await getTodayWorkout(client);
+  if (!workout) {
+    const noWorkoutMsg = t("evening.no_workout", lang);
+    await ctx.answerCallbackQuery({ text: noWorkoutMsg }).catch(() => {});
+    await ctx.editMessageText(noWorkoutMsg).catch(() => {});
+    return true;
+  }
+
+  const weekRow = await getCurrentWeekRow(client, todayStr);
+  if (!weekRow) {
+    await ctx.answerCallbackQuery({ text: t("evening.postpone_unavailable", lang), show_alert: true }).catch(() => {});
+    return false;
+  }
+
+  const occupied = getEffectiveTrainingDays(client, weekRow) ?? [];
+
+  try {
+    await setState(ctx.from.id, {
+      action: "postpone",
+      step: "pick",
+      data: {
+        week_id: weekRow.id,
+        week_number: weekRow.week_number,
+        postpone_occupied: occupied,
+      },
+    });
+  } catch (err) {
+    console.warn(`[EVENING] setState failed for ${ctx.from.id}:`, err);
+  }
+
+  const available = availablePostponeDays(todayIso, weekRow.end_date);
+
+  if (available.length === 0) {
+    await ctx.answerCallbackQuery({ text: t("evening.postpone_no_days", lang), show_alert: true }).catch(() => {});
+    return true;
+  }
+
+  await ctx.answerCallbackQuery().catch(() => {});
+
+  await ctx
+    .editMessageText(
+      `${t("evening.poll_question", lang)}\n\n${t("evening.postpone_title", lang)}\n${t("evening.postpone_hint", lang)}`,
+      { reply_markup: { inline_keyboard: buildPostponeKeyboard(available, occupied, lang) } },
+    )
+    .catch(() => {});
+
+  return true;
+}
+
+export function buildPostponeKeyboard(
+  available: number[],
+  occupied: number[],
+  lang: Language,
+): { text: string; callback_data: string }[][] {
+  const rows: { text: string; callback_data: string }[][] = [];
+
+  for (const iso of available) {
+    const taken = occupied.includes(iso);
+    rows.push([
+      {
+        text: taken
+          ? `⛔ ${weekdayShortLabel(iso, lang)} · ${t("evening.postpone_taken", lang)}`
+          : `✅ ${weekdayShortLabel(iso, lang)}`,
+        callback_data: `postpone_move:${iso}`,
+      },
+    ]);
+  }
+
+  rows.push([{ text: t("evening.postpone_week_button", lang), callback_data: "postpone_week" }]);
+  rows.push([{ text: t("evening.postpone_cancel", lang), callback_data: "postpone_cancel" }]);
+
+  return rows;
+}
+
+export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promise<boolean> {
+  if (!ctx.client || !ctx.from?.id || !ctx.callbackQuery?.id) return false;
+
+  const client = ctx.client;
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+  const lang = (client.language || "ru") as Language;
+  const targetIso = Number(isoRaw);
+  const todayIso = getTodayISODay(tz);
+
+  if (!Number.isInteger(targetIso) || targetIso < 1 || targetIso > 7) {
+    await ctx.answerCallbackQuery({ text: t("evening.postpone_unavailable", lang), show_alert: true }).catch(() => {});
+    return false;
+  }
+
+  const stateData = (ctx.state?.data ?? {}) as Partial<{ week_id: string }>;
+  const weekRow = await getCurrentWeekRow(client, todayStr);
+  if (!weekRow || (stateData.week_id && weekRow.id !== stateData.week_id)) {
+    await ctx.answerCallbackQuery({ text: t("evening.postpone_expired", lang), show_alert: true }).catch(() => {});
+    return false;
+  }
+
+  const occupied = getEffectiveTrainingDays(client, weekRow) ?? [];
+  const available = availablePostponeDays(todayIso, weekRow.end_date);
+  const availability = dayAvailability(targetIso, available, occupied);
+
+  if (!availability.ok) {
+    await ctx.answerCallbackQuery({
+      text: availability.reason === "occupied"
+        ? t("evening.postpone_occupied_alert", lang)
+        : t("evening.postpone_expired", lang),
+      show_alert: true,
+    }).catch(() => {});
+    return false;
+  }
+
+  const newDays = replaceTrainingDay(occupied, todayIso, targetIso);
+
+  const { error } = await supabaseAdmin
+    .from("program_schedule")
+    .update({ training_days: newDays, updated_at: new Date().toISOString() })
+    .eq("id", weekRow.id);
+
+  if (error) {
+    console.error(`[EVENING] Postpone save error for ${client.id}:`, error.message);
+    await ctx.answerCallbackQuery({ text: t("error.service_unavailable", lang), show_alert: true }).catch(() => {});
+    return false;
+  }
+
+  try {
+    await clearState(ctx.from.id);
+  } catch (err) {
+    console.warn(`[EVENING] clearState failed for ${ctx.from.id}:`, err);
+  }
+
+  const dayName = t(`schedule.day_fullnames.${String(targetIso)}`, lang);
+
+  await ctx.answerCallbackQuery().catch(() => {});
+  await ctx
+    .editMessageText(`${t("evening.poll_question", lang)}\n\n${t("evening.postpone_moved", lang, { day: dayName })}`)
+    .catch(() => {});
+
+  return true;
+}
+
+export async function handlePostponeWeek(ctx: MyContext): Promise<boolean> {
+  if (!ctx.from?.id) return false;
+
+  const client = ctx.client;
+  if (!client) return false;
+
+  await ctx.answerCallbackQuery().catch(() => {});
+
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+  const lang = (client.language || "ru") as Language;
+
+  const weekRow = await getCurrentWeekRow(client, todayStr);
+  if (!weekRow) {
+    await ctx.reply(t("evening.postpone_unavailable", lang));
+    return false;
+  }
+
+  await startTrainingDaysSetup(ctx, {
+    id: weekRow.id,
+    trainingDays: getEffectiveTrainingDays(client, weekRow) ?? [],
+  });
+  return true;
+}
+
+export async function handlePostponeCancel(ctx: MyContext): Promise<boolean> {
+  await ctx.answerCallbackQuery().catch(() => {});
+  if (ctx.from?.id) {
+    try {
+      await clearState(ctx.from.id);
+    } catch (err) {
+      console.warn(`[EVENING] clearState failed for ${ctx.from.id}:`, err);
+    }
+  }
+  return true;
 }

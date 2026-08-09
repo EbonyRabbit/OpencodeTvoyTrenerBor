@@ -39,6 +39,7 @@ export async function getProgramDayOrders(client: Client): Promise<number[] | nu
 type ScheduleStateData = {
   sched_orders: number[];
   sched_selected: number[];
+  sched_week_id: string | null;
   [key: string]: unknown;
 };
 
@@ -47,6 +48,7 @@ function readScheduleData(state: { data?: unknown } | null | undefined): Schedul
   return {
     sched_orders: Array.isArray(data.sched_orders) ? data.sched_orders : [],
     sched_selected: Array.isArray(data.sched_selected) ? data.sched_selected : [],
+    sched_week_id: typeof data.sched_week_id === "string" ? data.sched_week_id : null,
   };
 }
 
@@ -101,6 +103,21 @@ async function sendEditor(
 async function saveSchedule(ctx: MyContext, trainingDays: number[]): Promise<boolean> {
   if (!ctx.client || !ctx.from?.id) return false;
 
+  const { sched_week_id: weekId } = readScheduleData(ctx.state);
+
+  if (weekId) {
+    const { error } = await supabaseAdmin
+      .from("program_schedule")
+      .update({ training_days: trainingDays, updated_at: new Date().toISOString() })
+      .eq("id", weekId);
+
+    if (error) {
+      console.error(`[SCHEDULE] Week save error for ${ctx.from.id}:`, error.message);
+      return false;
+    }
+    return true;
+  }
+
   const { error } = await supabaseAdmin
     .from("clients")
     .update({ training_days: trainingDays, updated_at: new Date().toISOString() })
@@ -115,7 +132,10 @@ async function saveSchedule(ctx: MyContext, trainingDays: number[]): Promise<boo
   return true;
 }
 
-export async function startTrainingDaysSetup(ctx: MyContext): Promise<void> {
+export async function startTrainingDaysSetup(
+  ctx: MyContext,
+  weekOverride?: { id: string; trainingDays: number[] } | null,
+): Promise<void> {
   if (!ctx.client || !ctx.from?.id) return;
 
   const orders = await getProgramDayOrders(ctx.client);
@@ -124,7 +144,11 @@ export async function startTrainingDaysSetup(ctx: MyContext): Promise<void> {
     return;
   }
 
-  const data: ScheduleStateData = { sched_orders: orders, sched_selected: [] };
+  const data: ScheduleStateData = {
+    sched_orders: orders,
+    sched_selected: weekOverride ? [...weekOverride.trainingDays] : [],
+    sched_week_id: weekOverride?.id ?? null,
+  };
 
   try {
     await setState(ctx.from.id, {
@@ -136,7 +160,7 @@ export async function startTrainingDaysSetup(ctx: MyContext): Promise<void> {
     console.warn(`[SCHEDULE] setState failed for ${ctx.from.id}:`, err);
   }
 
-  await sendEditor(ctx, orders, []);
+  await sendEditor(ctx, orders, data.sched_selected);
 }
 
 export async function scheduleHandler(ctx: MyContext): Promise<void> {
@@ -190,7 +214,7 @@ export async function handleScheduleToggle(ctx: MyContext, isoRaw: string): Prom
     return;
   }
 
-  const { sched_orders: orders, sched_selected: selected } = readScheduleData(ctx.state);
+  const { sched_orders: orders, sched_selected: selected, sched_week_id: weekId } = readScheduleData(ctx.state);
 
   if (orders.length === 0) {
     await ctx.answerCallbackQuery({ text: t("schedule.expired", ctx.language), show_alert: true }).catch(() => {});
@@ -204,7 +228,7 @@ export async function handleScheduleToggle(ctx: MyContext, isoRaw: string): Prom
     await setState(ctx.from.id, {
       action: "training_days",
       step: "pick",
-      data: { sched_orders: orders, sched_selected: nextSelected },
+      data: { sched_orders: orders, sched_selected: nextSelected, sched_week_id: weekId },
     });
   } catch (err) {
     console.warn(`[SCHEDULE] setState failed for ${ctx.from.id}:`, err);

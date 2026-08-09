@@ -54,7 +54,7 @@ export default async function ClientHomePage({
       ? safeFetch(
           supabaseAdmin
             .from("program_schedule")
-            .select("week_number, start_date, end_date, focus, is_deload, status")
+            .select("week_number, start_date, end_date, focus, is_deload, status, training_days")
             .eq("client_id", clientId)
             .order("week_number"),
           [] as ScheduleRow[],

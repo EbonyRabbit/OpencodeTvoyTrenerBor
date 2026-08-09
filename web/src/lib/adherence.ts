@@ -88,6 +88,7 @@ export function calculateAdherence(
     start_date: string | null;
     end_date: string | null;
     focus: string | null;
+    training_days?: number[] | null;
   }[],
   parsed: ParsedContent | null,
   workoutLogs: WorkoutLog[],
@@ -114,8 +115,9 @@ export function calculateAdherence(
       start_date: week.start_date,
       end_date: week.end_date,
     };
-    const weekLog = trainingDays && trainingDays.length > 0
-      ? countWeekByDates(parsed, weekDates, today, trainingDays, logsByDate)
+    const weekTrainingDays = week.training_days ?? trainingDays;
+    const weekLog = weekTrainingDays && weekTrainingDays.length > 0
+      ? countWeekByDates(parsed, weekDates, today, weekTrainingDays, logsByDate)
       : countWeekByDayOrder(parsed, weekDates, today, logsByDate);
     if (weekLog.expected === 0) continue;
 

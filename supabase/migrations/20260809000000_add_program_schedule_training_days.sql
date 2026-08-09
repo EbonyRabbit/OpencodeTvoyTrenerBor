@@ -1,0 +1,1 @@
+ALTER TABLE program_schedule ADD COLUMN training_days INTEGER[];

@@ -188,11 +188,16 @@ export interface Database {
           is_deload: boolean;
           focus: string | null;
           status: string | null;
+          training_days: number[] | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "created_at" | "updated_at"> & {
+        Insert: Omit<
+          Database["public"]["Tables"]["program_schedule"]["Row"],
+          "id" | "created_at" | "updated_at" | "training_days"
+        > & {
           id?: string;
+          training_days?: number[] | null;
         };
         Update: Partial<Database["public"]["Tables"]["program_schedule"]["Row"]>;
         Relationships: [];

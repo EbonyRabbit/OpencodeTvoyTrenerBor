@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase-admin.js";
 import type { Client } from "./clients.js";
 import { getParsedContent, flattenLoggableExercises, getCompositeLetters, type ParsedExercise, type ParsedDay } from "./program-utils.js";
+import { getEffectiveTrainingDays } from "./postpone-utils.js";
 import { t, type Language } from "../i18n/index.js";
 import { DEFAULT_TIMEZONE } from "./constants.js";
 
@@ -183,7 +184,7 @@ export async function getTodayWorkout(client: Client, lang: Language = "ru"): Pr
 
   const { data: schedule, error: scheduleError } = await supabaseAdmin
     .from("program_schedule")
-    .select("week_number, start_date, end_date, is_deload, focus")
+    .select("week_number, start_date, end_date, is_deload, focus, training_days")
     .eq("client_id", client.id);
 
   if (scheduleError) {
@@ -204,12 +205,13 @@ export async function getTodayWorkout(client: Client, lang: Language = "ru"): Pr
   });
   if (!plan) return null;
 
-  const matchedDay = matchDayForToday(plan.days, client.training_days, todayName, tz);
+  const trainingDays = getEffectiveTrainingDays(client, currentWeekRow);
+
+  const matchedDay = matchDayForToday(plan.days, trainingDays, todayName, tz);
 
   if (!matchedDay?.exercises?.length) return null;
 
-  const scheduledIsoDay =
-    (client.training_days?.length ?? 0) > 0 ? getTodayISODay(tz) : null;
+  const scheduledIsoDay = (trainingDays?.length ?? 0) > 0 ? getTodayISODay(tz) : null;
 
   return {
     ...plan,

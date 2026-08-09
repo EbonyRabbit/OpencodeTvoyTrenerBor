@@ -107,13 +107,15 @@ export default async function WorkoutPage() {
 
   const { data: schedule } = await supabaseAdmin
     .from("program_schedule")
-    .select("week_number, start_date, end_date")
+    .select("week_number, start_date, end_date, training_days")
     .eq("client_id", clientId);
 
   const currentWeek = (schedule ?? []).find((w) => {
     if (!w.start_date || !w.end_date) return false;
     return todayStr >= w.start_date && todayStr <= w.end_date;
   });
+
+  const weekTrainingDays = currentWeek?.training_days ?? client.training_days;
 
   if (!currentWeek) {
     return (
@@ -171,14 +173,14 @@ export default async function WorkoutPage() {
     weekData.days,
     todayName,
     todayISODay,
-    client.training_days,
+    weekTrainingDays,
     currentWeek.start_date,
     todayStr,
   );
 
   if (!matchedDay?.exercises?.length) {
-    const dayNames = client.training_days?.length
-      ? client.training_days.map((iso) => capitalize(todayLabelFor(iso))).join(", ")
+    const dayNames = weekTrainingDays?.length
+      ? weekTrainingDays.map((iso) => capitalize(todayLabelFor(iso))).join(", ")
       : weekData.days.map((d) => d.day_name).join(", ");
     return (
       <Card>
@@ -193,7 +195,7 @@ export default async function WorkoutPage() {
     );
   }
 
-  const dayTitle = client.training_days?.length
+  const dayTitle = weekTrainingDays?.length
     ? capitalize(todayName)
     : matchedDay.day_name;
 

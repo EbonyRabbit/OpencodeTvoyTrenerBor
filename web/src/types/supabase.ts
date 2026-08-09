@@ -743,6 +743,7 @@ export type Database = {
           sheet_name: string | null
           start_date: string | null
           status: string | null
+          training_days: number[] | null
           updated_at: string
           week_number: number
         }
@@ -758,6 +759,7 @@ export type Database = {
           sheet_name?: string | null
           start_date?: string | null
           status?: string | null
+          training_days?: number[] | null
           updated_at?: string
           week_number: number
         }
@@ -773,6 +775,7 @@ export type Database = {
           sheet_name?: string | null
           start_date?: string | null
           status?: string | null
+          training_days?: number[] | null
           updated_at?: string
           week_number?: number
         }

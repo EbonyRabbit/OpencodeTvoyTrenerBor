@@ -238,14 +238,16 @@ export async function handlePostponeWeek(ctx: MyContext): Promise<boolean> {
     return false;
   }
 
-  await startTrainingDaysSetup(ctx, {
+  const opened = await startTrainingDaysSetup(ctx, {
     id: weekRow.id,
     trainingDays: getEffectiveTrainingDays(client, weekRow) ?? [],
   });
 
-  await ctx
-    .editMessageText(`${t("evening.poll_question", lang)}\n\n${t("evening.postpone_editor_open", lang)}`)
-    .catch(() => {});
+  if (opened) {
+    await ctx
+      .editMessageText(`${t("evening.poll_question", lang)}\n\n${t("evening.postpone_editor_open", lang)}`)
+      .catch(() => {});
+  }
 
   return true;
 }

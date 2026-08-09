@@ -77,12 +77,8 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
     const tz = client.timezone || DEFAULT_TIMEZONE;
     const todayStr = getTodayDateStr(tz);
     const currentWeek = getCurrentWeek(schedule ?? [], todayStr);
-    const visibleSchedule = (schedule ?? []) as Array<{
-      week_number: number;
-      training_days: number[] | null;
-    }>;
     const currentWeekRow = currentWeek !== null
-      ? (visibleSchedule.find((w) => w.week_number === currentWeek) ?? null)
+      ? ((schedule ?? []).find((w) => w.week_number === currentWeek) ?? null)
       : null;
     const trainingDays = currentWeekRow?.training_days ?? client.training_days;
     const truncationSuffix = t("program.truncation_suffix", ctx.language);

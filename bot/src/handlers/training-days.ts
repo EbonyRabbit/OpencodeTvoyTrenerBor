@@ -135,13 +135,13 @@ async function saveSchedule(ctx: MyContext, trainingDays: number[]): Promise<boo
 export async function startTrainingDaysSetup(
   ctx: MyContext,
   weekOverride?: { id: string; trainingDays: number[] } | null,
-): Promise<void> {
-  if (!ctx.client || !ctx.from?.id) return;
+): Promise<boolean> {
+  if (!ctx.client || !ctx.from?.id) return false;
 
   const orders = await getProgramDayOrders(ctx.client);
   if (!orders) {
     await ctx.reply(t("schedule.no_program", ctx.language));
-    return;
+    return false;
   }
 
   const data: ScheduleStateData = {
@@ -161,6 +161,7 @@ export async function startTrainingDaysSetup(
   }
 
   await sendEditor(ctx, orders, data.sched_selected);
+  return true;
 }
 
 export async function scheduleHandler(ctx: MyContext): Promise<void> {

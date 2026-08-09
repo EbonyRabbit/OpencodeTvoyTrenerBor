@@ -46,9 +46,12 @@ export function availablePostponeDays(todayStr: string, endDate: string | null):
 }
 
 export function replaceTrainingDay(days: number[], removeIso: number, addIso: number): number[] {
-  const filtered = days.filter((d) => d !== removeIso);
-  if (filtered.includes(addIso)) return [...filtered].sort((a, b) => a - b);
-  return [...filtered, addIso].sort((a, b) => a - b);
+  const idx = days.indexOf(removeIso);
+  if (idx === -1) return [...days];
+  if (days.includes(addIso)) return days.filter((d) => d !== removeIso);
+  const next = [...days];
+  next[idx] = addIso;
+  return next;
 }
 
 export type DayAvailability =

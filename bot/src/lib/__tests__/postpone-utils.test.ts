@@ -57,10 +57,23 @@ describe("availablePostponeDays", () => {
     // Monday 2026-08-03, no endDate -> up to Sunday
     expect(availablePostponeDays("2026-08-03", null)).toEqual([2, 3, 4, 5, 6, 7]);
   });
+
+  it("returns nothing when the week end date is in the past", () => {
+    expect(availablePostponeDays("2026-08-05", "2026-08-04")).toEqual([]);
+  });
+
+  it("returns nothing for an invalid today string", () => {
+    expect(availablePostponeDays("not-a-date", "2026-08-09")).toEqual([]);
+  });
+
+  it("collects each weekday once across a week boundary", () => {
+    // Mon 2026-08-03 .. 2026-08-17: weekdays repeat after Sunday
+    expect(availablePostponeDays("2026-08-03", "2026-08-17")).toEqual([2, 3, 4, 5, 6, 7, 1]);
+  });
 });
 
 describe("replaceTrainingDay", () => {
-  it("moves a day keeping order", () => {
+  it("moves a day keeping its position", () => {
     expect(replaceTrainingDay([1, 3, 5], 1, 2)).toEqual([2, 3, 5]);
   });
 
@@ -72,8 +85,13 @@ describe("replaceTrainingDay", () => {
     expect(replaceTrainingDay([1, 3, 5], 5, 6)).toEqual([1, 3, 6]);
   });
 
-  it("sorts the resulting list", () => {
-    expect(replaceTrainingDay([1, 3, 5], 5, 2)).toEqual([1, 2, 3]);
+  it("keeps the moved day position so its content follows it", () => {
+    // Wed (D2) -> Sat: Saturday must keep the day-2 content slot
+    expect(replaceTrainingDay([1, 3, 5], 3, 6)).toEqual([1, 6, 5]);
+  });
+
+  it("no-ops when the source day is absent", () => {
+    expect(replaceTrainingDay([1, 3, 5], 2, 6)).toEqual([1, 3, 5]);
   });
 });
 

@@ -6,8 +6,9 @@ import {
   formatSchedule,
   weekdayShortLabel,
   handleScheduleStart,
+  startTrainingDaysSetup,
 } from "./training-days.js";
-import { getTodayDateStr } from "../lib/workout-utils.js";
+import { getTodayDateStr, getCurrentWeekRow } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { getEffectiveTrainingDays } from "../lib/postpone-utils.js";
 
@@ -256,23 +257,9 @@ async function effectiveDays(client: Client): Promise<number[] | null> {
 
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
+  const weekRow = await getCurrentWeekRow(client, todayStr);
 
-  const { data, error } = await supabaseAdmin
-    .from("program_schedule")
-    .select("start_date, end_date, training_days")
-    .eq("client_id", client.id);
-
-  if (error) {
-    console.error(`[SETTINGS] Schedule query error for ${client.id}:`, error.message);
-    return client.training_days;
-  }
-
-  const currentWeekRow =
-    (data ?? []).find(
-      (w) => w.start_date && w.end_date && todayStr >= w.start_date && todayStr <= w.end_date,
-    ) ?? null;
-
-  return getEffectiveTrainingDays(client, currentWeekRow);
+  return getEffectiveTrainingDays(client, weekRow);
 }
 
 async function renderPanel(ctx: MyContext, client: Client): Promise<void> {
@@ -416,7 +403,15 @@ export async function handleSettingsCallback(
   }
 
   if (data === "settings_days") {
-    await handleScheduleStart(ctx);
+    await ctx.answerCallbackQuery().catch(() => {});
+    const tz = client.timezone || DEFAULT_TIMEZONE;
+    const todayStr = getTodayDateStr(tz);
+    const weekRow = await getCurrentWeekRow(client, todayStr);
+    if (weekRow?.training_days) {
+      await startTrainingDaysSetup(ctx, { id: weekRow.id, trainingDays: weekRow.training_days });
+    } else {
+      await handleScheduleStart(ctx);
+    }
     return;
   }
 

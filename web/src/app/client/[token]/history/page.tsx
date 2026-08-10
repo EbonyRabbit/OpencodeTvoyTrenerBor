@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent, flattenLoggableExercises, type ParsedDay } from "@/lib/program-utils";
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
+import { weekdayDateInWeek } from "@/lib/week-days";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { HistoryGrid } from "./history-grid";
@@ -250,25 +251,16 @@ export default async function HistoryPage() {
   for (const week of parsed.weeks) {
     const scheduleRow = scheduleRows.find((w) => w.week_number === week.week_number);
     if (!scheduleRow?.start_date) continue;
-    const start = new Date(`${scheduleRow.start_date}T12:00:00Z`);
-    if (isNaN(start.getTime())) continue;
-    const end = scheduleRow.end_date
-      ? new Date(`${scheduleRow.end_date}T12:00:00Z`)
-      : new Date(start.getTime() + 6 * 86_400_000);
-    if (isNaN(end.getTime()) || end < start) continue;
     const map = new Map<string, number>();
     for (const day of week.days ?? []) {
       const iso = dayNameToIso(day.day_name);
-      if (iso < 1 || iso > 7) continue;
-      const cursor = new Date(start);
-      while (cursor <= end) {
-        const cursorIso = cursor.getUTCDay() === 0 ? 7 : cursor.getUTCDay();
-        if (cursorIso === iso) {
-          map.set(cursor.toISOString().slice(0, 10), day.day_order);
-          break;
-        }
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
-      }
+      if (iso < 1) continue;
+      const plannedDate = weekdayDateInWeek(
+        scheduleRow.start_date,
+        scheduleRow.end_date,
+        iso,
+      );
+      if (plannedDate) map.set(plannedDate, day.day_order);
     }
     if (map.size > 0) plannedDateToOrder.set(week.week_number, map);
   }

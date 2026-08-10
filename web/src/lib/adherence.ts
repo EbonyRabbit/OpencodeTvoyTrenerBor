@@ -1,4 +1,5 @@
 import type { ParsedContent } from "./program-utils";
+import { weekdayDateInWeek } from "./week-days";
 
 export type WeekAdherence = {
   weekNumber: number;
@@ -75,24 +76,12 @@ function dayNameToIso(dayName: string): number {
 
 function plannedDateForDay(
   weekStartDate: string,
-  weekEndDate: string | null,
+  weekEndDate: string,
   dayName: string,
 ): string | null {
   const iso = dayNameToIso(dayName);
-  if (iso < 1 || iso > 7) return null;
-  const start = new Date(`${weekStartDate}T12:00:00Z`);
-  if (isNaN(start.getTime())) return null;
-  const end = weekEndDate
-    ? new Date(`${weekEndDate}T12:00:00Z`)
-    : new Date(start.getTime() + 6 * 86_400_000);
-  if (isNaN(end.getTime()) || end < start) return null;
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    const cursorIso = cursor.getUTCDay() === 0 ? 7 : cursor.getUTCDay();
-    if (cursorIso === iso) return cursor.toISOString().slice(0, 10);
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return null;
+  if (iso < 1) return null;
+  return weekdayDateInWeek(weekStartDate, weekEndDate, iso);
 }
 
 export function calculateAdherence(

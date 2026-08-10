@@ -268,6 +268,28 @@ describe("calculateAdherence (day_order fallback, no training_days)", () => {
     expect(result.weeks[0].completed).toBe(0);
   });
 
+  it("maps legacy planned dates inside a mid-week anchored window", () => {
+    // Week starts Wednesday 2026-08-05: plan days Пн/Ср/Пт fall on
+    // 2026-08-10 / 2026-08-05 / 2026-08-07 (Monday-anchored math would
+    // misplace Monday at 08-05, colliding with Wednesday)
+    const midWeekSchedule = [
+      { week_number: 1, start_date: "2026-08-05", end_date: "2026-08-11", focus: null },
+    ];
+    const result = calculateAdherence(
+      midWeekSchedule,
+      MON_WED_FRI_WEEK,
+      [
+        log("2026-08-05", "Тяга", { week: 1 }),
+        log("2026-08-10", "Присед", { week: 1 }),
+        log("2026-08-10", "жим лёжа", { week: 1 }),
+      ],
+      null,
+      "2026-08-11",
+    );
+    expect(result.weeks[0].completed).toBe(2);
+    expect(result.weeks[0].expected).toBe(3);
+  });
+
   it("counts full coverage across weeks with stored day_order", () => {
     const result = calculateAdherence(
       SCHEDULE,

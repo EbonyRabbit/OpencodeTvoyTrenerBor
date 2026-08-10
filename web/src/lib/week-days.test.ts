@@ -29,4 +29,9 @@ describe("weekdayDateInWeek", () => {
   it("returns null for an invalid start date", () => {
     expect(weekdayDateInWeek("not-a-date", "2026-08-11", 3)).toBeNull();
   });
+
+  it("falls back to a 7-day window when endDate is null", () => {
+    // Wed 2026-08-05 + 6 days = Tue 2026-08-11; Monday of that window:
+    expect(weekdayDateInWeek("2026-08-05", null, 1)).toBe("2026-08-10");
+  });
 });

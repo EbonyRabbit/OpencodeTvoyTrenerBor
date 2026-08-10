@@ -78,6 +78,18 @@ describe("consent i18n", () => {
   });
 });
 
+describe("morning postpone i18n", () => {
+  it("has Russian morning postpone translations", () => {
+    expect(t("morning.btn_postpone", "ru")).toContain("Перенести");
+    expect(t("morning.postpone_prompt", "ru")).toContain("другой день");
+  });
+
+  it("has English morning postpone translations", () => {
+    expect(t("morning.btn_postpone", "en")).toContain("Postpone");
+    expect(t("morning.postpone_prompt", "en")).toContain("another day");
+  });
+});
+
 describe("applyClientLanguage", () => {
   it("sets language to 'ru' for Russian client", () => {
     const ctx = { language: "en" as const };

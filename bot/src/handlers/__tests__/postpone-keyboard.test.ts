@@ -21,15 +21,15 @@ import { buildPostponeKeyboard } from "../evening-poll.js";
 
 describe("buildPostponeKeyboard", () => {
   it("marks available days and busy days", () => {
-    const rows = buildPostponeKeyboard([2, 3, 4, 6], [1, 6, 7], "ru");
+    const rows = buildPostponeKeyboard([2, 3, 4, 6], [1, 6, 7], "ru", "evening");
 
     const texts = rows.flat().map((b) => b.text);
     expect(texts.some((t) => t.includes("✅"))).toBe(true);
     expect(texts.some((t) => t.includes("⛔"))).toBe(true);
   });
 
-  it("carries the default evening source on move buttons", () => {
-    const rows = buildPostponeKeyboard([2, 3, 4, 5], [], "ru");
+  it("carries the evening source on move buttons", () => {
+    const rows = buildPostponeKeyboard([2, 3, 4, 5], [], "ru", "evening");
     const moveButtons = rows.flat().filter((b) => b.callback_data.startsWith("postpone_move"));
     expect(moveButtons.length).toBeGreaterThan(0);
     expect(moveButtons[0].callback_data).toBe("postpone_move:2:evening");
@@ -42,7 +42,7 @@ describe("buildPostponeKeyboard", () => {
   });
 
   it("always includes week editor and cancel buttons", () => {
-    const rows = buildPostponeKeyboard([2], [], "ru");
+    const rows = buildPostponeKeyboard([2], [], "ru", "evening");
     const data = rows.flat().map((b) => b.callback_data);
     expect(data).toContain("postpone_week:evening");
     expect(data).toContain("postpone_cancel");

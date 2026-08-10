@@ -7,6 +7,7 @@ import { getTodayWorkout, getTodayDateStr } from "../lib/workout-utils.js";
 import { markAsSent } from "./dedup.js";
 import { logBotEvent } from "./logger.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
+import { SKIP_MARKER, MORNING_PREFIX, EVENING_PREFIX } from "../lib/log-markers.js";
 
 const EVENING_HOUR = 20;
 const DEDUP_TTL_HOURS = 25;
@@ -51,6 +52,23 @@ async function getPausedClientIds(): Promise<Set<string>> {
   }
 
   return new Set((data ?? []).map((p) => p.client_id));
+}
+
+export type ExistingLog = { exercise: string | null | undefined };
+
+export function hasCompletionLogs(logs: ExistingLog[]): boolean {
+  return logs.some(
+    (log) =>
+      typeof log.exercise === "string" &&
+      log.exercise.trim() !== "" &&
+      log.exercise !== SKIP_MARKER &&
+      !log.exercise.startsWith(EVENING_PREFIX) &&
+      !log.exercise.startsWith(MORNING_PREFIX),
+  );
+}
+
+export function hasSkipLog(logs: ExistingLog[]): boolean {
+  return logs.some((log) => log.exercise === SKIP_MARKER);
 }
 
 export async function runEveningPoll(bot: Bot<MyContext>): Promise<void> {
@@ -100,14 +118,10 @@ export async function runEveningPoll(bot: Bot<MyContext>): Promise<void> {
           .eq("client_id", client.id)
           .eq("date", todayStr);
 
-        const hasCompletion = (existingLogs ?? []).some(
-          (log) => log.exercise && log.exercise !== "[SKIP]" && !log.exercise.startsWith("[EVENING_") && !log.exercise.startsWith("[MORNING_"),
-        );
+        const hasCompletion = hasCompletionLogs(existingLogs ?? []);
         if (hasCompletion) continue;
 
-        const hasSkip = (existingLogs ?? []).some(
-          (log) => log.exercise === "[SKIP]",
-        );
+        const hasSkip = hasSkipLog(existingLogs ?? []);
         if (hasSkip) continue;
 
         const dedupKey = `evening_poll:${client.id}:${todayStr}`;

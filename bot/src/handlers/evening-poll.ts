@@ -1,15 +1,15 @@
 import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
-import { getTodayWorkout, getTodayDateStr, getTodayISODay, getCurrentWeekRow } from "../lib/workout-utils.js";
+import { getTodayWorkout, getTodayDateStr, getTodayISODay, getCurrentWeekRow, getOccupiedDaysForWeek } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import {
-  getEffectiveTrainingDays,
   availablePostponeDays,
   replaceTrainingDay,
   dayAvailability,
   weekdayDateInWeek,
 } from "../lib/postpone-utils.js";
+import { MORNING_POSTPONE_MARKER, EVENING_POSTPONE_MARKER } from "../lib/log-markers.js";
 import { weekdayShortLabel, startTrainingDaysSetup } from "./training-days.js";
 
 export { DEFAULT_TIMEZONE };
@@ -110,7 +110,7 @@ async function openPostponePicker(ctx: MyContext, source: PostponeSource): Promi
     return false;
   }
 
-  const occupied = getEffectiveTrainingDays(client, weekRow) ?? [];
+  const occupied = await getOccupiedDaysForWeek(client, weekRow);
   if (!occupied.includes(todayIso)) {
     await ctx.answerCallbackQuery({ text: t("evening.postpone_occupied_alert", lang), show_alert: true }).catch(() => {});
     return false;
@@ -125,11 +125,15 @@ async function openPostponePicker(ctx: MyContext, source: PostponeSource): Promi
 
   await ctx.answerCallbackQuery().catch(() => {});
 
+  const heading =
+    source === "morning"
+      ? `${t("morning.postpone_prompt", lang)}\n\n${t("evening.postpone_hint", lang)}`
+      : `${postponeHeader(source, lang)}\n\n${t("evening.postpone_title", lang)}\n${t("evening.postpone_hint", lang)}`;
+
   await ctx
-    .editMessageText(
-      `${postponeHeader(source, lang)}\n\n${t("evening.postpone_title", lang)}\n${t("evening.postpone_hint", lang)}`,
-      { reply_markup: { inline_keyboard: buildPostponeKeyboard(available, occupied, lang, source) } },
-    )
+    .editMessageText(heading, {
+      reply_markup: { inline_keyboard: buildPostponeKeyboard(available, occupied, lang, source) },
+    })
     .catch(() => {});
 
   return true;
@@ -139,7 +143,7 @@ export function buildPostponeKeyboard(
   available: number[],
   occupied: number[],
   lang: Language,
-  source: PostponeSource = "evening",
+  source: PostponeSource,
 ): { text: string; callback_data: string }[][] {
   const rows: { text: string; callback_data: string }[][] = [];
 
@@ -184,7 +188,7 @@ export async function handlePostponeMove(ctx: MyContext, params: string): Promis
     return false;
   }
 
-  const occupied = getEffectiveTrainingDays(client, weekRow) ?? [];
+  const occupied = await getOccupiedDaysForWeek(client, weekRow);
   if (!occupied.includes(todayIso)) {
     await ctx.answerCallbackQuery({ text: t("evening.postpone_expired", lang), show_alert: true }).catch(() => {});
     return false;
@@ -213,13 +217,15 @@ export async function handlePostponeMove(ctx: MyContext, params: string): Promis
 
   const newDays = replaceTrainingDay(occupied, todayIso, targetIso);
 
+  const logTag = source === "morning" ? "MORNING" : "EVENING";
+
   const { error } = await supabaseAdmin
     .from("program_schedule")
     .update({ training_days: newDays, updated_at: new Date().toISOString() })
     .eq("id", weekRow.id);
 
   if (error) {
-    console.error(`[EVENING] Postpone save error for ${client.id}:`, error.message);
+    console.error(`[${logTag}] Postpone save error for ${client.id}:`, error.message);
     await ctx.answerCallbackQuery({ text: t("error.service_unavailable", lang), show_alert: true }).catch(() => {});
     return false;
   }
@@ -229,13 +235,13 @@ export async function handlePostponeMove(ctx: MyContext, params: string): Promis
     date: todayStr,
     week: weekRow.week_number,
     day_order: null,
-    exercise: source === "morning" ? "[MORNING_POSTPONE]" : "[EVENING_POSTPONE]",
-    comment: `Moved training to weekday ${targetIso}`,
+    exercise: source === "morning" ? MORNING_POSTPONE_MARKER : EVENING_POSTPONE_MARKER,
+    comment: `Moved training to weekday ${targetIso} (${source})`,
   } as never;
 
   const { error: logError } = await supabaseAdmin.from("workout_logs").insert(postponeLog);
   if (logError) {
-    console.warn(`[EVENING] Postpone log insert failed for ${client.id}:`, logError.message);
+    console.warn(`[${logTag}] Postpone log insert failed for ${client.id}:`, logError.message);
   }
 
   const dayName = t(`schedule.day_fullnames.${String(targetIso)}`, lang);
@@ -248,7 +254,7 @@ export async function handlePostponeMove(ctx: MyContext, params: string): Promis
   return true;
 }
 
-export async function handlePostponeWeek(ctx: MyContext, params = "evening"): Promise<boolean> {
+export async function handlePostponeWeek(ctx: MyContext, params: string): Promise<boolean> {
   if (!ctx.from?.id) return false;
 
   const client = ctx.client;
@@ -259,6 +265,7 @@ export async function handlePostponeWeek(ctx: MyContext, params = "evening"): Pr
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
   const lang = (client.language || "ru") as Language;
+  // Legacy buttons carry no source suffix: "" resolves to evening.
   const source: PostponeSource = params === "morning" ? "morning" : "evening";
 
   const weekRow = await getCurrentWeekRow(client, todayStr);
@@ -267,9 +274,11 @@ export async function handlePostponeWeek(ctx: MyContext, params = "evening"): Pr
     return false;
   }
 
+  const occupied = await getOccupiedDaysForWeek(client, weekRow);
+
   const opened = await startTrainingDaysSetup(ctx, {
     id: weekRow.id,
-    trainingDays: getEffectiveTrainingDays(client, weekRow) ?? [],
+    trainingDays: occupied,
   });
 
   if (opened) {

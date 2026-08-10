@@ -4,6 +4,7 @@ import { getParsedContent, flattenLoggableExercises, type ParsedDay } from "@/li
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { weekdayDateInWeek } from "@/lib/week-days";
+import { weekdayIsoFromName } from "@/lib/day-names";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { HistoryGrid } from "./history-grid";
@@ -29,6 +30,7 @@ type ScheduleRow = {
   week_number: number;
   start_date: string | null;
   end_date: string | null;
+  training_days: number[] | null;
 };
 
 const PSEUDO_EXERCISE = /^\[/;
@@ -98,20 +100,6 @@ function getIsoWeekday(dateStr: string): number {
   return iso === 0 ? 7 : iso;
 }
 
-const DAY_NAME_TO_ISO: Record<string, number> = {
-  понедельник: 1,
-  вторник: 2,
-  среда: 3,
-  четверг: 4,
-  пятница: 5,
-  суббота: 6,
-  воскресенье: 7,
-};
-
-function dayNameToIso(dayName: string): number {
-  return DAY_NAME_TO_ISO[normalizeName(dayName)] ?? 0;
-}
-
 export default async function HistoryPage() {
   const h = await headers();
   const clientId = h.get("x-client-id");
@@ -160,7 +148,7 @@ export default async function HistoryPage() {
 
   const { data: schedule } = await supabaseAdmin
     .from("program_schedule")
-    .select("week_number, start_date, end_date")
+    .select("week_number, start_date, end_date, training_days")
     .eq("client_id", clientId);
   const scheduleRows = (schedule ?? []) as ScheduleRow[];
   const trainingDays = client.training_days ?? [];
@@ -247,13 +235,21 @@ export default async function HistoryPage() {
     return week?.week_number ?? null;
   }
 
+  function weekRowForDate(date: string): ScheduleRow | null {
+    return (
+      scheduleRows.find(
+        (w) => w.start_date && w.end_date && date >= w.start_date && date <= w.end_date,
+      ) ?? null
+    );
+  }
+
   const plannedDateToOrder = new Map<number, Map<string, number>>();
   for (const week of parsed.weeks) {
     const scheduleRow = scheduleRows.find((w) => w.week_number === week.week_number);
     if (!scheduleRow?.start_date) continue;
     const map = new Map<string, number>();
     for (const day of week.days ?? []) {
-      const iso = dayNameToIso(day.day_name);
+      const iso = weekdayIsoFromName(day.day_name);
       if (iso < 1) continue;
       const plannedDate = weekdayDateInWeek(
         scheduleRow.start_date,
@@ -274,10 +270,14 @@ export default async function HistoryPage() {
 
     if (isSkipLog(log)) {
       let dayOrder = log.day_order;
-      if (dayOrder == null && trainingDays.length > 0) {
-        const iso = getIsoWeekday(log.date);
-        const index = trainingDays.indexOf(iso);
-        if (index !== -1) dayOrder = index + 1;
+      if (dayOrder == null) {
+        const weekRow = weekRowForDate(log.date);
+        const weekDays = weekRow?.training_days ?? trainingDays;
+        if (weekDays.length > 0) {
+          const iso = getIsoWeekday(log.date);
+          const index = weekDays.indexOf(iso);
+          if (index !== -1) dayOrder = index + 1;
+        }
       }
       if (dayOrder == null) {
         dayOrder = plannedDateToOrder.get(weekNumber)?.get(log.date) ?? null;

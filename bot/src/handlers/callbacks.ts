@@ -10,7 +10,16 @@ import {
 import { t, type Language } from "../i18n/index.js";
 import { setState, clearState } from "../state/machine.js";
 import { startExerciseLogging, handleWizardSkip } from "./wizard.js";
-import { handleEveningYes, handleEveningNo, handleEveningPostpone, handleMorningPostpone, handlePostponeMove, handlePostponeWeek, handlePostponeCancel, handlePostponeTaken } from "./evening-poll.js";
+import {
+  handleEveningYes,
+  handleEveningNo,
+  handleEveningPostpone,
+  handleMorningPostpone,
+  handlePostponeMove,
+  handlePostponeWeek,
+  handlePostponeCancel,
+  handlePostponeTaken,
+} from "./evening-poll.js";
 import { startMeasurements, showMeasurementHistory } from "./measurements.js";
 import { computeNextDayOfMonthDate, DEFERRED_MONTH_TTL_HOURS } from "../cron/measurement-reminder.js";
 import { handleScheduleStart, handleScheduleToggle, handleScheduleDone, handleScheduleCancel } from "./training-days.js";
@@ -21,6 +30,7 @@ import { getTodayDateStr } from "../lib/workout-utils.js";
 import { getCompositeLetters, flattenLoggableExercises } from "../lib/program-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { markAsSent } from "../cron/dedup.js";
+import { SKIP_MARKER } from "../lib/log-markers.js";
 
 type CallbackHandler = (ctx: MyContext, params: string) => Promise<void>;
 
@@ -398,7 +408,7 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
     date: todayStr,
     week: todayWorkout?.week_number ?? null,
     day_order: todayWorkout?.day_order ?? null,
-    exercise: "[SKIP]",
+    exercise: SKIP_MARKER,
     sets: null,
     reps: null,
     weight: null,

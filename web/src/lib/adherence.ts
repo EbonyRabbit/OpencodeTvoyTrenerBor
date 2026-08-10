@@ -1,5 +1,6 @@
 import type { ParsedContent } from "./program-utils";
 import { weekdayDateInWeek } from "./week-days";
+import { weekdayIsoFromName } from "./day-names";
 
 export type WeekAdherence = {
   weekNumber: number;
@@ -60,26 +61,12 @@ function isCompletedDay(
   return plannedNames.every((name) => loggedNames.has(name));
 }
 
-const DAY_NAME_TO_ISO: Record<string, number> = {
-  понедельник: 1,
-  вторник: 2,
-  среда: 3,
-  четверг: 4,
-  пятница: 5,
-  суббота: 6,
-  воскресенье: 7,
-};
-
-function dayNameToIso(dayName: string): number {
-  return DAY_NAME_TO_ISO[normalizeName(dayName)] ?? 0;
-}
-
 function plannedDateForDay(
   weekStartDate: string,
   weekEndDate: string,
   dayName: string,
 ): string | null {
-  const iso = dayNameToIso(dayName);
+  const iso = weekdayIsoFromName(dayName);
   if (iso < 1) return null;
   return weekdayDateInWeek(weekStartDate, weekEndDate, iso);
 }

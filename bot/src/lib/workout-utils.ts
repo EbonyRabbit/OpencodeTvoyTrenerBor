@@ -4,6 +4,7 @@ import { getParsedContent, flattenLoggableExercises, getCompositeLetters, type P
 import { getEffectiveTrainingDays, weekdayDateInWeek } from "./postpone-utils.js";
 import { t, type Language } from "../i18n/index.js";
 import { DEFAULT_TIMEZONE } from "./constants.js";
+import { isPseudoExercise } from "./log-markers.js";
 
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
@@ -122,6 +123,29 @@ export async function getWorkoutPlan(
   };
 }
 
+export async function getOccupiedDaysForWeek(
+  client: Client,
+  weekRow: CurrentWeekRow,
+): Promise<number[]> {
+  const effective = getEffectiveTrainingDays(client, weekRow);
+  if (effective && effective.length > 0) return effective;
+
+  const plan = await getWorkoutPlan(client, weekRow.week_number, {
+    is_deload: weekRow.is_deload,
+    focus: weekRow.focus,
+  });
+  if (!plan?.days?.length) return [];
+
+  const occupied = new Set<number>();
+  for (const day of [...plan.days].sort((a, b) => a.day_order - b.day_order)) {
+    const iso = weekdayIsoFromName(day.day_name);
+    if (iso < 1) continue;
+    const date = weekdayDateInWeek(weekRow.start_date ?? "", weekRow.end_date, iso);
+    if (date) occupied.add(iso);
+  }
+  return [...occupied];
+}
+
 const isoDayFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
 export function getTodayISODay(timezone: string): number {
@@ -189,12 +213,19 @@ const RU_DAY_NAME_TO_ISO: Record<string, number> = {
   воскресенье: 7,
 };
 
-export function dayNameToIso(dayName: string): number {
-  return RU_DAY_NAME_TO_ISO[dayName.trim().toLowerCase()] ?? 0;
+export function weekdayIsoFromName(dayName: string): number {
+  const normalized = dayName.trim().toLowerCase();
+  if (!normalized) return 0;
+  const exact = RU_DAY_NAME_TO_ISO[normalized];
+  if (exact) return exact;
+  for (const [name, iso] of Object.entries(RU_DAY_NAME_TO_ISO)) {
+    if (normalized.includes(name)) return iso;
+  }
+  return 0;
 }
 
 export function plannedDateForDay(weekStartDate: string, dayName: string): string | null {
-  const iso = dayNameToIso(dayName);
+  const iso = weekdayIsoFromName(dayName);
   if (iso < 1) return null;
   return weekdayDateInWeek(weekStartDate, null, iso);
 }
@@ -288,10 +319,8 @@ export interface PreviousLog {
   heart_rate: number | null;
 }
 
-const PSEUDO_EXERCISE = /^\[/;
-
 export function isPseudoName(name: string): boolean {
-  return PSEUDO_EXERCISE.test(name.trim());
+  return isPseudoExercise(name);
 }
 
 function escapeLikeValue(value: string): string {

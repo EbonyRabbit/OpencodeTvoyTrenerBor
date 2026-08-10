@@ -73,7 +73,7 @@ export default async function WorkoutsPage({
     safeFetch(
       supabase
         .from("program_schedule")
-        .select("week_number, start_date, end_date, focus, status")
+        .select("week_number, start_date, end_date, focus, status, training_days")
         .eq("client_id", id)
         .order("week_number", { ascending: true }),
       [],

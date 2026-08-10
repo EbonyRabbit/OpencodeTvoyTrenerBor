@@ -69,7 +69,23 @@ export async function handleEveningNo(ctx: MyContext): Promise<boolean> {
   return handleEveningResponse(ctx, "no");
 }
 
+export type PostponeSource = "evening" | "morning";
+
+function postponeHeader(source: PostponeSource, lang: Language): string {
+  return source === "morning"
+    ? t("morning.postpone_prompt", lang)
+    : t("evening.poll_question", lang);
+}
+
 export async function handleEveningPostpone(ctx: MyContext): Promise<boolean> {
+  return openPostponePicker(ctx, "evening");
+}
+
+export async function handleMorningPostpone(ctx: MyContext): Promise<boolean> {
+  return openPostponePicker(ctx, "morning");
+}
+
+async function openPostponePicker(ctx: MyContext, source: PostponeSource): Promise<boolean> {
   if (!ctx.from?.id || !ctx.callbackQuery?.id) return false;
 
   const client = ctx.client;
@@ -111,8 +127,8 @@ export async function handleEveningPostpone(ctx: MyContext): Promise<boolean> {
 
   await ctx
     .editMessageText(
-      `${t("evening.poll_question", lang)}\n\n${t("evening.postpone_title", lang)}\n${t("evening.postpone_hint", lang)}`,
-      { reply_markup: { inline_keyboard: buildPostponeKeyboard(available, occupied, lang) } },
+      `${postponeHeader(source, lang)}\n\n${t("evening.postpone_title", lang)}\n${t("evening.postpone_hint", lang)}`,
+      { reply_markup: { inline_keyboard: buildPostponeKeyboard(available, occupied, lang, source) } },
     )
     .catch(() => {});
 
@@ -123,6 +139,7 @@ export function buildPostponeKeyboard(
   available: number[],
   occupied: number[],
   lang: Language,
+  source: PostponeSource = "evening",
 ): { text: string; callback_data: string }[][] {
   const rows: { text: string; callback_data: string }[][] = [];
 
@@ -133,26 +150,28 @@ export function buildPostponeKeyboard(
         text: taken
           ? `⛔ ${weekdayShortLabel(iso, lang)} · ${t("evening.postpone_taken", lang)}`
           : `✅ ${weekdayShortLabel(iso, lang)}`,
-        callback_data: taken ? `postpone_taken:${iso}` : `postpone_move:${iso}`,
+        callback_data: taken ? `postpone_taken:${iso}` : `postpone_move:${iso}:${source}`,
       },
     ]);
   }
 
-  rows.push([{ text: t("evening.postpone_week_button", lang), callback_data: "postpone_week" }]);
+  rows.push([{ text: t("evening.postpone_week_button", lang), callback_data: `postpone_week:${source}` }]);
   rows.push([{ text: t("evening.postpone_cancel", lang), callback_data: "postpone_cancel" }]);
 
   return rows;
 }
 
-export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promise<boolean> {
+export async function handlePostponeMove(ctx: MyContext, params: string): Promise<boolean> {
   if (!ctx.client || !ctx.from?.id || !ctx.callbackQuery?.id) return false;
 
+  const [isoRaw, sourceRaw] = params.split(":");
   const client = ctx.client;
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
   const lang = (client.language || "ru") as Language;
   const targetIso = Number(isoRaw);
   const todayIso = getTodayISODay(tz);
+  const source: PostponeSource = sourceRaw === "morning" ? "morning" : "evening";
 
   if (!Number.isInteger(targetIso) || targetIso < 1 || targetIso > 7) {
     await ctx.answerCallbackQuery({ text: t("evening.postpone_unavailable", lang), show_alert: true }).catch(() => {});
@@ -210,7 +229,7 @@ export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promis
     date: todayStr,
     week: weekRow.week_number,
     day_order: null,
-    exercise: "[EVENING_POSTPONE]",
+    exercise: source === "morning" ? "[MORNING_POSTPONE]" : "[EVENING_POSTPONE]",
     comment: `Moved training to weekday ${targetIso}`,
   } as never;
 
@@ -223,13 +242,13 @@ export async function handlePostponeMove(ctx: MyContext, isoRaw: string): Promis
 
   await ctx.answerCallbackQuery().catch(() => {});
   await ctx
-    .editMessageText(`${t("evening.poll_question", lang)}\n\n${t("evening.postpone_moved", lang, { day: dayName })}`)
+    .editMessageText(`${postponeHeader(source, lang)}\n\n${t("evening.postpone_moved", lang, { day: dayName })}`)
     .catch(() => {});
 
   return true;
 }
 
-export async function handlePostponeWeek(ctx: MyContext): Promise<boolean> {
+export async function handlePostponeWeek(ctx: MyContext, params = "evening"): Promise<boolean> {
   if (!ctx.from?.id) return false;
 
   const client = ctx.client;
@@ -240,6 +259,7 @@ export async function handlePostponeWeek(ctx: MyContext): Promise<boolean> {
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
   const lang = (client.language || "ru") as Language;
+  const source: PostponeSource = params === "morning" ? "morning" : "evening";
 
   const weekRow = await getCurrentWeekRow(client, todayStr);
   if (!weekRow) {
@@ -254,7 +274,7 @@ export async function handlePostponeWeek(ctx: MyContext): Promise<boolean> {
 
   if (opened) {
     await ctx
-      .editMessageText(`${t("evening.poll_question", lang)}\n\n${t("evening.postpone_editor_open", lang)}`)
+      .editMessageText(`${postponeHeader(source, lang)}\n\n${t("evening.postpone_editor_open", lang)}`)
       .catch(() => {});
   }
 

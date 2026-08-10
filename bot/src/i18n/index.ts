@@ -159,6 +159,8 @@ const resources = {
       morning: {
         greeting: "Доброе утро, {{name}}! 💪",
         header: "План тренировки на сегодня:",
+        btn_postpone: "🔁 Перенести",
+        postpone_prompt: "Перенести тренировку на другой день:",
       },
       evening: {
         poll_question: "Тренировка сегодня была?",
@@ -598,6 +600,8 @@ const resources = {
       morning: {
         greeting: "Good morning, {{name}}! 💪",
         header: "Today's workout plan:",
+        btn_postpone: "🔁 Postpone",
+        postpone_prompt: "Move today's workout to another day:",
       },
       evening: {
         poll_question: "Did you work out today?",

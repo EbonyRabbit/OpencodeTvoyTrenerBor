@@ -55,7 +55,8 @@ function parseMorningTime(timeStr: string): { hour: number; minute: number } | n
 function buildMorningKeyboard(lang: Language): InlineKeyboard {
   return new InlineKeyboard()
     .text(t("workout.open_button", lang), "today_open")
-    .text(t("workout.skip_button", lang), "skip_workout");
+    .text(t("workout.skip_button", lang), "skip_workout")
+    .text(t("morning.btn_postpone", lang), "morning_postpone");
 }
 
 function sleep(ms: number): Promise<void> {

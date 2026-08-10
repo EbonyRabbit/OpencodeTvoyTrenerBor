@@ -101,7 +101,7 @@ export async function runEveningPoll(bot: Bot<MyContext>): Promise<void> {
           .eq("date", todayStr);
 
         const hasCompletion = (existingLogs ?? []).some(
-          (log) => log.exercise && log.exercise !== "[SKIP]" && !log.exercise.startsWith("[EVENING_"),
+          (log) => log.exercise && log.exercise !== "[SKIP]" && !log.exercise.startsWith("[EVENING_") && !log.exercise.startsWith("[MORNING_"),
         );
         if (hasCompletion) continue;
 

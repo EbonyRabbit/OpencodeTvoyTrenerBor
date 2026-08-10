@@ -927,16 +927,17 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **17.1** | Миграция БД | `supabase/migrations/20260808xxxxxx_add_week_training_days.sql`: `ALTER TABLE program_schedule ADD COLUMN training_days INTEGER[] NULL` | ⬜ |
-| **17.2** | Типы бота | `bot/src/lib/types.ts`: `training_days` в `ProgramScheduleRow/Insert/Update` (клиенты, схема program_schedule) | ⬜ |
-| **17.3** | Типы веба | `web/src/types/supabase.ts`: `training_days` в `program_schedule.Row/Insert/Update` | ⬜ |
-| **17.4** | Бот: эффективная маска недели | `bot/src/lib/workout-utils.ts`: `getEffectiveTrainingDays(client, weekRow)` → `weekRow.training_days ?? client.training_days`; использование в `getTodayWorkout` (селект `training_days` из строки недели) | ⬜ |
-| **17.5** | Бот: флоу переноса | `evening-poll.ts` + `handlers/callbacks.ts` + state machine: «Перенести» → список дней вт–Вс (занятые помечены, alert при нажатии) → колбэк выбора → update `program_schedule.training_days` | ⬜ |
-| **17.6** | Бот: перевыбор недели | Опция «📅 Изменить всё расписание недели» → мультитора (как `training-days.ts` sched_toggle) → сохранение в неделю | ⬜ |
-| **17.7** | Бот: i18n | `i18n/index.ts` ru/en: заголовок выбора дня, «занято», подтверждение, панель изменения расписания, отмена | ⬜ |
-| **17.8** | Веб-портал | `client/[token]/workout/page.tsx` + `client/[token]/page.tsx`: учитывать недельный оверрайд (запрос `program_schedule` текущей недели `training_days`) | ⬜ |
-| **17.9** | Тесты | Бот: unit `effectiveTrainingDays`/`matchDayForToday` с оверрайдом, перенос в неделе; Web: adherence с оверрайдом недели | ⬜ |
-| **17.10** | Верификация + gate | bot tsc + vitest; web tsc + vitest + next build; ревью `@code-reviewer` ≥9.5; коммит+push | ⬜ |
+| **17.1** | Миграция БД | `supabase/migrations/20260809..._add_program_schedule_training_days.sql`: `ALTER TABLE program_schedule ADD COLUMN IF NOT EXISTS training_days INTEGER[] NULL` | ✅ |
+| **17.2** | Типы бота | `bot/src/lib/types.ts`: `training_days` в `ProgramScheduleRow/Insert/Update` (клиенты, схема program_schedule) | ✅ |
+| **17.3** | Типы веба | `web/src/types/supabase.ts`: `training_days` в `program_schedule.Row/Insert/Update` | ✅ |
+| **17.4** | Бот: эффективная маска недели | `bot/src/lib/postpone-utils.ts`: `getEffectiveTrainingDays(client, weekRow)` → `weekRow.training_days ?? client.training_days`; общий `getCurrentWeekRow` в `workout-utils.ts` + использование в `getTodayWorkout` | ✅ |
+| **17.5** | Бот: флоу переноса | `evening-poll.ts` + `callbacks.ts`: «Перенести» → свободные дни недели (✅/⛔, `postpone_taken` alert) → перенос через `replaceTrainingDay` (позиционный) + `[EVENING_POSTPONE]` лог; race-guard (свежий ре-фетч + «сегодня ещё занят» + дата цели > сегодня, `weekdayDateInWeek`) | ✅ |
+| **17.6** | Бот: перевыбор недели | «📅 Изменить все дни недели» → готовый редактор `startTrainingDaysSetup(weekOverride)`; сохранение в неделю БЕЗ сортировки (`finalizeSchedule`, позиционная семантика) | ✅ |
+| **17.7** | Бот: i18n | `i18n/index.ts` ru/en: все `postpone_*` ключи; `postpone_editor_open`; мёртвый `response_postpone` удалён | ✅ |
+| **17.8** | Веб-портал | `client/[token]/workout/page.tsx` (weekTrainingDays), `page.tsx` (селект `training_days`), `adherence.ts` (оверрайд недели); общий `web/src/lib/week-days.ts` (anchor-aware датирование) + history page | ✅ |
+| **17.9** | Тесты | Бот 276: `postpone-utils` (21), `finalizeSchedule`, mid-week `weekdayDateInWeek`+`plannedDateForDay`, adherence оверрайд; Web 58: `week-days`, adherence mid-week window | ✅ |
+| **17.10** | Верификация + gate | bot/web tsc + vitest + next build; ревью `@code-reviewer` 9.6/10 (4 раунда: 8.8 → 8.6 → 8.4 → 9.0 → 9.4 → 9.6); коммиты 606a66b…f00fdfb, все запушены | ✅ |
+| **17.11** | E2E прод | Миграция `db push`; тест на проде: перенос тренировки в Telegram, проверка расписания недели, вечерний опрос в старый день не приходит | ⬜ |
 | **17.11** | E2E прод | Миграция `db push`; тест на проде: перенос тренировки в Telegram, проверка расписания недели, вечерний опрос в старый день не приходит | ⬜ |
 
 ### Файлы для создания/изменения

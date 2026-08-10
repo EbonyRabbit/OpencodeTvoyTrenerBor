@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay, getTodayDayOfMonth, parseTimeRounded } from "../workout-utils.js";
+import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay, getTodayDayOfMonth, parseTimeRounded, plannedDateForDay } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -331,6 +331,25 @@ describe("isTodayWorkoutCompleted", () => {
     await isTodayWorkoutCompleted(client, workout);
     expect(eq1).toHaveBeenCalledWith("client_id", "client-1");
     expect(eq2).toHaveBeenCalledWith("date", expect.any(String));
+  });
+});
+
+describe("plannedDateForDay", () => {
+  it("maps day names to dates in a Monday-anchored week", () => {
+    expect(plannedDateForDay("2026-08-03", "понедельник")).toBe("2026-08-03");
+    expect(plannedDateForDay("2026-08-03", "суббота")).toBe("2026-08-08");
+    expect(plannedDateForDay("2026-08-03", "воскресенье")).toBe("2026-08-09");
+  });
+
+  it("maps day names to dates in a mid-week-anchored week", () => {
+    // Week starts Wednesday 2026-08-05: Saturday of that window is 2026-08-08
+    expect(plannedDateForDay("2026-08-05", "суббота")).toBe("2026-08-08");
+    expect(plannedDateForDay("2026-08-05", "вторник")).toBe("2026-08-11");
+  });
+
+  it("returns null for unknown day names and invalid dates", () => {
+    expect(plannedDateForDay("2026-08-03", "no-such-day")).toBeNull();
+    expect(plannedDateForDay("not-a-date", "понедельник")).toBeNull();
   });
 });
 

@@ -33,15 +33,13 @@ export function weekdayDateInWeek(
     : new Date(start.getTime() + 6 * MS_PER_DAY);
   if (isNaN(end.getTime()) || end < start) return null;
 
-  const seen = new Set<number>();
+  let iterations = 0;
   const cursor = new Date(start);
   while (cursor <= end) {
-    const cursorIso = isoDayOfUTC(cursor);
-    if (cursorIso === iso) {
+    if (++iterations > 7) return null;
+    if (isoDayOfUTC(cursor) === iso) {
       return cursor.toISOString().slice(0, 10);
     }
-    seen.add(cursorIso);
-    if (seen.size === 7) return null;
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
@@ -52,10 +50,9 @@ export function availablePostponeDays(todayStr: string, endDate: string | null):
   const start = parseUTCDate(todayStr);
   if (isNaN(start.getTime())) return [];
 
-  const todayIso = isoDayOfUTC(start);
   const end = endDate
     ? parseUTCDate(endDate)
-    : new Date(start.getTime() + (7 - todayIso) * MS_PER_DAY);
+    : new Date(start.getTime() + 6 * MS_PER_DAY);
 
   if (isNaN(end.getTime()) || end < start) return [];
 
@@ -63,7 +60,7 @@ export function availablePostponeDays(todayStr: string, endDate: string | null):
   const seen = new Set<number>();
   const cursor = new Date(start.getTime() + MS_PER_DAY);
 
-  while (cursor <= end) {
+  while (cursor <= end && seen.size < 7) {
     const iso = isoDayOfUTC(cursor);
     if (!seen.has(iso)) {
       seen.add(iso);

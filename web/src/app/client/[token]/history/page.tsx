@@ -250,14 +250,25 @@ export default async function HistoryPage() {
   for (const week of parsed.weeks) {
     const scheduleRow = scheduleRows.find((w) => w.week_number === week.week_number);
     if (!scheduleRow?.start_date) continue;
+    const start = new Date(`${scheduleRow.start_date}T12:00:00Z`);
+    if (isNaN(start.getTime())) continue;
+    const end = scheduleRow.end_date
+      ? new Date(`${scheduleRow.end_date}T12:00:00Z`)
+      : new Date(start.getTime() + 6 * 86_400_000);
+    if (isNaN(end.getTime()) || end < start) continue;
     const map = new Map<string, number>();
     for (const day of week.days ?? []) {
       const iso = dayNameToIso(day.day_name);
-      if (iso < 1) continue;
-      const date = new Date(`${scheduleRow.start_date}T12:00:00Z`);
-      if (isNaN(date.getTime())) continue;
-      date.setUTCDate(date.getUTCDate() + (iso - 1));
-      map.set(date.toISOString().slice(0, 10), day.day_order);
+      if (iso < 1 || iso > 7) continue;
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        const cursorIso = cursor.getUTCDay() === 0 ? 7 : cursor.getUTCDay();
+        if (cursorIso === iso) {
+          map.set(cursor.toISOString().slice(0, 10), day.day_order);
+          break;
+        }
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
     }
     if (map.size > 0) plannedDateToOrder.set(week.week_number, map);
   }

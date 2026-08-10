@@ -54,8 +54,8 @@ describe("availablePostponeDays", () => {
     expect(availablePostponeDays("2026-08-08", "2026-08-11")).toEqual([7, 1, 2]);
   });
 
-  it("falls back to the end of the current ISO week when endDate is null", () => {
-    // Monday 2026-08-03, no endDate -> up to Sunday
+  it("falls back to a 7-day window from today when endDate is null", () => {
+    // Monday 2026-08-03, no endDate -> up to 2026-08-09 (same weekday next week)
     expect(availablePostponeDays("2026-08-03", null)).toEqual([2, 3, 4, 5, 6, 7]);
   });
 

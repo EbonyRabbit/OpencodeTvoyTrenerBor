@@ -73,13 +73,26 @@ function dayNameToIso(dayName: string): number {
   return DAY_NAME_TO_ISO[normalizeName(dayName)] ?? 0;
 }
 
-function plannedDateForDay(weekStartDate: string, dayName: string): string | null {
+function plannedDateForDay(
+  weekStartDate: string,
+  weekEndDate: string | null,
+  dayName: string,
+): string | null {
   const iso = dayNameToIso(dayName);
-  if (iso < 1) return null;
-  const date = new Date(`${weekStartDate}T12:00:00Z`);
-  if (isNaN(date.getTime())) return null;
-  date.setUTCDate(date.getUTCDate() + (iso - 1));
-  return date.toISOString().slice(0, 10);
+  if (iso < 1 || iso > 7) return null;
+  const start = new Date(`${weekStartDate}T12:00:00Z`);
+  if (isNaN(start.getTime())) return null;
+  const end = weekEndDate
+    ? new Date(`${weekEndDate}T12:00:00Z`)
+    : new Date(start.getTime() + 6 * 86_400_000);
+  if (isNaN(end.getTime()) || end < start) return null;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const cursorIso = cursor.getUTCDay() === 0 ? 7 : cursor.getUTCDay();
+    if (cursorIso === iso) return cursor.toISOString().slice(0, 10);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return null;
 }
 
 export function calculateAdherence(
@@ -211,7 +224,7 @@ function countWeekByDayOrder(
     const plannedNames = day.exercises.map((ex) => normalizeName(ex.name)).filter(isRealExercise);
     if (plannedNames.length === 0) continue;
 
-    const plannedDate = plannedDateForDay(week.start_date, day.day_name);
+    const plannedDate = plannedDateForDay(week.start_date, week.end_date, day.day_name);
     if (plannedDate != null && plannedDate > today) continue;
 
     expected++;

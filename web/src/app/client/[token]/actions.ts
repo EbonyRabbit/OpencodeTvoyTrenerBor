@@ -58,8 +58,11 @@ function validateExerciseLog(ex: ExerciseLog): string | null {
   if (ex.type === "cardio" && (
     ex.distance_km === null || ex.duration_sec === null || ex.heart_rate === null || ex.pace === null
   )) return `${ex.exercise}: заполните дистанцию, время, темп и пульс`;
-  if (ex.type === "circuit" && (ex.rounds === null || ex.duration_sec === null)) {
-    return `${ex.exercise}: заполните раунды и время`;
+  if (ex.type === "circuit" && ex.rounds === null) {
+    return `${ex.exercise}: укажите число раундов или МАКС`;
+  }
+  if (ex.type === "circuit" && ex.duration_sec !== null) {
+    return `${ex.exercise}: время для круговой не указывается`;
   }
   return null;
 }

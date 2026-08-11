@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getParsedContent, flattenLoggableExercises, type ParsedDay } from "@/lib/program-utils";
+import { getParsedContent, flattenLoggableExercises, getCompositeLetters, type ParsedDay, type ParsedExercise } from "@/lib/program-utils";
+import type { HistoryEntry } from "@/lib/history-format";
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { weekdayDateInWeek } from "@/lib/week-days";
@@ -47,21 +48,6 @@ function isSkipLog(log: WorkoutLogRow): boolean {
   return normalizeName(log.exercise).startsWith("[skip]");
 }
 
-export type HistoryEntry = {
-  exercise: string;
-  weight: number | null;
-  sets: number | null;
-  reps: string | null;
-  rpe: number | null;
-  rounds: number | null;
-  distance_km: number | null;
-  duration_sec: number | null;
-  heart_rate: number | null;
-  pace: string | null;
-  comment: string | null;
-  date: string;
-};
-
 export type HistoryCell = {
   entries: HistoryEntry[];
 };
@@ -69,6 +55,8 @@ export type HistoryCell = {
 export type HistoryRow = {
   day_order: number;
   exercise: string;
+  children: ParsedExercise[];
+  compositeLetter: string | null;
   cells: Array<HistoryCell | null>;
 };
 
@@ -200,6 +188,14 @@ export default async function HistoryPage() {
       }
 
       const names = new Set<string>();
+      const circuitLetters = new Map<string, string>();
+      const compositeLetters = getCompositeLetters(day.exercises ?? []);
+      (day.exercises ?? []).forEach((ex, i) => {
+        if (ex.type === "circuit") {
+          const n = normalizeName(ex.name);
+          if (n) circuitLetters.set(n, compositeLetters.get(i) ?? "A");
+        }
+      });
       for (const ex of flattenLoggableExercises(day.exercises ?? [])) {
         const name = normalizeName(ex.name);
         if (!name) continue;
@@ -209,6 +205,8 @@ export default async function HistoryPage() {
           historyDay.rows.push({
             day_order: day.day_order,
             exercise: ex.name,
+            children: ex.type === "circuit" ? (ex.children ?? []) : [],
+            compositeLetter: ex.type === "circuit" ? (circuitLetters.get(name) ?? null) : null,
             cells: Array.from({ length: weekCount }, () => null),
           });
         }

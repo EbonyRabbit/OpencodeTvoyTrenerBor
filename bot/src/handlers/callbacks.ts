@@ -5,6 +5,7 @@ import {
   isTodayWorkoutCompleted,
   formatSingleExercise,
   getPreviousWorkoutLogs,
+  collectLoggableNames,
   type TodayWorkout,
 } from "../lib/workout-utils.js";
 import { t, type Language } from "../i18n/index.js";
@@ -27,7 +28,7 @@ import { handleResumeCallback } from "./resume.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
-import { getCompositeLetters, flattenLoggableExercises } from "../lib/program-utils.js";
+import { getCompositeLetters } from "../lib/program-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { markAsSent } from "../cron/dedup.js";
 import { SKIP_MARKER } from "../lib/log-markers.js";
@@ -229,7 +230,7 @@ export async function showExercise(
   const currentExercise = effectiveWorkout.exercises[index];
   const lastLogs = await getPreviousWorkoutLogs(
     ctx.client,
-    flattenLoggableExercises([currentExercise]).map((ex) => ex.name),
+    collectLoggableNames([currentExercise]),
   );
   const text = formatSingleExercise(
     index,

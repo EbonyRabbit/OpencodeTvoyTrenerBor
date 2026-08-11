@@ -198,10 +198,6 @@ export function WorkoutForm({
           setError(`${ex.name}: укажите число раундов или МАКС`);
           return;
         }
-        if (!inp.duration.trim() || toDurationSec(inp.duration) == null) {
-          setError(`${ex.name}: укажите корректное время`);
-          return;
-        }
       } else {
         if (inp.sets.trim() && (toNum(inp.sets) == null || !Number.isInteger(toNum(inp.sets)))) {
           setError(`${ex.name}: подходы должны быть целым неотрицательным числом`);
@@ -250,7 +246,7 @@ export function WorkoutForm({
             rpe: null,
             rounds: amrapRoundsToInt(inp.rounds),
             distance_km: null,
-            duration_sec: toDurationSec(inp.duration),
+            duration_sec: null,
             heart_rate: null,
             pace: null,
             comment: inp.comment || null,
@@ -325,7 +321,6 @@ export function WorkoutForm({
               ) : type === "circuit" ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Field label="Раунды" value={inputs[i].rounds} onChange={(v) => updateField(i, "rounds", v)} placeholder={ex.rounds ?? "МАКС"} />
-                  <Field label="Время" value={inputs[i].duration} onChange={(v) => updateField(i, "duration", v)} placeholder={ex.duration ?? "мин"} />
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

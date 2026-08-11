@@ -73,7 +73,7 @@ type WizardStep =
 
 const STRENGTH_STEPS: WizardStep[] = ["sets", "reps", "weight", "rpe", "comment"];
 const CARDIO_STEPS: WizardStep[] = ["duration", "distance", "pace", "heart_rate", "comment"];
-const CIRCUIT_STEPS: WizardStep[] = ["rounds", "duration", "comment"];
+const CIRCUIT_STEPS: WizardStep[] = ["rounds", "comment"];
 const SUPERSET_PARENT_STEPS: WizardStep[] = ["sets"];
 const SUPERSET_CHILD_STEPS: WizardStep[] = ["reps", "weight", "rpe", "comment"];
 
@@ -198,7 +198,6 @@ function buildSummary(data: WizardData, lang: Language): string {
   if (data.type === "circuit") {
     const metrics: string[] = [];
     if (data.rounds) metrics.push(t("wizard.summary_rounds", lang, { rounds: data.rounds }));
-    if (data.duration) metrics.push(t("wizard.summary_duration", lang, { duration: formatDurationLabel(data.duration, lang) }));
     const commentLine = data.comment ? `\n${t("wizard.summary_comment", lang, { comment: data.comment })}` : "";
     return t("wizard.logged_summary_circuit", lang, {
       exercise: data.exercise_name,
@@ -549,7 +548,7 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
       weight: null,
       rpe: null,
       rounds: roundsValue(data.rounds),
-      duration_sec: data.duration ? Number(data.duration) : null,
+      duration_sec: null,
       distance_km: null,
       heart_rate: null,
       pace: null,

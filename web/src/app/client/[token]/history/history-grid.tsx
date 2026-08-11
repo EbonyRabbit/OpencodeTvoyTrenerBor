@@ -1,39 +1,14 @@
 "use client";
 
-import type { HistoryDay, HistoryEntry } from "./page";
-
-function formatSetsReps(entry: HistoryEntry): string | null {
-  const perSetList = entry.reps?.includes("/");
-  if (perSetList) return entry.reps ?? null;
-  if (entry.sets != null && entry.reps) return `${entry.sets}×${entry.reps}`;
-  if (entry.sets != null) return `${entry.sets} подх.`;
-  return entry.reps ?? null;
-}
-
-function formatWeight(entry: HistoryEntry): string | null {
-  if (entry.weight == null) return null;
-  return entry.weight > 0 ? `${entry.weight} кг` : "вес тела";
-}
-
-function formatDuration(entry: HistoryEntry): string | null {
-  if (entry.duration_sec == null || entry.duration_sec <= 0) return null;
-  const total = entry.duration_sec;
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return m > 0 ? `${m} мин` : `${s} сек`;
-}
-
-function formatMetrics(entry: HistoryEntry): string[] {
-  const metrics: string[] = [];
-  if (entry.rounds != null) metrics.push(entry.rounds === -1 ? "МАКС раундов" : `${entry.rounds} раунд.`);
-  if (entry.distance_km != null && entry.distance_km > 0) metrics.push(`${entry.distance_km} км`);
-  if (entry.duration_sec != null && entry.duration_sec > 0) metrics.push(formatDuration(entry)!);
-  if (entry.pace) metrics.push(`темп ${entry.pace}`);
-  if (entry.heart_rate != null) metrics.push(`пульс ${entry.heart_rate}`);
-  return metrics;
-}
+import type { HistoryDay } from "./page";
+import type { HistoryEntry } from "@/lib/history-format";
+import {
+  formatDate,
+  formatMetrics,
+  formatPlannedChild,
+  formatSetsReps,
+  formatWeight,
+} from "@/lib/history-format";
 
 export function HistoryGrid({
   days,
@@ -132,6 +107,15 @@ function DayGroup({
         <tr key={row.day_order + ":" + row.exercise}>
           <td className="sticky left-0 z-10 border-b border-r bg-background px-3 py-2 align-top font-medium">
             {row.exercise}
+            {row.children.length > 0 && (
+              <div className="mt-0.5 space-y-0.5 font-normal">
+                {row.children.map((child, ci) => (
+                  <div key={ci} className="text-xs text-muted-foreground">
+                    {formatPlannedChild(child, row.compositeLetter, ci)}
+                  </div>
+                ))}
+              </div>
+            )}
           </td>
           {row.cells.map((cell, i) => {
             const week = i + 1;
@@ -169,18 +153,6 @@ function DayGroup({
       ))}
     </>
   );
-}
-
-const MONTHS_SHORT = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-
-function formatDate(entry: HistoryEntry): string | null {
-  if (!entry.date) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(entry.date);
-  if (!match) return entry.date;
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return entry.date;
-  return `${day} ${MONTHS_SHORT[month - 1]}`;
 }
 
 function EntryLine({ entry }: { entry: HistoryEntry }) {

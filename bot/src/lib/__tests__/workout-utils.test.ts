@@ -161,11 +161,67 @@ describe("formatExercise", () => {
     expect(result).toContain("Пульс: 140-160");
   });
 
-  it("renders circuit with rounds goal", () => {
-    const ex = { name: "Круг на всё тело", type: "circuit", rounds: "МАКС", duration: "20 мин" };
+  it("renders circuit with children and rounds goal", () => {
+    const ex = {
+      name: "Круг на всё тело",
+      type: "circuit",
+      rounds: "МАКС",
+      duration: "20 мин",
+      children: [
+        { name: "Берпи", sets: "3", reps: "15" },
+        { name: "Присед", sets: "3", reps: "10", weight: "20" },
+      ],
+    };
     const result = formatExercise(1, ex as never, "ru", new Map());
-    expect(result).toContain("МАКС раундов");
-    expect(result).toContain("за 20 мин");
+    expect(result).toContain("(круг)");
+    expect(result).toContain("A1. Берпи");
+    expect(result).toContain("3×15");
+    expect(result).toContain("A2. Присед");
+    expect(result).toContain("20 кг");
+    expect(result).toContain("Цель: МАКС раундов");
+    expect(result).not.toContain("за 20 мин");
+    expect(result).not.toContain("20 мин");
+  });
+
+  it("renders circuit children with bodyweight and sets-only fallback", () => {
+    const ex = {
+      name: "Круг",
+      type: "circuit",
+      rounds: "3",
+      children: [
+        { name: "Отжимания", sets: "3", reps: "15", weight: "0" },
+        { name: "Планка", sets: "4" },
+      ],
+    };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("A1. Отжимания");
+    expect(result).toContain("3×15 · вес тела");
+    expect(result).toContain("A2. Планка");
+    expect(result).toContain("4 подх.");
+    expect(result).not.toContain("0 кг");
+  });
+
+  it("shows previous rounds for the circuit parent in day plan", () => {
+    const ex = {
+      name: "Круг на всё тело",
+      type: "circuit",
+      rounds: "4",
+      children: [{ name: "Берпи", sets: "3", reps: "15" }],
+    };
+    const map = new Map<string, { rounds: number; duration_sec: number; sets: number | null; reps: string | null; weight: number | null }>();
+    map.set("круг на всё тело", { rounds: 3, duration_sec: 900, sets: null, reps: null, weight: null });
+    const result = formatExercise(1, ex as never, "ru", map);
+    expect(result).toContain("Прошлый раз");
+    expect(result).toContain("3 раунд");
+    expect(result).not.toContain("мин");
+  });
+
+  it("pluralizes the circuit goal rounds", () => {
+    const base = { name: "Круг", type: "circuit", children: [] };
+    expect(formatExercise(1, { ...base, rounds: "1" } as never, "ru", new Map())).toContain("Цель: 1 раунд");
+    expect(formatExercise(1, { ...base, rounds: "2" } as never, "ru", new Map())).toContain("Цель: 2 раунда");
+    expect(formatExercise(1, { ...base, rounds: "5" } as never, "ru", new Map())).toContain("Цель: 5 раундов");
+    expect(formatExercise(1, { ...base, rounds: "МАКС" } as never, "ru", new Map())).toContain("Цель: МАКС раундов");
   });
 });
 
@@ -200,6 +256,56 @@ describe("formatSingleExercise", () => {
     expect(result).toContain("pace 5:00");
     expect(result).toContain("heart rate 145");
     expect(result).not.toContain("пульс");
+  });
+
+  it("renders circuit children with planned detail and rounds goal", () => {
+    const exercise = {
+      name: "Круг на всё тело",
+      type: "circuit",
+      rounds: "4",
+      children: [
+        { name: "Берпи", sets: "3", reps: "15", weight: "20" },
+        { name: "Джампинг Джек", sets: "3", reps: "20", weight: "0" },
+      ],
+    };
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", new Map(), "A");
+    expect(result).toContain("(круг)");
+    expect(result).toContain("Круг на всё тело");
+    expect(result).toContain("A1. Берпи");
+    expect(result).toContain("3×15 · 20 кг");
+    expect(result).toContain("A2. Джампинг Джек");
+    expect(result).toContain("3×20 · вес тела");
+    expect(result).toContain("Цель: 4 раунда");
+    expect(result).not.toContain("мин");
+  });
+});
+
+describe("formatPreviousLog duration hiding", () => {
+  it("hides previous duration for circuit logs with rounds", () => {
+    const exercise = {
+      name: "Круг на всё тело",
+      type: "circuit",
+      rounds: "4",
+      children: [{ name: "Берпи", sets: "3", reps: "15" }],
+    };
+    const lastLogs = new Map([
+      ["круг на всё тело", { rounds: 3, duration_sec: 900, sets: null, reps: null, weight: null, distance_km: null, pace: null, heart_rate: null }],
+    ]);
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", lastLogs, "A");
+    expect(result).toContain("Прошлый раз");
+    expect(result).toContain("3 раунд");
+    expect(result).not.toContain("мин");
+    expect(result).not.toContain("15 мин");
+  });
+
+  it("keeps duration for cardio logs without rounds", () => {
+    const exercise = { name: "Бег", type: "cardio", duration: "30 мин" };
+    const lastLogs = new Map([
+      ["бег", { rounds: null, duration_sec: 1500, sets: null, reps: null, weight: null, distance_km: 5, pace: "5:00", heart_rate: 145 }],
+    ]);
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", lastLogs);
+    expect(result).toContain("Прошлый раз");
+    expect(result).toContain("25 мин");
   });
 });
 

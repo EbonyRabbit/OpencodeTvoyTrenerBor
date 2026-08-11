@@ -959,3 +959,68 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/app/client/[token]/workout/page.tsx` | Изменение (недельная маска) |
 | `web/src/app/client/[token]/page.tsx` | Изменение (adherence с недельной маской) |
 | `web/src/lib/adherence.ts` (при необходимости) | Изменение (недельный оверрайд) |
+
+---
+
+## Фаза 18: Отображение круговой — состав упражнений, время убрано
+
+### Контекст
+
+Круговая тренировка логируется как одна строка `exercise = имя круга` + `rounds` + `duration_sec`.
+При отображении показывается только «Круговая» + сколько раундов + сколько минут — **без состава**,
+хотя в программе у круговой есть `children` (упражнения, которые тренер указал при создании).
+
+Цель:
+- В боте (план дня и карточка упражнения) и в истории тренировок показывать **состав круговой**:
+  названия упражнений с количеством повторов/подходов и весом снаряда, если указаны в программе.
+- Время выполнения круговой **убрать полностью**: не спрашивать у клиента и не сохранять
+  (бот-визард и веб-форма), не показывать в отображении, истории и предпросмотре программы
+  (включая старые записи с `duration_sec`).
+
+### Осознанные решения
+
+| Решение | Выбор |
+|---------|-------|
+| Отображение состава | Дети круговой (`children`) показываются как в суперсетах: «A1. Берпи — 3×15 · 20 кг» |
+| Логирование | Останется одна строка на круг (`rounds` + комментарий); дети логируются вместе с кругом |
+| Время круговой | `duration_sec` больше не спрашивается и не пишется для `type=circuit`; для старых записей время скрывается везде, где `rounds != null` |
+| История | Состав круговой — под названием круга в левой колонке таблицы (повторы/подходы и вес из плана) |
+| Предпросмотр программы | Для круговой в метриках остаётся только «Раунды», «Время» убирается (кардио не трогаем) |
+
+### Известные ограничения
+
+- Круг с кардио-детьми: в боте такой ребёнок рендерится с кардио-деталями, в веб-истории — голым именем (рендер детей в истории учитывает только sets/reps/weight). Редкий кейс, принят осознанно.
+- Состав круга в истории берётся из плана первой встреченной недели (дедуп строк по имени); при смене состава круга между неделями в истории может остаться состав первой недели. Для снятия ограничения стоит хранить состав круга в самой записи лога (JSON-колонка).
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **18.1** | Бот: рендер круговой с детьми | `bot/src/lib/workout-utils.ts` — ветка `circuit` в `formatExercise()` и `formatSingleExercise()` (заголовок `circuit_label`, дети список «A1. Название — 3×15 · 20 кг», цель «Цель: N раунд(а/ов)», отдых/заметки) | ✅ |
+| **18.2** | Бот: планируемые детали | `formatPlannedDetail()` — для круговой только раунды; `formatPreviousLog()` — при `rounds != null` время не показывать (старые записи тоже) | ✅ |
+| **18.3** | Бот: wizard без времени | `bot/src/handlers/wizard.ts` — `CIRCUIT_STEPS = ["rounds", "comment"]`, сводка без «Время», вставка `duration_sec: null` | ✅ |
+| **18.4** | Бот: i18n | `bot/src/i18n/index.ts` — удалить неиспользуемые `planned_duration_prefix`, `planned_rounds`, `exercise_weight`, `exercise_rpe` (ru/en) | ✅ |
+| **18.5** | Бот: тесты | `bot/src/lib/__tests__/workout-utils.test.ts` — тест круговой: дети с деталями, нет «за 20 мин»; кейс `formatSingleExercise` для круга; скрытие времени у старых circuit-логов, сохранение у cardio; «Прошлый раз» родителя круга; плюрализация цели | ✅ |
+| **18.6** | История: состав круговой | `web/src/app/client/[token]/history/page.tsx` — `HistoryRow.children` из `ex.children` + буквы композита; `history-grid.tsx` — вывод «A1. Берпи — 3×15 · 20 кг» под названием круга | ✅ |
+| **18.7** | История: без времени | `history-format.ts` — `formatMetrics()`: при `rounds != null` время не показывается (включая старые записи) | ✅ |
+| **18.8** | Веб-форма: без времени | `web/src/app/client/[token]/workout/workout-form.tsx` — убрать поле «Время» и валидацию для круговой; `actions.ts` — серверная проверка: `duration_sec !== null` для `circuit` отклоняется | ✅ |
+| **18.9** | Превью программы | `web/src/app/programs/[id]/_components/program-week-preview.tsx` — для круговой метрика «Время» убрана, остаётся «Раунды»; колонка «Время» для круга рендерит «—»; `program-editor.tsx` — у круга нет поля «Время», автоимя без duration | ✅ |
+| **18.10** | Верификация + gate | bot `npm run test:unit` (304 ✓) + `npm run build` ✓; web tsc ✓ + vitest (84 ✓) + next build ✓; ревью `@code-reviewer` 9.6/10 (гейт ≥9.5 пройден) | ✅ |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `bot/src/lib/workout-utils.ts` | Изменение (circuit-ветка, formatPlannedDetail с separator, formatPlannedWeight, pluralizeRounds, collectLoggableNames, formatPreviousLog скрытие времени) |
+| `bot/src/lib/__tests__/workout-utils.test.ts` | Изменение (тесты круговой) |
+| `bot/src/handlers/wizard.ts` | Изменение (CIRCUIT_STEPS без duration) |
+| `bot/src/handlers/callbacks.ts` | Изменение (collectLoggableNames для прошлых логов детей круга) |
+| `bot/src/i18n/index.ts` | Изменение (удаление мёртвых ключей, circuit_goal без вшитых единиц) |
+| `web/src/app/client/[token]/history/page.tsx` | Изменение (HistoryRow.children + compositeLetter) |
+| `web/src/app/client/[token]/history/history-grid.tsx` | Изменение (рендер детей с буквами) |
+| `web/src/lib/history-format.ts` | Новый (форматтеры истории, вынесены из grid) |
+| `web/src/lib/history-format.test.ts` | Новый (тесты formatMetrics/formatPlannedChild) |
+| `web/src/app/client/[token]/workout/workout-form.tsx` | Изменение (без поля «Время» для круга) |
+| `web/src/app/client/[token]/actions.ts` | Изменение (валидация: rounds обязателен, duration_sec отклоняется) |
+| `web/src/app/programs/[id]/_components/program-week-preview.tsx` | Изменение (без «Время» для круга) |
+| `web/src/app/programs/[id]/edit/_components/program-editor.tsx` | Изменение (без поля «Время» и без duration в автоимени круга) |

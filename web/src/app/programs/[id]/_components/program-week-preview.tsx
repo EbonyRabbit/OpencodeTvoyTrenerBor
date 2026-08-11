@@ -57,9 +57,10 @@ function ExerciseRows({ exercise, columns, letter }: { exercise: ParsedExercise;
       {exercise.name}
     </>
   );
+  const isCircuit = exercise.type === "circuit";
   const cardioMetrics = [
     exercise.distance ? `Дистанция: ${exercise.distance}` : null,
-    exercise.duration ? `Время: ${exercise.duration}` : null,
+    !isCircuit && exercise.duration ? `Время: ${exercise.duration}` : null,
     exercise.pace ? `Темп: ${exercise.pace}` : null,
     exercise.heart_rate ? `Пульс: ${exercise.heart_rate}` : null,
     exercise.rounds ? `Раунды: ${exercise.rounds}` : null,
@@ -70,7 +71,7 @@ function ExerciseRows({ exercise, columns, letter }: { exercise: ParsedExercise;
       <TableRow className={getBlockColor(exercise.block)}>
         {columns.map((col) => (
           <TableCell key={col}>
-            {col === EXERCISE_COLUMN ? nameCell : getCellValue(exercise, col)}
+            {col === EXERCISE_COLUMN ? nameCell : isCircuit && col === "Время" ? "—" : getCellValue(exercise, col)}
           </TableCell>
         ))}
       </TableRow>

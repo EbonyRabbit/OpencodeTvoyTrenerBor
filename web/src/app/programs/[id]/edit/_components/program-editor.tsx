@@ -266,8 +266,7 @@ function autofillCompositeName(exercise: EditableExercise): EditableExercise {
     }
   }
   if (exercise.type === "circuit") {
-    const duration = exercise.duration?.trim();
-    return { ...exercise, name: duration ? `AMRAP ${duration}` : "AMRAP" };
+    return { ...exercise, name: "AMRAP" };
   }
   return exercise;
 }
@@ -351,7 +350,6 @@ function MetricParams({
   if (type === "circuit") {
     return (
       <>
-        <ParamField label="Время" value={exercise.duration} onChange={(v) => onUpdate({ duration: v })} placeholder="20 мин" />
         <ParamField label="Раунды" value={exercise.rounds} onChange={(v) => onUpdate({ rounds: v })} placeholder="МАКС" />
         <span className="self-center text-[10px] text-muted-foreground">цель круга</span>
       </>

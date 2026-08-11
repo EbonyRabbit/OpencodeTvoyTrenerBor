@@ -38,7 +38,7 @@ function isRealExercise(value: string | null | undefined): boolean {
   return name !== "" && !PSEUDO_EXERCISE.test(name);
 }
 
-function getPlannedDayNames(
+export function getPlannedDayNames(
   parsed: ParsedContent | null,
   weekNumber: number,
   dayOrder: number,
@@ -49,7 +49,7 @@ function getPlannedDayNames(
   return day.exercises.map((ex) => normalizeName(ex.name)).filter(isRealExercise);
 }
 
-function isCompletedDay(
+export function isCompletedDay(
   logsOnDate: WorkoutLog[],
   plannedNames: string[],
 ): boolean {
@@ -170,6 +170,50 @@ function countWeekByDates(
   return { expected, completed };
 }
 
+export function collectDayOrderLogs(
+  logsByDate: Map<string, WorkoutLog[]>,
+  weekStart: string,
+  weekEnd: string,
+  today: string,
+  includeFuture: boolean,
+): { byOrder: Map<number, WorkoutLog[]>; byDate: Map<string, WorkoutLog[]> } {
+  const byOrder = new Map<number, WorkoutLog[]>();
+  const byDate = new Map<string, WorkoutLog[]>();
+
+  for (const [dateStr, logs] of logsByDate) {
+    if (dateStr < weekStart || dateStr > weekEnd) continue;
+    if (!includeFuture && dateStr > today) continue;
+    byDate.set(dateStr, logs);
+    for (const log of logs) {
+      if (log.day_order == null) continue;
+      const existing = byOrder.get(log.day_order);
+      if (existing) existing.push(log);
+      else byOrder.set(log.day_order, [log]);
+    }
+  }
+
+  return { byOrder, byDate };
+}
+
+export function isDayCompletedByOrder(
+  byOrder: Map<number, WorkoutLog[]>,
+  byDate: Map<string, WorkoutLog[]>,
+  day: { day_order: number; day_name: string },
+  weekStart: string,
+  weekEnd: string,
+  plannedNames: string[],
+): boolean {
+  const byOrderLogs = byOrder.get(day.day_order) ?? [];
+  const plannedDate = plannedDateForDay(weekStart, weekEnd, day.day_name);
+  const byDateLogs =
+    plannedDate != null
+      ? (byDate.get(plannedDate) ?? []).filter(
+          (l) => l.day_order == null || l.day_order === day.day_order,
+        )
+      : [];
+  return isCompletedDay(byOrderLogs.concat(byDateLogs), plannedNames);
+}
+
 function countWeekByDayOrder(
   parsed: ParsedContent | null,
   week: { week_number: number; start_date: string; end_date: string },
@@ -180,20 +224,13 @@ function countWeekByDayOrder(
   let completed = 0;
 
   const weekDays = parsed?.weeks?.find((w) => w.week_number === week.week_number)?.days ?? [];
-  const logsByOrder = new Map<number, WorkoutLog[]>();
-  const logsInWeekByDate = new Map<string, WorkoutLog[]>();
-
-  for (const [dateStr, logs] of logsByDate) {
-    if (dateStr < week.start_date || dateStr > week.end_date) continue;
-    if (dateStr > today) continue;
-    logsInWeekByDate.set(dateStr, logs);
-    for (const log of logs) {
-      if (log.day_order == null) continue;
-      const existing = logsByOrder.get(log.day_order);
-      if (existing) existing.push(log);
-      else logsByOrder.set(log.day_order, [log]);
-    }
-  }
+  const { byOrder, byDate } = collectDayOrderLogs(
+    logsByDate,
+    week.start_date,
+    week.end_date,
+    today,
+    false,
+  );
 
   for (const day of weekDays) {
     if (!day.exercises?.length) continue;
@@ -204,14 +241,7 @@ function countWeekByDayOrder(
     if (plannedDate != null && plannedDate > today) continue;
 
     expected++;
-    const byOrder = logsByOrder.get(day.day_order) ?? [];
-    const byDate =
-      plannedDate != null
-        ? (logsInWeekByDate.get(plannedDate) ?? []).filter(
-            (l) => l.day_order == null || l.day_order === day.day_order,
-          )
-        : [];
-    if (isCompletedDay(byOrder.concat(byDate), plannedNames)) {
+    if (isDayCompletedByOrder(byOrder, byDate, day, week.start_date, week.end_date, plannedNames)) {
       completed++;
     }
   }

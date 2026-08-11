@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent } from "@/lib/program-utils";
 import { calculateAdherence, getAdherenceColor } from "@/lib/adherence";
+import { getNextWorkoutDay } from "@/lib/next-workout";
 import { safeFetch } from "@/lib/safe-fetch";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
@@ -108,6 +109,14 @@ export default async function ClientHomePage({
       })()
     : null;
 
+  const nextWorkout = getNextWorkoutDay({
+    schedule,
+    clientTrainingDays: client.training_days,
+    parsed,
+    workoutLogs,
+    today,
+  });
+
   const quickLinks = [
     { href: `/client/${token}/program`, label: "Программа", desc: "Просмотр тренировок" },
     { href: `/client/${token}/measurements`, label: "Замеры", desc: "Прогресс тела" },
@@ -127,6 +136,37 @@ export default async function ClientHomePage({
           </p>
         )}
       </div>
+
+      {nextWorkout && (
+        <Link href={`/client/${token}/program`} className="block">
+          <Card className="transition-colors hover:bg-muted">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Следующая тренировка
+                  </p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {nextWorkout.isToday ? (
+                      <span className="text-green-600">Сегодня</span>
+                    ) : (
+                      new Date(`${nextWorkout.date}T12:00:00Z`).toLocaleDateString(
+                        "ru-RU",
+                        {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                        },
+                      )
+                    )}
+                  </p>
+                </div>
+                <span className="text-sm text-muted-foreground">→</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {currentWeek ? (
         <Card>

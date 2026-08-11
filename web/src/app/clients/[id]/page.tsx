@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase-server";
 import { getParsedContent } from "@/lib/program-utils";
 import { safeFetch, safeCount } from "@/lib/safe-fetch";
 import { resolveWorkoutCount } from "@/lib/workout-stats";
+import { getNextWorkoutDay } from "@/lib/next-workout";
+import { getTodayDateStr } from "@/lib/date-utils";
+import { DEFAULT_TIMEZONE } from "@/lib/constants";
 // import { resolvePhotoUrls } from "@/lib/photos"; // DISABLED: photo storage removed
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
@@ -45,7 +48,7 @@ export default async function ClientProfilePage({
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, morning_time, measurement_time, measurement_day, checkin_day, checkin_time, access_start_date, access_end_date, purchase_date, purchased_program_id, created_at, updated_at, program:programs!clients_program_id_fkey(id, title, active, template_file_url, parsed_content)")
+    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, training_days, morning_time, measurement_time, measurement_day, checkin_day, checkin_time, access_start_date, access_end_date, purchase_date, purchased_program_id, created_at, updated_at, program:programs!clients_program_id_fkey(id, title, active, template_file_url, parsed_content)")
     .eq("id", id)
     .single();
 
@@ -68,6 +71,8 @@ export default async function ClientProfilePage({
     purchasedProgramName = ppResult.data?.title ?? null;
   }
 
+  const today = getTodayDateStr(typedClient.timezone || DEFAULT_TIMEZONE);
+
   const [
     latestCheckinResult,
     workoutCountResult,
@@ -76,6 +81,7 @@ export default async function ClientProfilePage({
     scheduleResult,
     checkinHistoryResult,
     measurementHistoryResult,
+    workoutLogsResult,
     // latestPhotosResult, // DISABLED: photo storage removed
   ] = await Promise.all([
     safeFetch(
@@ -90,7 +96,7 @@ export default async function ClientProfilePage({
       supabase.from("messages").select("*", { count: "exact", head: true }).eq("client_id", id),
     ),
     safeFetch(
-      supabase.from("program_schedule").select("id, week_number, focus, start_date, end_date").eq("client_id", id).order("week_number", { ascending: true }).limit(52),
+      supabase.from("program_schedule").select("id, week_number, focus, start_date, end_date, training_days").eq("client_id", id).order("week_number", { ascending: true }).limit(52),
       [],
     ),
     safeFetch(
@@ -101,6 +107,10 @@ export default async function ClientProfilePage({
       supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: false }).limit(20),
       [],
     ),
+    safeFetch(
+      supabase.from("workout_logs").select("date, exercise, week, day_order").eq("client_id", id),
+      [],
+    ),
     // safeFetch( // DISABLED: photo storage removed
     //   supabase.from("photos").select("id, date, type, drive_url, storage_path").eq("client_id", id).order("date", { ascending: false }).limit(6),
     //   [],
@@ -108,6 +118,14 @@ export default async function ClientProfilePage({
   ]);
 
   const parsedContent = typedClient.program ? getParsedContent(typedClient.program) : null;
+
+  const nextWorkout = getNextWorkoutDay({
+    schedule: scheduleResult.data ?? [],
+    clientTrainingDays: typedClient.training_days,
+    parsed: parsedContent,
+    workoutLogs: workoutLogsResult.data ?? [],
+    today,
+  });
 
   const workoutCount = resolveWorkoutCount(workoutCountResult);
   if (workoutCountResult.error) {
@@ -137,6 +155,7 @@ export default async function ClientProfilePage({
         messageCount={messageCountResult.count}
         schedule={scheduleResult.data ?? []}
         parsedContent={parsedContent}
+        nextWorkout={nextWorkout}
         checkinHistory={checkinHistory}
         measurementHistory={measurementHistory}
         // latestPhotos={latestPhotos} // DISABLED: photo storage removed

@@ -28,6 +28,9 @@ import { MiniLineChart } from "./mini-line-chart";
 // import { PHOTO_TYPE_LABELS } from "@/lib/photos"; // DISABLED: photo storage removed
 import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
+import type { NextWorkoutDay } from "@/lib/next-workout";
+import { getTodayDateStr } from "@/lib/date-utils";
+import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import type { Database, Json } from "@/types/supabase";
 
 type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "checkin_day" | "checkin_time" | "training_days" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
@@ -62,6 +65,22 @@ function formatTime(time: string | null): string {
   const m = parts[1];
   if (!h || isNaN(Number(h)) || (m !== undefined && isNaN(Number(m)))) return "—";
   return `${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`;
+}
+
+function formatNextWorkout(next: NextWorkoutDay, tz: string | null): string {
+  if (next.isToday) return "Сегодня";
+  const todayLocal = getTodayDateStr(tz || DEFAULT_TIMEZONE);
+  const diffDays = Math.round(
+    (new Date(`${next.date}T12:00:00Z`).getTime() -
+      new Date(`${todayLocal}T12:00:00Z`).getTime()) /
+      (1000 * 60 * 60 * 24),
+  );
+  if (diffDays === 1) return "Завтра";
+  return new Date(`${next.date}T12:00:00Z`).toLocaleDateString("ru-RU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function daysSince(date: string | null): number | null {
@@ -166,6 +185,7 @@ export function ClientProfile({
   messageCount,
   schedule,
   parsedContent,
+  nextWorkout,
   checkinHistory,
   measurementHistory,
   initialActivityEvents,
@@ -181,6 +201,7 @@ export function ClientProfile({
   messageCount: number;
   schedule: ScheduleRow[];
   parsedContent: ParsedContent | null;
+  nextWorkout: NextWorkoutDay | null;
   checkinHistory: CheckinHistoryRow[];
   measurementHistory: MeasurementHistoryRow[];
   initialActivityEvents: ActivityEvent[];
@@ -308,6 +329,22 @@ export function ClientProfile({
               value={STATUS_LABELS[programStatus]}
             />
           )}
+          {nextWorkout ? (
+            <InfoRow
+              label="Следующая тренировка"
+              value={
+                <span
+                  className={
+                    nextWorkout.isToday
+                      ? "font-semibold text-green-600"
+                      : undefined
+                  }
+                >
+                  {formatNextWorkout(nextWorkout, client.timezone)}
+                </span>
+              }
+            />
+          ) : null}
           {client.purchase_date && (
             <InfoRow
               label="Дата покупки"

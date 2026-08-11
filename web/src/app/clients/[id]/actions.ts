@@ -553,6 +553,15 @@ export async function updateClient(
       .eq("id", clientId);
     if (error) return { error: error.message };
 
+    if (update.training_days !== undefined) {
+      const { error: scheduleError } = await supabaseAdmin
+        .from("program_schedule")
+        .update({ training_days: update.training_days })
+        .eq("client_id", clientId);
+
+      if (scheduleError) return { error: scheduleError.message };
+    }
+
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/clients");
     return {};

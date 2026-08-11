@@ -20,17 +20,15 @@ vi.mock("../lib/supabase-admin.js", () => ({
 import { finalizeSchedule } from "../training-days.js";
 
 describe("finalizeSchedule", () => {
-  it("keeps the position order when saving a week override", () => {
-    // Wed content moved to Sat: [1,6,5] must survive, otherwise the
-    // postponed day silently relocates to Friday on the editor save.
-    expect(finalizeSchedule([1, 6, 5], "week-1")).toEqual([1, 6, 5]);
+  it("sorts the selected days regardless of toggle order", () => {
+    expect(finalizeSchedule([1, 6, 5])).toEqual([1, 5, 6]);
   });
 
-  it("appends newly toggled days after retained ones", () => {
-    expect(finalizeSchedule([1, 6, 5, 2], "week-1")).toEqual([1, 6, 5, 2]);
+  it("sorts newly toggled days together with retained ones", () => {
+    expect(finalizeSchedule([1, 6, 5, 2])).toEqual([1, 2, 5, 6]);
   });
 
   it("sorts the global schedule", () => {
-    expect(finalizeSchedule([5, 1, 3], null)).toEqual([1, 3, 5]);
+    expect(finalizeSchedule([5, 1, 3])).toEqual([1, 3, 5]);
   });
 });

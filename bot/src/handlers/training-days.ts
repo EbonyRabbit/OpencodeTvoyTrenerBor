@@ -100,36 +100,32 @@ async function sendEditor(
   });
 }
 
-export function finalizeSchedule(selected: number[], weekId: string | null): number[] {
-  if (weekId) return [...selected];
+export function finalizeSchedule(selected: number[]): number[] {
   return [...selected].sort((a, b) => a - b);
 }
 
 async function saveSchedule(ctx: MyContext, trainingDays: number[]): Promise<boolean> {
   if (!ctx.client || !ctx.from?.id) return false;
 
-  const { sched_week_id: weekId } = readScheduleData(ctx.state);
+  const now = new Date().toISOString();
 
-  if (weekId) {
-    const { error } = await supabaseAdmin
-      .from("program_schedule")
-      .update({ training_days: trainingDays, updated_at: new Date().toISOString() })
-      .eq("id", weekId);
-
-    if (error) {
-      console.error(`[SCHEDULE] Week save error for ${ctx.from.id}:`, error.message);
-      return false;
-    }
-    return true;
-  }
-
-  const { error } = await supabaseAdmin
+  const clientUpdate = supabaseAdmin
     .from("clients")
-    .update({ training_days: trainingDays, updated_at: new Date().toISOString() })
+    .update({ training_days: trainingDays, updated_at: now })
     .eq("id", ctx.client.id);
 
-  if (error) {
-    console.error(`[SCHEDULE] Save error for ${ctx.from.id}:`, error.message);
+  const scheduleUpdate = supabaseAdmin
+    .from("program_schedule")
+    .update({ training_days: trainingDays, updated_at: now })
+    .eq("client_id", ctx.client.id);
+
+  const [clientResult, scheduleResult] = await Promise.all([clientUpdate, scheduleUpdate]);
+
+  if (clientResult.error || scheduleResult.error) {
+    console.error(
+      `[SCHEDULE] Save error for ${ctx.from.id}:`,
+      clientResult.error?.message ?? scheduleResult.error?.message,
+    );
     return false;
   }
 
@@ -278,7 +274,7 @@ export async function handleScheduleDone(ctx: MyContext): Promise<void> {
     return;
   }
 
-  const trainingDays = finalizeSchedule(selected, weekId);
+  const trainingDays = finalizeSchedule(selected);
 
   const saved = await saveSchedule(ctx, trainingDays);
   if (!saved) {

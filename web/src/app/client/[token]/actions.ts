@@ -462,6 +462,13 @@ export async function updateClientSettings(
 
     if (error) return { error: error.message };
 
+    const { error: scheduleError } = await supabaseAdmin
+      .from("program_schedule")
+      .update({ training_days: data.training_days ?? null })
+      .eq("client_id", clientId);
+
+    if (scheduleError) return { error: scheduleError.message };
+
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };

@@ -73,6 +73,7 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
       .from("programs")
       .select("id, title, type, description, duration_weeks, price")
       .eq("active", true)
+      .eq("type", "template")
       .is("client_id", null)
       .order("title");
 
@@ -148,6 +149,7 @@ export async function handleProgramRequestCallback(ctx: MyContext, programId: st
       .from("programs")
       .select("title")
       .eq("id", programId)
+      .eq("type", "template")
       .maybeSingle();
 
     const programTitle = program?.title ?? programId;

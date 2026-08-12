@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-type Program = { id: string; title: string };
+type Program = { id: string; title: string; type: string };
 
 export function ClientActions({
   clientId,
@@ -405,6 +405,7 @@ export function ClientActions({
                   {programs.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.title}
+                      {p.type === "personal" ? " — персональная" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -609,6 +610,7 @@ export function ClientActions({
                     {programs.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.title}
+                        {p.type === "personal" ? " — персональная" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

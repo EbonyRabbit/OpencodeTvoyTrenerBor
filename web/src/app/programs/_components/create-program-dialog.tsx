@@ -35,6 +35,7 @@ export function CreateProgramDialog() {
   const [equipment, setEquipment] = useState("");
   const [language, setLanguage] = useState("ru");
   const [price, setPrice] = useState("");
+  const [type, setType] = useState<"template" | "personal">("template");
 
   const canSubmit = useMemo(() => {
     if (loading) return false;
@@ -51,6 +52,7 @@ export function CreateProgramDialog() {
     setEquipment("");
     setLanguage("ru");
     setPrice("");
+    setType("template");
     setError(null);
   }, []);
 
@@ -87,6 +89,7 @@ export function CreateProgramDialog() {
         equipment: equipment.trim() || undefined,
         language,
         price: parsedPrice,
+        type,
       });
 
       if (result.error) {
@@ -104,7 +107,7 @@ export function CreateProgramDialog() {
     } finally {
       setLoading(false);
     }
-  }, [title, description, durationWeeks, equipment, language, price, reset, router]);
+  }, [title, description, durationWeeks, equipment, language, price, type, reset, router]);
 
   return (
     <Dialog
@@ -235,6 +238,37 @@ export function CreateProgramDialog() {
                   <SelectItem value="en">English</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <label id="label-type" className="text-sm font-medium">
+                Тип
+              </label>
+              <Select
+                value={type}
+                onValueChange={(v) => {
+                  if (v === "template" || v === "personal") setType(v);
+                }}
+              >
+                <SelectTrigger
+                  className="w-full"
+                  aria-labelledby="label-type"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="template">
+                    Шаблон — видна в каталоге бота
+                  </SelectItem>
+                  <SelectItem value="personal">
+                    Персональная — скрыта из каталога бота
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Персональные программы не отображаются в меню покупки в
+                Telegram-боте.
+              </p>
             </div>
           </div>
 

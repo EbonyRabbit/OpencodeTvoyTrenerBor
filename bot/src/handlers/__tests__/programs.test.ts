@@ -1,5 +1,101 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildBuyUrl, buildProgramRequestCoachMessage } from "../../lib/program-links.js";
+import { programsHandler } from "../programs.js";
+import { supabaseAdmin } from "../../lib/supabase-admin.js";
+import type { MyContext } from "../../bot.js";
+
+vi.mock("../../config.js", () => ({
+  config: {
+    telegram: { botToken: "test", webhookSecret: "test" },
+    supabase: { url: "http://localhost:54321", serviceRoleKey: "test" },
+    coachChatId: 0n,
+    paymentBaseUrl: "",
+    nodeEnv: "test",
+    port: 3001,
+    webhookPath: "/webhook",
+    publicUrl: "",
+  },
+}));
+
+vi.mock("../../lib/supabase-admin.js", () => ({
+  supabaseAdmin: { from: vi.fn() },
+}));
+
+type QueryCall = { method: string; args: unknown[] };
+
+function mockProgramsQuery(data: Record<string, unknown>[]) {
+  const calls: QueryCall[] = [];
+  const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+  const chain = {
+    select: (...args: unknown[]) => {
+      calls.push({ method: "select", args });
+      return chain;
+    },
+    eq: (...args: unknown[]) => {
+      calls.push({ method: "eq", args });
+      return chain;
+    },
+    is: (...args: unknown[]) => {
+      calls.push({ method: "is", args });
+      return chain;
+    },
+    order: (...args: unknown[]) => {
+      calls.push({ method: "order", args });
+      return chain;
+    },
+    then: (onFulfilled: (v: unknown) => unknown) =>
+      Promise.resolve({ data, error: null }).then(onFulfilled),
+  };
+  fake.from.mockImplementation((table: string) => {
+    if (table === "programs") return chain;
+    throw new Error(`Unexpected table: ${table}`);
+  });
+  return calls;
+}
+
+function makeCtx() {
+  return {
+    from: { id: 123456789, username: "buyer" },
+    language: "ru",
+    reply: vi.fn().mockResolvedValue(undefined),
+  } as unknown as MyContext;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("programsHandler catalog query", () => {
+  it("filters the catalog by type=template to hide personal programs", async () => {
+    const calls = mockProgramsQuery([
+      {
+        id: "tpl-1",
+        title: "Сила Новичка 12 недель",
+        type: "template",
+        description: null,
+        duration_weeks: 12,
+        price: 9900,
+      },
+    ]);
+    const ctx = makeCtx();
+
+    await programsHandler(ctx);
+
+    const eqCalls = calls.filter((c) => c.method === "eq").map((c) => c.args);
+    expect(eqCalls).toContainEqual(["type", "template"]);
+    expect(ctx.reply).toHaveBeenCalled();
+  });
+
+  it("shows an empty message when no template programs exist", async () => {
+    mockProgramsQuery([]);
+    const ctx = makeCtx();
+
+    await programsHandler(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith("Нет доступных программ.");
+  });
+});
+
 
 describe("buildBuyUrl", () => {
   it("includes tg id and encoded username", () => {

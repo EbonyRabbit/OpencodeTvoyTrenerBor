@@ -89,7 +89,7 @@ export async function getActivePrograms() {
   }
   const { data } = await supabaseAdmin
     .from("programs")
-    .select("id, title, active")
+    .select("id, title, active, type")
     .eq("active", true)
     .order("title");
   return data ?? [];

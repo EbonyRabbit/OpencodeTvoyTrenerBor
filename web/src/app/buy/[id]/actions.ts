@@ -100,9 +100,10 @@ export async function createPurchaseRequest(
 
     const { data: program, error: programError } = await supabaseAdmin
       .from("programs")
-      .select("id, title, price, duration_weeks")
+      .select("id, title, type, description, duration_weeks, price")
       .eq("id", programId)
       .eq("active", true)
+      .eq("type", "template")
       .is("client_id", null)
       .maybeSingle<BuyProgram>();
 
@@ -111,7 +112,7 @@ export async function createPurchaseRequest(
       dedupMap.delete(dedupKey);
       return { error: "Произошла ошибка. Попробуйте позже." };
     }
-    if (!program) {
+    if (!program || program.type !== "template") {
       dedupMap.delete(dedupKey);
       return { error: "Программа недоступна для покупки." };
     }

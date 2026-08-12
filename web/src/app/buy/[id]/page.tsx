@@ -18,6 +18,7 @@ export async function generateMetadata({
     .select("title")
     .eq("id", id)
     .eq("active", true)
+    .eq("type", "template")
     .is("client_id", null)
     .maybeSingle<{ title: string }>();
 
@@ -43,6 +44,7 @@ export default async function BuyPage({
     .select("id, title, type, description, duration_weeks, price")
     .eq("id", id)
     .eq("active", true)
+    .eq("type", "template")
     .is("client_id", null)
     .maybeSingle<BuyProgram>();
 

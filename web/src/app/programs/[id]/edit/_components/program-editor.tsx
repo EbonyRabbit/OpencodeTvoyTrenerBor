@@ -32,7 +32,7 @@ import {
   getCompositeLetters,
   type ExerciseType,
 } from "@/lib/program-utils";
-import { updateProgramContent } from "../../actions";
+import { updateProgramContent, updateProgramType } from "../../actions";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { ExerciseAutocomplete } from "./exercise-autocomplete";
 
@@ -659,6 +659,29 @@ export function ProgramEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [typeSaving, setTypeSaving] = useState(false);
+  const [typeError, setTypeError] = useState<string | null>(null);
+  const [programType, setProgramType] = useState<"template" | "personal">(
+    program.type === "personal" ? "personal" : "template",
+  );
+
+  const handleTypeChange = useCallback(async (next: string | null) => {
+    if (next !== "template" && next !== "personal") return;
+    setTypeError(null);
+    setTypeSaving(true);
+    try {
+      const result = await updateProgramType(program.id, next);
+      if (result.error) {
+        setTypeError(result.error);
+      } else {
+        setProgramType(next);
+      }
+    } catch {
+      setTypeError("Не удалось изменить тип программы");
+    } finally {
+      setTypeSaving(false);
+    }
+  }, [program.id]);
 
   const weeks = state.weeks ?? [];
   const [openPanels, setOpenPanels] = useState<string[]>(() => weeks.map((_, i) => `week-${i}`));
@@ -730,6 +753,40 @@ export function ProgramEditor({
             ← Назад к программе
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Редактирование: {program.title}</h1>
+          <div className="mt-2 flex items-center gap-2">
+            <label
+              id="label-editor-type"
+              className="text-sm text-muted-foreground"
+            >
+              Тип:
+            </label>
+            <Select
+              value={programType}
+              onValueChange={handleTypeChange}
+            >
+              <SelectTrigger
+                className="h-8 w-72"
+                aria-labelledby="label-editor-type"
+                disabled={typeSaving}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="template">
+                  Шаблон — видна в каталоге бота
+                </SelectItem>
+                <SelectItem value="personal">
+                  Персональная — скрыта из каталога бота
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {typeSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {typeError && (
+              <span className="text-xs text-destructive" role="alert">
+                {typeError}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {dirty && (

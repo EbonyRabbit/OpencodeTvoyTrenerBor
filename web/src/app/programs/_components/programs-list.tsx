@@ -190,9 +190,14 @@ export function ProgramsList({
                     <h3 className="font-semibold leading-tight">
                       {program.title}
                     </h3>
-                    <Badge variant={STATUS_VARIANTS[status]}>
-                      {STATUS_LABELS[status]}
-                    </Badge>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {program.type === "personal" && (
+                        <Badge variant="secondary">Персональная</Badge>
+                      )}
+                      <Badge variant={STATUS_VARIANTS[status]}>
+                        {STATUS_LABELS[status]}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pb-3">

@@ -33,7 +33,7 @@ function normalizeName(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
-function isRealExercise(value: string | null | undefined): boolean {
+export function isRealExercise(value: string | null | undefined): boolean {
   const name = normalizeName(value);
   return name !== "" && !PSEUDO_EXERCISE.test(name);
 }
@@ -147,7 +147,6 @@ function countWeekByDates(
   logsByDate: Map<string, WorkoutLog[]>,
 ): { expected: number; completed: number } {
   let expected = 0;
-  let completed = 0;
 
   const lastDate = week.end_date < today ? week.end_date : today;
   const cursor = new Date(`${week.start_date}T12:00:00Z`);
@@ -162,12 +161,32 @@ function countWeekByDates(
     const plannedNames = getPlannedDayNames(parsed, week.week_number, dayOrder);
     if (plannedNames.length === 0) continue;
     expected++;
-    if (isCompletedDay(logsByDate.get(dateStr) ?? [], plannedNames)) {
-      completed++;
-    }
   }
 
-  return { expected, completed };
+  return { expected, completed: countTrainedDays(week.start_date, week.end_date, today, logsByDate) };
+}
+
+// Считает, сколько дней в рамках недели (до today) клиент реально
+// тренировался: в логе есть хотя бы одно реальное упражнение. Тренировки
+// вне плановых дат («не по плану») тоже засчитываются.
+function countTrainedDays(
+  weekStart: string,
+  weekEnd: string,
+  today: string,
+  logsByDate: Map<string, WorkoutLog[]>,
+): number {
+  const lastDate = weekEnd < today ? weekEnd : today;
+  const cursor = new Date(`${weekStart}T12:00:00Z`);
+  const last = new Date(`${lastDate}T12:00:00Z`);
+  let trained = 0;
+
+  for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const dateStr = cursor.toISOString().slice(0, 10);
+    const logs = logsByDate.get(dateStr) ?? [];
+    if (logs.some((l) => isRealExercise(l.exercise))) trained++;
+  }
+
+  return trained;
 }
 
 export function collectDayOrderLogs(
@@ -221,16 +240,8 @@ function countWeekByDayOrder(
   logsByDate: Map<string, WorkoutLog[]>,
 ): { expected: number; completed: number } {
   let expected = 0;
-  let completed = 0;
 
   const weekDays = parsed?.weeks?.find((w) => w.week_number === week.week_number)?.days ?? [];
-  const { byOrder, byDate } = collectDayOrderLogs(
-    logsByDate,
-    week.start_date,
-    week.end_date,
-    today,
-    false,
-  );
 
   for (const day of weekDays) {
     if (!day.exercises?.length) continue;
@@ -241,12 +252,9 @@ function countWeekByDayOrder(
     if (plannedDate != null && plannedDate > today) continue;
 
     expected++;
-    if (isDayCompletedByOrder(byOrder, byDate, day, week.start_date, week.end_date, plannedNames)) {
-      completed++;
-    }
   }
 
-  return { expected, completed };
+  return { expected, completed: countTrainedDays(week.start_date, week.end_date, today, logsByDate) };
 }
 
 export function getAdherenceColor(pct: number | null): string {

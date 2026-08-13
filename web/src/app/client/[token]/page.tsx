@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent } from "@/lib/program-utils";
 import { calculateAdherence, getAdherenceColor } from "@/lib/adherence";
-import { getNextWorkoutDay } from "@/lib/next-workout";
+import { getNextWorkoutDay, hasTrainedOnDate } from "@/lib/next-workout";
 import { safeFetch } from "@/lib/safe-fetch";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
@@ -19,6 +19,14 @@ function getGreeting(): string {
   if (hour < 12) return "Доброе утро";
   if (hour < 18) return "Добрый день";
   return "Добрый вечер";
+}
+
+function formatWorkoutDate(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("ru-RU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 export default async function ClientHomePage({
@@ -117,6 +125,8 @@ export default async function ClientHomePage({
     today,
   });
 
+  const trainedToday = hasTrainedOnDate(workoutLogs, today);
+
   const quickLinks = [
     { href: `/client/${token}/program`, label: "Программа", desc: "Просмотр тренировок" },
     { href: `/client/${token}/measurements`, label: "Замеры", desc: "Прогресс тела" },
@@ -137,7 +147,7 @@ export default async function ClientHomePage({
         )}
       </div>
 
-      {nextWorkout && (
+      {(nextWorkout || trainedToday) && (
         <Link href={`/client/${token}/program`} className="block">
           <Card className="transition-colors hover:bg-muted">
             <CardContent className="py-4">
@@ -147,19 +157,24 @@ export default async function ClientHomePage({
                     Следующая тренировка
                   </p>
                   <p className="mt-1 text-lg font-semibold">
-                    {nextWorkout.isToday ? (
+                    {trainedToday ? (
+                      <span className="text-green-600">✅ Выполнена сегодня</span>
+                    ) : nextWorkout?.isToday ? (
                       <span className="text-green-600">Сегодня</span>
-                    ) : (
-                      new Date(`${nextWorkout.date}T12:00:00Z`).toLocaleDateString(
-                        "ru-RU",
-                        {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                        },
-                      )
-                    )}
+                    ) : nextWorkout ? (
+                      formatWorkoutDate(nextWorkout.date)
+                    ) : null}
                   </p>
+                  {trainedToday && nextWorkout && !nextWorkout.isToday && (
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      Следующая: {formatWorkoutDate(nextWorkout.date)}
+                    </p>
+                  )}
+                  {trainedToday && nextWorkout?.isToday && (
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      Завершите сегодняшнюю тренировку
+                    </p>
+                  )}
                 </div>
                 <span className="text-sm text-muted-foreground">→</span>
               </div>
@@ -197,8 +212,8 @@ export default async function ClientHomePage({
             )}
             {currentWeekStats && (
               <p className="text-sm">
-                Тренировки: {currentWeekStats.completed} /{" "}
-                {currentWeekStats.expected}{" "}
+                Тренировки: {currentWeekStats.completed} (плановых:{" "}
+                {currentWeekStats.expected}){" "}
                 <span className={getAdherenceColor(currentWeekStats.adherencePct)}>
                   ({currentWeekStats.adherencePct}%)
                 </span>
@@ -234,7 +249,8 @@ export default async function ClientHomePage({
               </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              {adherence.totalCompleted} из {adherence.totalExpected} тренировок
+              {adherence.totalCompleted} тренировок (плановых:{" "}
+              {adherence.totalExpected})
             </p>
           </CardContent>
         </Card>

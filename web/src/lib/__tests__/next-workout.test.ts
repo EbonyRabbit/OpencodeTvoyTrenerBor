@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getNextWorkoutDay } from "../next-workout";
+import { getNextWorkoutDay, hasTrainedOnDate } from "../next-workout";
 import type { ParsedContent } from "../program-utils";
 
 const parsed: ParsedContent = {
@@ -314,5 +314,23 @@ describe("getNextWorkoutDay", () => {
       weekNumber: 3,
       isToday: false,
     });
+  });
+});
+
+describe("hasTrainedOnDate", () => {
+  it("returns true when there is a real exercise log on the date", () => {
+    expect(hasTrainedOnDate([{ date: "2026-08-10", exercise: "Присед" }], "2026-08-10")).toBe(true);
+  });
+
+  it("returns false for pseudo logs", () => {
+    expect(hasTrainedOnDate([{ date: "2026-08-10", exercise: "[SKIP]" }], "2026-08-10")).toBe(false);
+  });
+
+  it("returns false when there are no logs on the date", () => {
+    expect(hasTrainedOnDate([{ date: "2026-08-10", exercise: "Присед" }], "2026-08-11")).toBe(false);
+  });
+
+  it("returns true for an off-plan workout logged today", () => {
+    expect(hasTrainedOnDate([{ date: "2026-08-10", exercise: "Тяга" }], "2026-08-10")).toBe(true);
   });
 });

@@ -72,7 +72,7 @@ describe("calculateAdherence (date path)", () => {
     expect(result.weeks[0].expected).toBe(3);
   });
 
-  it("does not count a partial workout as completed", () => {
+  it("counts a partial workout as a trained day", () => {
     const result = calculateAdherence(
       SCHEDULE,
       MON_WED_FRI_WEEK,
@@ -80,7 +80,7 @@ describe("calculateAdherence (date path)", () => {
       TRAINING_DAYS,
       "2026-08-16",
     );
-    expect(result.weeks[0].completed).toBe(0);
+    expect(result.weeks[0].completed).toBe(1);
     expect(result.weeks[0].expected).toBe(3);
   });
 
@@ -95,7 +95,7 @@ describe("calculateAdherence (date path)", () => {
     expect(result.weeks[0].completed).toBe(0);
   });
 
-  it("ignores pseudo rows (evening photos) and rest days", () => {
+  it("ignores pseudo-only days but counts a real off-plan workout on a rest day", () => {
     const result = calculateAdherence(
       SCHEDULE,
       MON_WED_FRI_WEEK,
@@ -104,7 +104,43 @@ describe("calculateAdherence (date path)", () => {
       "2026-08-16",
     );
     expect(result.weeks[0].expected).toBe(3);
+    expect(result.weeks[0].completed).toBe(1);
+  });
+
+  it("does not count a day with only pseudo logs", () => {
+    const result = calculateAdherence(
+      SCHEDULE,
+      MON_WED_FRI_WEEK,
+      [log("2026-08-04", "[SKIP]"), log("2026-08-04", "[EVENING_ФОТО]")],
+      TRAINING_DAYS,
+      "2026-08-16",
+    );
     expect(result.weeks[0].completed).toBe(0);
+  });
+
+  it("counts a workout done off-plan (on a rest day)", () => {
+    // Клиент потренировался во вторник (не плановый день) — день засчитан.
+    const result = calculateAdherence(
+      SCHEDULE,
+      MON_WED_FRI_WEEK,
+      [log("2026-08-04", "Тяга"), log("2026-08-04", "Присед")],
+      TRAINING_DAYS,
+      "2026-08-09",
+    );
+    expect(result.weeks[0].completed).toBe(1);
+    expect(result.weeks[0].expected).toBe(3);
+  });
+
+  it("does not count trained days after today in the current week", () => {
+    const result = calculateAdherence(
+      SCHEDULE,
+      MON_WED_FRI_WEEK,
+      [log("2026-08-08", "Присед")],
+      TRAINING_DAYS,
+      "2026-08-05",
+    );
+    expect(result.weeks[0].completed).toBe(0);
+    expect(result.weeks[0].expected).toBe(2);
   });
 
   it("ignores pseudo exercises in the program plan", () => {
@@ -192,7 +228,7 @@ describe("calculateAdherence (day_order fallback, no training_days)", () => {
     expect(result.weeks[0].completed).toBe(1);
   });
 
-  it("does not count a partial day in fallback path", () => {
+  it("counts a partial day in fallback path as a trained day", () => {
     const result = calculateAdherence(
       SCHEDULE,
       MON_WED_FRI_WEEK,
@@ -200,7 +236,7 @@ describe("calculateAdherence (day_order fallback, no training_days)", () => {
       null,
       "2026-08-16",
     );
-    expect(result.weeks[0].completed).toBe(0);
+    expect(result.weeks[0].completed).toBe(1);
   });
 
   it("excludes future planned days of the current week via day_name", () => {
@@ -233,9 +269,7 @@ describe("calculateAdherence (day_order fallback, no training_days)", () => {
     expect(result.weeks[0].expected).toBe(3);
   });
 
-  it("does not double-count the same planned day from order and date matches", () => {
-    // day_order=1 logs logged on Wednesday + legacy logs on the planned
-    // Monday date: still exactly one completed day
+  it("counts each distinct trained day once even with several logs", () => {
     const result = calculateAdherence(
       SCHEDULE,
       MON_WED_FRI_WEEK,
@@ -248,13 +282,11 @@ describe("calculateAdherence (day_order fallback, no training_days)", () => {
       null,
       "2026-08-16",
     );
-    expect(result.weeks[0].completed).toBe(1);
-    expect(result.totalCompleted).toBe(1);
+    expect(result.weeks[0].completed).toBe(2);
+    expect(result.totalCompleted).toBe(2);
   });
 
-  it("counts an order-mismatched log on the planned date for its own day only", () => {
-    // Monday's exercise logged on Monday but tagged with day_order=2 must
-    // not complete Monday by date (cross-contamination guard)
+  it("counts the date as trained regardless of stored day_order mismatch", () => {
     const result = calculateAdherence(
       SCHEDULE,
       MON_WED_FRI_WEEK,
@@ -265,7 +297,7 @@ describe("calculateAdherence (day_order fallback, no training_days)", () => {
       null,
       "2026-08-16",
     );
-    expect(result.weeks[0].completed).toBe(0);
+    expect(result.weeks[0].completed).toBe(1);
   });
 
   it("maps legacy planned dates inside a mid-week anchored window", () => {

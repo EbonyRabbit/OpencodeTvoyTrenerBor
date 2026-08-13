@@ -3,6 +3,7 @@ import type { WorkoutLog } from "./adherence";
 import {
   getPlannedDayNames,
   isCompletedDay,
+  isRealExercise,
   collectDayOrderLogs,
   isDayCompletedByOrder,
 } from "./adherence";
@@ -35,6 +36,10 @@ function addDays(dateStr: string, days: number): string {
   const d = parseUTCDate(dateStr);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+export function hasTrainedOnDate(workoutLogs: WorkoutLog[], date: string): boolean {
+  return workoutLogs.some((l) => l.date === date && isRealExercise(l.exercise));
 }
 
 export function getNextWorkoutDay({

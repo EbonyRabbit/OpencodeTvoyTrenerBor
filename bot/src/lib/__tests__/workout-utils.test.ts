@@ -20,7 +20,7 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatExercise, formatSingleExercise, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay, getTodayDayOfMonth, parseTimeRounded, plannedDateForDay } from "../workout-utils.js";
+import { truncateMessage, formatExercise, formatSingleExercise, formatWorkoutMessage, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay, getTodayDayOfMonth, parseTimeRounded, plannedDateForDay, escapeHtml } from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
@@ -55,6 +55,67 @@ describe("truncateMessage", () => {
     const msg = "A".repeat(4000) + "\n" + "B".repeat(200);
     const result = truncateMessage(msg, suffix);
     expect(result).not.toContain("\nB");
+  });
+
+  it("closes unclosed italic tags after truncation", () => {
+    const longLine = "<i>".repeat(200) + "x".repeat(5000);
+    const result = truncateMessage(longLine, suffix, { html: true });
+    const opens = (result.match(/<i>/g) ?? []).length;
+    const closes = (result.match(/<\/i>/g) ?? []).length;
+    expect(opens).toBe(closes);
+    expect(result).toContain("</i>");
+    expect(result.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("closes bold tags left open at the truncation point", () => {
+    const msg = "<b>Присед\n" + "y".repeat(5000);
+    const result = truncateMessage(msg, suffix, { html: true });
+    const opens = (result.match(/<b>/g) ?? []).length;
+    const closes = (result.match(/<\/b>/g) ?? []).length;
+    expect(opens).toBe(closes);
+    expect(opens).toBeGreaterThan(0);
+    expect(result).toContain("</b>");
+  });
+
+  it("closes nested unclosed tags in the right order", () => {
+    const msg = "<b><i>Детали\n" + "z".repeat(5000);
+    const result = truncateMessage(msg, suffix, { html: true });
+    const lastCloseB = result.lastIndexOf("</b>");
+    const lastCloseI = result.lastIndexOf("</i>");
+    expect(lastCloseI).toBeGreaterThan(-1);
+    expect(lastCloseB).toBeGreaterThan(lastCloseI);
+  });
+
+  it("strips a dangling partial opening tag at the cut point", () => {
+    const msg = "x".repeat(4086) + "<b\n" + "y".repeat(500);
+    const result = truncateMessage(msg, suffix, { html: true });
+    expect(result).not.toContain("<b\n");
+    expect(result).not.toMatch(/<[a-zA-Z]*$/);
+    expect(result.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("strips a partial HTML entity cut at the truncation boundary", () => {
+    const msg = "a".repeat(4085) + "&amp;" + "z".repeat(5000);
+    const result = truncateMessage(msg, suffix, { html: true });
+    expect(result).not.toContain("&");
+    expect(result).toBe("a".repeat(4085) + suffix);
+    expect(result.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("leaves plain text untouched without the html option", () => {
+    const msg = "<i>x\n" + "y".repeat(5000);
+    const result = truncateMessage(msg, suffix);
+    expect(result).not.toContain("</i>");
+  });
+});
+
+describe("escapeHtml", () => {
+  it("escapes ampersands, angle brackets and quotes", () => {
+    expect(escapeHtml(`A & B <x> "q"`)).toBe("A &amp; B &lt;x&gt; &quot;q&quot;");
+  });
+
+  it("leaves plain text untouched", () => {
+    expect(escapeHtml("Присед 3×8")).toBe("Присед 3×8");
   });
 });
 
@@ -223,6 +284,94 @@ describe("formatExercise", () => {
     expect(formatExercise(1, { ...base, rounds: "5" } as never, "ru", new Map())).toContain("Цель: 5 раундов");
     expect(formatExercise(1, { ...base, rounds: "МАКС" } as never, "ru", new Map())).toContain("Цель: МАКС раундов");
   });
+
+  it("escapes HTML characters in non-numeric rounds goal text", () => {
+    const ex = { name: "Круг", type: "circuit", rounds: "До & отказа", children: [] };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("До &amp; отказа раундов");
+    expect(result).not.toContain("До & отказа");
+  });
+
+  it("wraps the exercise name in a bold tag", () => {
+    const ex = { name: "Присед", sets: "4", reps: "8", weight: "60" };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("<b>1. Присед</b>");
+  });
+
+  it("renders the plan on one line joined by dots", () => {
+    const ex = { name: "Присед", sets: "4", reps: "8", weight: "60", rpe: "8" };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    const planLine = result.split("\n").find((l) => l.includes("4×8"));
+    expect(planLine).toBe("4×8 · 60 кг · RPE 8");
+  });
+
+  it("wraps the last-time line in an italic tag", () => {
+    const ex = { name: "Присед", sets: "4", reps: "8", weight: "60" };
+    const result = withLast(ex, { weight: 60, sets: 4, reps: "8" });
+    const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
+    expect(lastLine).toContain("<i>");
+    expect(lastLine).toContain("</i>");
+    expect(lastLine).toContain("60 кг · 4×8");
+  });
+
+  it("escapes HTML characters in exercise name", () => {
+    const ex = { name: "Жим <sup>тест</sup>", sets: "3", reps: "10" };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("<b>1. Жим &lt;sup&gt;тест&lt;/sup&gt;</b>");
+    expect(result).not.toContain("<sup>");
+  });
+
+  it("escapes HTML characters in rest and notes", () => {
+    const ex = { name: "Присед", sets: "3", reps: "8", rest: "90 <сек>", notes: "До & отказа" };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("90 &lt;сек&gt;");
+    expect(result).toContain("До &amp; отказа");
+    expect(result).not.toContain("90 <сек>");
+  });
+
+  it("escapes HTML characters in superset children", () => {
+    const ex = {
+      name: "Грудь+спина",
+      type: "superset",
+      children: [{ name: "Жим <узкий>", sets: "3", reps: "8" }],
+    };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    expect(result).toContain("A1. Жим &lt;узкий&gt;");
+  });
+
+  it("escapes HTML characters in superset and circuit names", () => {
+    const superset = formatExercise(1, {
+      name: "Грудь <и> спина",
+      type: "superset",
+      children: [{ name: "Жим", sets: "3", reps: "8" }],
+    } as never, "ru", new Map());
+    expect(superset).toContain("Грудь &lt;и&gt; спина (суперсет)");
+
+    const circuit = formatExercise(1, {
+      name: "Круг <и> всё",
+      type: "circuit",
+      rounds: "3",
+      children: [{ name: "Берпи", sets: "3", reps: "15" }],
+    } as never, "ru", new Map());
+    expect(circuit).toContain("Круг &lt;и&gt; всё (круг)");
+  });
+
+  it("escapes HTML characters in previous-log reps and pace", () => {
+    const ex = { name: "Присед", sets: "3", reps: "8" };
+    const result = withLast(ex, {
+      weight: 60,
+      sets: 3,
+      reps: "<не вышло>",
+      distance_km: null,
+      duration_sec: null,
+      rounds: null,
+      pace: null,
+      heart_rate: null,
+    });
+    const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
+    expect(lastLine).toContain("&lt;не вышло&gt;");
+    expect(lastLine).not.toContain("<не вышло>");
+  });
 });
 
 describe("formatSingleExercise", () => {
@@ -277,6 +426,48 @@ describe("formatSingleExercise", () => {
     expect(result).toContain("3×20 · вес тела");
     expect(result).toContain("Цель: 4 раунда");
     expect(result).not.toContain("мин");
+  });
+
+  it("escapes HTML characters in name, block and rest", () => {
+    const exercise = {
+      name: "Жим <узким>",
+      block: "Грудь & спина",
+      rest: "90 <сек>",
+      sets: "3",
+      reps: "8",
+    };
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", new Map());
+    expect(result).toContain("&lt;узким&gt;");
+    expect(result).toContain("Грудь &amp; спина");
+    expect(result).toContain("90 &lt;сек&gt;");
+    expect(result).not.toContain("<узким>");
+    expect(result).not.toContain("<сек>");
+  });
+
+  it("escapes non-numeric rounds goal text in single view", () => {
+    const exercise = { name: "Круг", type: "circuit", rounds: "До & отказа", children: [] };
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", new Map());
+    expect(result).toContain("До &amp; отказа раундов");
+    expect(result).not.toContain("До & отказа");
+  });
+});
+
+describe("formatWorkoutMessage", () => {
+  it("escapes HTML characters in day name and goal", async () => {
+    mockLogsQuery([]);
+    const workout = {
+      week_number: 3,
+      is_deload: false,
+      day_name: "Понедельник <тест>",
+      goal: "Сила & объем",
+      exercises: [{ name: "Присед", sets: "3", reps: "8" }],
+    };
+    const client = { id: "client-msg-1", timezone: "Europe/Moscow" } as Parameters<typeof formatWorkoutMessage>[2];
+    const result = await formatWorkoutMessage(workout as never, "ru", client);
+    expect(result).toContain("Понедельник &lt;тест&gt;");
+    expect(result).toContain("Сила &amp; объем");
+    expect(result).not.toContain("<тест>");
+    expect(result).not.toContain("& объем");
   });
 });
 

@@ -107,14 +107,14 @@ export async function runAutoResume(bot: Bot<MyContext>): Promise<void> {
             const workout = await getTodayWorkout(client, lang);
             const header = t("resume.resumed_header", lang);
             if (workout && await isTodayWorkoutCompleted(client, workout)) {
-              const truncated = truncateMessage(`${header}\n\n${t("workout.already_completed", lang)}`, t("program.truncation_suffix", lang));
-              await bot.api.sendMessage(client.telegram_id, truncated);
+              const truncated = truncateMessage(`${header}\n\n${t("workout.already_completed", lang)}`, t("program.truncation_suffix", lang), { html: true });
+              await bot.api.sendMessage(client.telegram_id, truncated, { parse_mode: "HTML" });
             } else {
               const msg = workout
                 ? `${header}\n\n${await formatWorkoutMessage(workout, lang, client)}`
                 : `${header}\n\n${t("resume.no_workout_today", lang)}`;
-              const truncated = truncateMessage(msg, t("program.truncation_suffix", lang));
-              await bot.api.sendMessage(client.telegram_id, truncated);
+              const truncated = truncateMessage(msg, t("program.truncation_suffix", lang), { html: true });
+              await bot.api.sendMessage(client.telegram_id, truncated, { parse_mode: "HTML" });
             }
             await sleep(MSG_DELAY_MS);
           } catch (sendErr) {

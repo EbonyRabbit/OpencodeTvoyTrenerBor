@@ -9,6 +9,7 @@ import {
   formatWorkoutMessage,
   truncateMessage,
   isTodayWorkoutCompleted,
+  escapeHtml,
 } from "../lib/workout-utils.js";
 import { markAsSent } from "./dedup.js";
 import { logBotEvent } from "./logger.js";
@@ -139,15 +140,16 @@ export async function runMorningNotification(bot: Bot<MyContext>): Promise<void>
         const dedupResult = await markAsSent(dedupKey, DEDUP_TTL_HOURS);
         if (dedupResult !== "sent") continue;
 
-        const greeting = t("morning.greeting", lang, { name: client.name });
+        const greeting = t("morning.greeting", lang, { name: escapeHtml(client.name ?? "") });
         const header = t("morning.header", lang);
         const workoutText = await formatWorkoutMessage(workout, lang, fullClient);
         const message = `${greeting}\n\n${header}\n\n${workoutText}`;
-        const truncated = truncateMessage(message, t("program.truncation_suffix", lang));
+        const truncated = truncateMessage(message, t("program.truncation_suffix", lang), { html: true });
         const keyboard = buildMorningKeyboard(lang);
 
         await bot.api.sendMessage(client.telegram_id, truncated, {
           reply_markup: keyboard,
+          parse_mode: "HTML",
         });
 
         sent++;

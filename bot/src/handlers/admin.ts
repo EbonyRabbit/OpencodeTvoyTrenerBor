@@ -2,7 +2,7 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
-import { getTodayDateStr, truncateMessage } from "../lib/workout-utils.js";
+import { getTodayDateStr, truncateMessage, escapeHtml } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { getActivePause } from "../lib/plan-adjustment.js";
 import { daysBetween } from "../lib/date-utils.js";
@@ -30,10 +30,6 @@ function generateCode(): string {
     i++;
   }
   return code;
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export async function adminDebugToday(ctx: MyContext): Promise<void> {
@@ -108,7 +104,7 @@ export async function adminDebugToday(ctx: MyContext): Promise<void> {
 
       const telegramStatus = client.telegram_id ? "✅ TG" : "❌ TG";
 
-      lines.push(`• ${escapeHtml(client.name ?? "Без имени")}`);
+      lines.push(`• ${client.name ?? "Без имени"}`);
       lines.push(`  ${weekInfo}`);
       lines.push(`  ${pauseInfo || "Активен"}`);
       lines.push(`  ${telegramStatus} | ${clientToday}`);

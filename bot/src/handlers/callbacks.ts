@@ -6,6 +6,7 @@ import {
   formatSingleExercise,
   getPreviousWorkoutLogs,
   collectLoggableNames,
+  truncateMessage,
   type TodayWorkout,
 } from "../lib/workout-utils.js";
 import { t, type Language } from "../i18n/index.js";
@@ -232,18 +233,23 @@ export async function showExercise(
     ctx.client,
     collectLoggableNames([currentExercise]),
   );
-  const text = formatSingleExercise(
-    index,
-    effectiveWorkout.exercises.length,
-    currentExercise,
-    ctx.language,
-    lastLogs,
-    compositeLetters.get(index) ?? "A",
+  const text = truncateMessage(
+    formatSingleExercise(
+      index,
+      effectiveWorkout.exercises.length,
+      currentExercise,
+      ctx.language,
+      lastLogs,
+      compositeLetters.get(index) ?? "A",
+    ),
+    t("program.truncation_suffix", ctx.language),
+    { html: true },
   );
   const keyboard = buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language);
 
   await ctx.reply(text, {
     reply_markup: { inline_keyboard: keyboard },
+    parse_mode: "HTML",
   });
 }
 

@@ -8,6 +8,47 @@ import { isPseudoExercise } from "./log-markers.js";
 
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function closeHtmlTags(text: string): string {
+  const stack: string[] = [];
+  const tokenRe = /<\/?([a-zA-Z][a-zA-Z0-9]*)\s*[^>]*?>/g;
+  let match: RegExpExecArray | null;
+  while ((match = tokenRe.exec(text)) !== null) {
+    const token = match[0];
+    const tagName = match[1];
+    if (token.startsWith("</")) {
+      if (stack.length > 0 && stack[stack.length - 1] === tagName) stack.pop();
+      continue;
+    }
+    if (token.endsWith("/>")) continue;
+    stack.push(tagName);
+  }
+  for (let i = stack.length - 1; i >= 0; i--) {
+    text += `</${stack[i]}>`;
+  }
+  return text;
+}
+
+function closeHtmlTagsWithinLimit(text: string, limit: number): string {
+  const closed = closeHtmlTags(text);
+  if (closed.length <= limit) return closed;
+  let trimmed = text;
+  let result = closed;
+  while (result.length > limit && trimmed.length > 0) {
+    const step = Math.max(1, Math.floor((result.length - limit) / 2));
+    trimmed = trimmed.slice(0, Math.max(0, trimmed.length - step)).replace(/<[^>]*$/, "");
+    result = closeHtmlTags(trimmed);
+  }
+  return result;
+}
+
 export interface WorkoutPlan {
   week_number: number;
   is_deload: boolean;
@@ -421,7 +462,7 @@ function formatPreviousLog(log: PreviousLog, lang: Language): string {
     parts.push(formatDuration(log.duration_sec, lang));
   }
   if (log.pace) {
-    parts.push(t("workout.metric_pace", lang, { pace: log.pace }));
+    parts.push(t("workout.metric_pace", lang, { pace: escapeHtml(log.pace) }));
   }
   if (log.rounds != null) {
     parts.push(log.rounds === -1
@@ -437,16 +478,16 @@ function formatPreviousLog(log: PreviousLog, lang: Language): string {
   const weight =
     log.weight != null && log.weight > 0 ? `${log.weight} кг` : log.weight === 0 ? "вес тела" : null;
   const perSetList = log.reps != null && String(log.reps).includes("/");
-  const setsReps = perSetList
-    ? log.reps
+  const setsReps = perSetList && log.reps != null
+    ? escapeHtml(log.reps)
     : log.sets != null && log.reps
-      ? `${log.sets}×${log.reps}`
+      ? `${log.sets}×${escapeHtml(log.reps)}`
       : log.sets != null
         ? `${log.sets} подх.`
         : log.reps
-          ? log.reps
+          ? escapeHtml(log.reps)
           : null;
-  return [weight, setsReps].filter(Boolean).join(" ");
+  return [weight, setsReps].filter(Boolean).join(" · ");
 }
 
 export function formatDuration(totalSeconds: number, lang: Language = "ru"): string {
@@ -460,7 +501,7 @@ export function formatDuration(totalSeconds: number, lang: Language = "ru"): str
 }
 
 function formatPlannedWeight(weight: string): string {
-  return weight === "0" ? "вес тела" : `${weight} кг`;
+  return weight === "0" ? "вес тела" : `${escapeHtml(weight)} кг`;
 }
 
 function pluralizeRounds(value: string, lang: Language): string {
@@ -477,20 +518,20 @@ function pluralizeRounds(value: string, lang: Language): string {
   return `${value} раундов`;
 }
 
-function formatPlannedDetail(ex: ParsedExercise, lang: Language, separator = ", "): string {
+function formatPlannedDetail(ex: ParsedExercise, lang: Language, separator = " · "): string {
   const parts: string[] = [];
   if (ex.type === "cardio") {
-    if (ex.distance) parts.push(t("workout.planned_distance", lang, { distance: ex.distance }));
-    if (ex.duration) parts.push(t("workout.planned_duration", lang, { duration: ex.duration }));
-    if (ex.pace) parts.push(t("workout.planned_pace", lang, { pace: ex.pace }));
-    if (ex.heart_rate) parts.push(t("workout.planned_heart_rate", lang, { heart_rate: ex.heart_rate }));
+    if (ex.distance) parts.push(t("workout.planned_distance", lang, { distance: escapeHtml(ex.distance) }));
+    if (ex.duration) parts.push(t("workout.planned_duration", lang, { duration: escapeHtml(ex.duration) }));
+    if (ex.pace) parts.push(t("workout.planned_pace", lang, { pace: escapeHtml(ex.pace) }));
+    if (ex.heart_rate) parts.push(t("workout.planned_heart_rate", lang, { heart_rate: escapeHtml(ex.heart_rate) }));
     return parts.join(" · ");
   }
-  if (ex.sets && ex.reps) parts.push(`${ex.sets}×${ex.reps}`);
-  else if (ex.sets) parts.push(`${ex.sets} подх.`);
-  else if (ex.reps) parts.push(ex.reps);
+  if (ex.sets && ex.reps) parts.push(`${escapeHtml(ex.sets)}×${escapeHtml(ex.reps)}`);
+  else if (ex.sets) parts.push(`${escapeHtml(ex.sets)} подх.`);
+  else if (ex.reps) parts.push(escapeHtml(ex.reps));
   if (ex.weight) parts.push(formatPlannedWeight(ex.weight));
-  if (ex.rpe) parts.push(`RPE ${ex.rpe}`);
+  if (ex.rpe) parts.push(`RPE ${escapeHtml(ex.rpe)}`);
   return parts.join(separator);
 }
 
@@ -502,13 +543,13 @@ function formatChildLine(
 ): string {
   const lines: string[] = [];
   const detail = formatPlannedDetail(child, lang, " · ");
-  lines.push(`${letter}. ${child.name}${detail ? ` — ${detail}` : ""}`);
+  lines.push(`${letter}. ${escapeHtml(child.name)}${detail ? ` — ${detail}` : ""}`);
   const lastDetail = last ? formatPreviousLog(last, lang) : "";
   if (lastDetail) {
-    lines.push(`   ${t("workout.exercise_last", lang, { detail: lastDetail })}`);
+    lines.push(`<i>${t("workout.exercise_last", lang, { detail: lastDetail })}</i>`);
   }
   if (child.rest) {
-    lines.push(`   ${t("workout.exercise_rest", lang, { rest: child.rest })}`);
+    lines.push(`<i>${t("workout.exercise_rest", lang, { rest: escapeHtml(child.rest) })}</i>`);
   }
   return lines.join("\n");
 }
@@ -523,64 +564,64 @@ export function formatExercise(
   const lines: string[] = [];
 
   if (ex.type === "superset" && ex.children?.length) {
-    const name = ex.name ? t("workout.superset_label", lang, { name: ex.name }) : t("workout.superset_bare", lang);
-    lines.push(t("workout.exercise_item", lang, { index, name }));
+    const name = ex.name ? t("workout.superset_label", lang, { name: escapeHtml(ex.name) }) : t("workout.superset_bare", lang);
+    lines.push(`<b>${t("workout.exercise_item", lang, { index, name })}</b>`);
     for (let i = 0; i < ex.children.length; i++) {
       const child = ex.children[i];
       const last = lastLogs.get(child.name.trim().toLowerCase());
       lines.push(formatChildLine(`${compositeLetter}${i + 1}`, child, lang, last));
     }
     if (ex.rest) {
-      lines.push(t("workout.exercise_rest", lang, { rest: ex.rest }));
+      lines.push(`<i>${t("workout.exercise_rest", lang, { rest: escapeHtml(ex.rest) })}</i>`);
     }
     if (ex.notes) {
-      lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+      lines.push(t("workout.exercise_notes", lang, { notes: escapeHtml(ex.notes) }));
     }
     return lines.join("\n");
   }
 
   if (ex.type === "circuit") {
-    const name = ex.name ? t("workout.circuit_label", lang, { name: ex.name }) : t("workout.circuit_bare", lang);
-    lines.push(t("workout.exercise_item", lang, { index, name }));
+    const name = ex.name ? t("workout.circuit_label", lang, { name: escapeHtml(ex.name) }) : t("workout.circuit_bare", lang);
+    lines.push(`<b>${t("workout.exercise_item", lang, { index, name })}</b>`);
     const children = ex.children ?? [];
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
       const last = lastLogs.get(child.name.trim().toLowerCase());
       lines.push(formatChildLine(`${compositeLetter}${i + 1}`, child, lang, last));
     }
-    const goal = ex.rounds ? t("workout.circuit_goal", lang, { rounds: pluralizeRounds(ex.rounds, lang) }) : "";
+    const goal = ex.rounds ? t("workout.circuit_goal", lang, { rounds: escapeHtml(pluralizeRounds(ex.rounds, lang)) }) : "";
     if (goal) {
-      lines.push(`   ${goal}`);
+      lines.push(`<i>${goal}</i>`);
     }
     const last = lastLogs.get(ex.name.trim().toLowerCase());
     if (last) {
-      lines.push(`   ${t("workout.exercise_last", lang, { detail: formatPreviousLog(last, lang) })}`);
+      lines.push(`<i>${t("workout.exercise_last", lang, { detail: formatPreviousLog(last, lang) })}</i>`);
     }
     if (ex.rest) {
-      lines.push(t("workout.exercise_rest", lang, { rest: ex.rest }));
+      lines.push(`<i>${t("workout.exercise_rest", lang, { rest: escapeHtml(ex.rest) })}</i>`);
     }
     if (ex.notes) {
-      lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+      lines.push(t("workout.exercise_notes", lang, { notes: escapeHtml(ex.notes) }));
     }
     return lines.join("\n");
   }
 
-  lines.push(t("workout.exercise_item", lang, { index, name: ex.name }));
+  lines.push(`<b>${t("workout.exercise_item", lang, { index, name: escapeHtml(ex.name) })}</b>`);
 
   const detail = formatPlannedDetail(ex, lang);
-  if (detail) lines.push(`   ${detail}`);
+  if (detail) lines.push(detail);
 
   const lastDetail = lastLogs.get(ex.name.trim().toLowerCase());
   if (lastDetail) {
-    lines.push(`   ${t("workout.exercise_last", lang, { detail: formatPreviousLog(lastDetail, lang) })}`);
+    lines.push(`<i>${t("workout.exercise_last", lang, { detail: formatPreviousLog(lastDetail, lang) })}</i>`);
   }
 
   if (ex.rest) {
-    lines.push(t("workout.exercise_rest", lang, { rest: ex.rest }));
+    lines.push(`<i>${t("workout.exercise_rest", lang, { rest: escapeHtml(ex.rest) })}</i>`);
   }
 
   if (ex.notes) {
-    lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+    lines.push(t("workout.exercise_notes", lang, { notes: escapeHtml(ex.notes) }));
   }
 
   return lines.join("\n");
@@ -621,10 +662,10 @@ export async function formatWorkoutMessage(
   if (workout.is_deload) weekParts.push(t("workout.deload_badge", lang));
   lines.push(weekParts.join(" | "));
 
-  lines.push(t("workout.day_label", lang, { day: workout.day_name }));
+  lines.push(t("workout.day_label", lang, { day: escapeHtml(workout.day_name) }));
 
   if (workout.goal) {
-    lines.push(t("workout.goal_label", lang, { goal: workout.goal }));
+    lines.push(t("workout.goal_label", lang, { goal: escapeHtml(workout.goal) }));
   }
 
   lines.push("");
@@ -651,10 +692,10 @@ export function formatSingleExercise(
   if (ex.type === "superset" && ex.children?.length) {
     lines.push(t("workout.exercise_header", lang, { current: index + 1, total }));
     lines.push("");
-    lines.push(ex.name ? t("workout.superset_label", lang, { name: ex.name }) : t("workout.superset_bare", lang));
+    lines.push(`<b>${ex.name ? t("workout.superset_label", lang, { name: escapeHtml(ex.name) }) : t("workout.superset_bare", lang)}</b>`);
     if (ex.sets) {
       lines.push("");
-      lines.push(t("workout.exercise_sets_reps", lang, { sets: ex.sets, reps: t("workout.superset_per_circuit", lang) }));
+      lines.push(t("workout.exercise_sets_reps", lang, { sets: escapeHtml(ex.sets), reps: t("workout.superset_per_circuit", lang) }));
     }
 
     for (let i = 0; i < ex.children.length; i++) {
@@ -665,11 +706,11 @@ export function formatSingleExercise(
 
     if (ex.rest) {
       lines.push("");
-      lines.push(t("workout.exercise_rest_detail", lang, { rest: ex.rest }));
+      lines.push(`<i>${t("workout.exercise_rest_detail", lang, { rest: escapeHtml(ex.rest) })}</i>`);
     }
     if (ex.notes) {
       lines.push("");
-      lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+      lines.push(t("workout.exercise_notes", lang, { notes: escapeHtml(ex.notes) }));
     }
     return lines.join("\n");
   }
@@ -678,19 +719,18 @@ export function formatSingleExercise(
   lines.push("");
   lines.push(
     ex.type === "circuit"
-      ? ex.name ? t("workout.circuit_label", lang, { name: ex.name }) : t("workout.circuit_bare", lang)
-      : ex.name,
+      ? `<b>${ex.name ? t("workout.circuit_label", lang, { name: escapeHtml(ex.name) }) : t("workout.circuit_bare", lang)}</b>`
+      : `<b>${escapeHtml(ex.name)}</b>`,
   );
 
   if (ex.block) {
     lines.push("");
-    lines.push(t("workout.exercise_block", lang, { block: ex.block }));
+    lines.push(t("workout.exercise_block", lang, { block: escapeHtml(ex.block) }));
   }
 
   if (ex.type === "cardio") {
     const cardioLines = formatPlannedDetail(ex, lang);
     if (cardioLines) {
-      lines.push("");
       lines.push(cardioLines);
     }
   } else if (ex.type === "circuit") {
@@ -702,33 +742,33 @@ export function formatSingleExercise(
       }
     }
 
-    const goal = ex.rounds ? t("workout.circuit_goal", lang, { rounds: pluralizeRounds(ex.rounds, lang) }) : "";
+    const goal = ex.rounds ? t("workout.circuit_goal", lang, { rounds: escapeHtml(pluralizeRounds(ex.rounds, lang)) }) : "";
     if (goal) {
       lines.push("");
-      lines.push(goal);
+      lines.push(`<i>${goal}</i>`);
     }
   } else {
     const detail = formatPlannedDetail(ex, lang);
     if (detail) {
-      lines.push("");
       lines.push(detail);
     }
   }
 
   if (ex.rest) {
-    lines.push(t("workout.exercise_rest_detail", lang, { rest: ex.rest }));
+    lines.push("");
+    lines.push(`<i>${t("workout.exercise_rest_detail", lang, { rest: escapeHtml(ex.rest) })}</i>`);
   }
 
   const last = lastLogs.get(ex.name.trim().toLowerCase());
   const lastDetail = last ? formatPreviousLog(last, lang) : "";
   if (lastDetail) {
     lines.push("");
-    lines.push(t("workout.exercise_last", lang, { detail: lastDetail }));
+    lines.push(`<i>${t("workout.exercise_last", lang, { detail: lastDetail })}</i>`);
   }
 
   if (ex.notes) {
     lines.push("");
-    lines.push(t("workout.exercise_notes", lang, { notes: ex.notes }));
+    lines.push(t("workout.exercise_notes", lang, { notes: escapeHtml(ex.notes) }));
   }
 
   return lines.join("\n");
@@ -780,12 +820,18 @@ interface MeasurementRow {
   body_fat: number | null;
 }
 
-export function truncateMessage(message: string, suffix: string): string {
+export function truncateMessage(message: string, suffix: string, options?: { html?: boolean }): string {
   if (message.length <= TELEGRAM_MAX_MESSAGE_LENGTH) return message;
   const limit = TELEGRAM_MAX_MESSAGE_LENGTH - suffix.length - 1;
   const truncated = message.slice(0, limit);
   const lastNewline = truncated.lastIndexOf("\n");
   const safeTruncated = lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated;
+  if (options?.html) {
+    const stripped = safeTruncated
+      .replace(/<[^>]*$/, "")
+      .replace(/&[a-zA-Z0-9#]*;?$/, "");
+    return closeHtmlTagsWithinLimit(stripped, limit) + suffix;
+  }
   return safeTruncated + suffix;
 }
 
@@ -822,7 +868,7 @@ export async function sendTodayWorkout(
   }
 
   const message = await formatWorkoutMessage(workout, sender.language, client);
-  const truncated = truncateMessage(message, t("program.truncation_suffix", sender.language));
+  const truncated = truncateMessage(message, t("program.truncation_suffix", sender.language), { html: true });
 
   const buttons = [
     [{ text: t("workout.open_button", sender.language), callback_data: "today_open" }],
@@ -833,6 +879,7 @@ export async function sendTodayWorkout(
     reply_markup: {
       inline_keyboard: buttons,
     },
+    parse_mode: "HTML",
   });
 
   return true;

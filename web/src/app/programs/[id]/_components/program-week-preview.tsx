@@ -45,9 +45,11 @@ function typeBadge(type?: string): ReactNode | null {
   return null;
 }
 
-function ExerciseRows({ exercise, columns, letter }: { exercise: ParsedExercise; columns: string[]; letter?: string }) {
+function ExerciseRows({ exercise, columns, letter, isChild = false }: { exercise: ParsedExercise; columns: string[]; letter?: string; isChild?: boolean }) {
   const type = exercise.type ?? "strength";
   const isComposite = isCompositeExercise(exercise);
+  const isCircuit = exercise.type === "circuit";
+  const hideRest = isChild;
   const nameCell = (
     <>
       {letter && (
@@ -57,7 +59,6 @@ function ExerciseRows({ exercise, columns, letter }: { exercise: ParsedExercise;
       {exercise.name}
     </>
   );
-  const isCircuit = exercise.type === "circuit";
   const cardioMetrics = [
     exercise.distance ? `Дистанция: ${exercise.distance}` : null,
     !isCircuit && exercise.duration ? `Время: ${exercise.duration}` : null,
@@ -71,7 +72,13 @@ function ExerciseRows({ exercise, columns, letter }: { exercise: ParsedExercise;
       <TableRow className={getBlockColor(exercise.block)}>
         {columns.map((col) => (
           <TableCell key={col}>
-            {col === EXERCISE_COLUMN ? nameCell : isCircuit && col === "Время" ? "—" : getCellValue(exercise, col)}
+            {col === EXERCISE_COLUMN
+              ? nameCell
+              : hideRest && col === "Отдых"
+                ? "—"
+                : isCircuit && col === "Время"
+                  ? "—"
+                  : getCellValue(exercise, col)}
           </TableCell>
         ))}
       </TableRow>
@@ -94,6 +101,7 @@ function ExerciseRows({ exercise, columns, letter }: { exercise: ParsedExercise;
                       exercise={child}
                       columns={columns}
                       letter={`${letter ?? "A"}${ci + 1}`}
+                      isChild
                     />
                   ))}
                 </TableBody>

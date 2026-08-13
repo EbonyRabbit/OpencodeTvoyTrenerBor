@@ -207,6 +207,39 @@ describe("formatExercise", () => {
     expect(lastLine).toContain("60 кг");
   });
 
+  it("hides child rest inside superset but keeps parent rest", () => {
+    const ex = {
+      name: "Грудь+спина",
+      type: "superset",
+      rest: "120",
+      children: [
+        { name: "Жим", sets: "3", reps: "8", rest: "30" },
+        { name: "Тяга", sets: "3", reps: "10", rest: "45" },
+      ],
+    };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    const restLines = result.split("\n").filter((l) => l.includes("Отдых"));
+    expect(restLines).toHaveLength(1);
+    expect(restLines[0]).toContain("120");
+    expect(restLines[0]).not.toContain("30");
+    expect(restLines[0]).not.toContain("45");
+  });
+
+  it("hides child rest inside circuit but keeps parent rest", () => {
+    const ex = {
+      name: "Круг",
+      type: "circuit",
+      rounds: "3",
+      rest: "90",
+      children: [{ name: "Берпи", sets: "3", reps: "15", rest: "30" }],
+    };
+    const result = formatExercise(1, ex as never, "ru", new Map());
+    const restLines = result.split("\n").filter((l) => l.includes("Отдых"));
+    expect(restLines).toHaveLength(1);
+    expect(restLines[0]).toContain("90");
+    expect(restLines[0]).not.toContain("30");
+  });
+
   it("renders cardio with planned metrics", () => {
     const ex = {
       name: "Бег",
@@ -375,6 +408,24 @@ describe("formatExercise", () => {
 });
 
 describe("formatSingleExercise", () => {
+  it("hides child rest in single superset view but keeps parent rest", () => {
+    const exercise = {
+      name: "Грудь+спина",
+      type: "superset",
+      rest: "120",
+      children: [
+        { name: "Жим", sets: "3", reps: "8", rest: "30" },
+        { name: "Тяга", sets: "3", reps: "10", rest: "45" },
+      ],
+    };
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", new Map());
+    const restLines = result.split("\n").filter((l) => l.includes("Отдых"));
+    expect(restLines).toHaveLength(1);
+    expect(restLines[0]).toContain("120");
+    expect(restLines[0]).not.toContain("30");
+    expect(restLines[0]).not.toContain("45");
+  });
+
   it("uses batched child logs and localizes cardio metrics", () => {
     const exercise = {
       name: "Mixed superset",

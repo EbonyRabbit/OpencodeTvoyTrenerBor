@@ -548,9 +548,6 @@ function formatChildLine(
   if (lastDetail) {
     lines.push(`<i>${t("workout.exercise_last", lang, { detail: lastDetail })}</i>`);
   }
-  if (child.rest) {
-    lines.push(`<i>${t("workout.exercise_rest", lang, { rest: escapeHtml(child.rest) })}</i>`);
-  }
   return lines.join("\n");
 }
 

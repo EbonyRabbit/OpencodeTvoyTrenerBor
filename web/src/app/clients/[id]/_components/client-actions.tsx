@@ -10,6 +10,7 @@ import {
   disableClient,
   deleteClient,
   markPurchased,
+  sendProgramInstructions,
   togglePayment,
   updateClient,
 } from "../actions";
@@ -87,6 +88,14 @@ export function ClientActions({
   const [confirming, setConfirming] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState<{
     connectCode?: string;
+    warning?: string;
+  } | null>(null);
+
+  const [instructing, setInstructing] = useState(false);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [instructionsResult, setInstructionsResult] = useState<{
+    connectCode?: string;
+    warning?: string;
   } | null>(null);
 
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -135,7 +144,7 @@ export function ClientActions({
     try {
       const result = await activateProgram(clientId, selectedProgram);
       if (result.error) {
-        if (result.error.includes("Программа назначена")) {
+        if (result.programAssigned) {
           setShowProgramSelect(false);
           setSelectedProgram("");
           setPrograms([]);
@@ -147,6 +156,11 @@ export function ClientActions({
       setShowProgramSelect(false);
       setSelectedProgram("");
       setPrograms([]);
+      setInstructionsResult({
+        connectCode: result.connectCode,
+        warning: result.warning,
+      });
+      setInstructionsOpen(true);
       router.refresh();
     } catch {
       setError("Произошла ошибка");
@@ -155,20 +169,49 @@ export function ClientActions({
     }
   }, [clientId, selectedProgram, router]);
 
+  const handleSendInstructions = useCallback(async () => {
+    if (!currentProgramId) return;
+    setInstructing(true);
+    setError(null);
+    try {
+      const result = await sendProgramInstructions(clientId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setInstructionsResult({
+        connectCode: result.connectCode,
+        warning: result.warning,
+      });
+      setInstructionsOpen(true);
+      router.refresh();
+    } catch {
+      setError("Произошла ошибка");
+    } finally {
+      setInstructing(false);
+    }
+  }, [clientId, currentProgramId, router]);
+
   const handleGenerateCode = useCallback(async () => {
     if (currentCode && !confirm("Сгенерировать новый код подключения?")) return;
     setGenerating(true);
     setError(null);
     try {
       const result = await generateConnectCode(clientId);
-      if (result.error) setError(result.error);
-      if (result.code) setNewCode(result.code);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (result.code) {
+        setNewCode(result.code);
+        router.refresh();
+      }
     } catch {
       setError("Произошла ошибка");
     } finally {
       setGenerating(false);
     }
-  }, [clientId, currentCode]);
+  }, [clientId, currentCode, router]);
 
   const handleGeneratePortalLink = useCallback(async () => {
     if (portalLink && !confirm("Сгенерировать новую ссылку? Старая перестанет работать.")) return;
@@ -279,10 +322,16 @@ export function ClientActions({
     try {
       const result = await markPurchased(clientId, selectedProgram);
       if (result.error) {
+        if (result.programAssigned) {
+          setShowPurchaseDialog(false);
+          setPurchaseSuccess(null);
+          setSelectedProgram("");
+          router.refresh();
+        }
         setError(result.error);
         return;
       }
-      setPurchaseSuccess({ connectCode: result.connectCode });
+      setPurchaseSuccess({ connectCode: result.connectCode, warning: result.warning });
       router.refresh();
     } catch {
       setError("Произошла ошибка");
@@ -439,6 +488,24 @@ export function ClientActions({
         <Button
           type="button"
           variant="outline"
+          onClick={handleSendInstructions}
+          disabled={
+            !currentProgramId || currentPaymentStatus !== "paid" || instructing
+          }
+          title={
+            !currentProgramId
+              ? "Сначала назначьте программу"
+              : currentPaymentStatus !== "paid"
+                ? "Сначала подтвердите оплату"
+                : ""
+          }
+        >
+          {instructing ? "Отправка..." : "Отправить инструкции"}
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
           onClick={handleGenerateCode}
           disabled={generating}
         >
@@ -562,7 +629,8 @@ export function ClientActions({
               <DialogHeader>
                 <DialogTitle>Покупка подтверждена</DialogTitle>
                 <DialogDescription>
-                  Программа назначена, клиент уведомлён в Telegram.
+                  {purchaseSuccess.warning ??
+                    "Программа назначена, клиент уведомлён в Telegram."}
                 </DialogDescription>
               </DialogHeader>
               {purchaseSuccess.connectCode && (
@@ -631,6 +699,45 @@ export function ClientActions({
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={instructionsOpen}
+        onOpenChange={(open) => {
+          setInstructionsOpen(open);
+          if (!open) {
+            setInstructionsResult(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {instructionsResult?.warning
+                ? "Инструкции не доставлены"
+                : "Инструкции отправлены"}
+            </DialogTitle>
+            <DialogDescription>
+              {instructionsResult?.warning ??
+                "Сообщение с инструкциями отправлено клиенту в Telegram."}
+            </DialogDescription>
+          </DialogHeader>
+          {instructionsResult?.connectCode && (
+            <div className="rounded-md bg-muted p-3">
+              <p className="text-sm text-muted-foreground">
+                Код подключения для клиента:
+              </p>
+              <p className="font-mono text-lg font-bold">
+                {instructionsResult.connectCode}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              Закрыть
+            </DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

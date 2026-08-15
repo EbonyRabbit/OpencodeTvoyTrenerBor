@@ -51,7 +51,7 @@ function lineList(value: string[], onChange: (next: string[]) => void): {
   };
 }
 
-export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onDone: () => void }) {
+export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onDone?: () => void }) {
   const [form, setForm] = useState<ExerciseFormData>(() =>
     exercise
       ? {
@@ -90,7 +90,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
         setError(result.error);
       } else {
         if (!exercise) setForm(defaultExerciseForm());
-        onDone();
+        onDone?.();
       }
     } catch {
       setError("Произошла ошибка");
@@ -111,7 +111,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
         setDeleting(false);
         return;
       }
-      onDone();
+      onDone?.();
     } catch {
       setError("Произошла ошибка");
       setDeleting(false);

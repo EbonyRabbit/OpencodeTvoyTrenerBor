@@ -97,7 +97,7 @@ export default async function ExercisesPage() {
                 </div>
               </summary>
               <div className="border-t px-4 py-4">
-                <ExerciseForm exercise={exercise} onDone={() => undefined} />
+                <ExerciseForm exercise={exercise} />
               </div>
             </details>
           </li>

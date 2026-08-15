@@ -20,29 +20,29 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/exercises", label: "Упражнения", icon: <ClipboardList />, adminOnly: true },
 ];
 
-export function NavMenu({ role }: { role: string | null }) {
+export function NavMenu({ role }: { role?: string | null }) {
   const pathname = usePathname();
 
   return (
     <nav className="flex flex-wrap items-center gap-1.5" aria-label="Основное меню">
-      {NAV_ITEMS.filter((item) => !item.adminOnly || role === "admin" || role === "coach").map(
-        (item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                buttonVariants({ variant: active ? "default" : "ghost", size: "sm" }),
-              )}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          );
-        },
-      )}
+      {NAV_ITEMS.filter(
+        (item) => !item.adminOnly || role == null || role === "admin" || role === "coach",
+      ).map((item) => {
+        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              buttonVariants({ variant: active ? "default" : "ghost", size: "sm" }),
+            )}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }

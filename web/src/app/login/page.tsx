@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { login } from "@/lib/auth-actions";
+import { NavMenu } from "@/app/dashboard/_components/nav-menu";
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, null);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-sm space-y-6 px-4">
+    <div className="flex min-h-screen flex-col">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b bg-background px-6 py-3">
+        <h1 className="text-lg font-semibold">ТвойТренерБот</h1>
+        <NavMenu />
+      </header>
+      <div className="flex flex-1 items-center justify-center">
+        <div className="w-full max-w-sm space-y-6 px-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold">ТвойТренерБот</h1>
           <p className="mt-2 text-sm text-muted-foreground">Вход в панель управления</p>
@@ -62,6 +68,7 @@ export default function LoginPage() {
             Политикой конфиденциальности
           </Link>
         </p>
+      </div>
       </div>
     </div>
   );

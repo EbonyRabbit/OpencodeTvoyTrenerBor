@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { verifySession } from "@/lib/dal";
 import { logout } from "@/lib/auth-actions";
+import { NavMenu } from "./_components/nav-menu";
 
 export default async function DashboardLayout({
   children,
@@ -11,25 +11,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b px-6 py-4">
-        <div className="flex items-center gap-6">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-3">
+        <div className="flex flex-wrap items-center gap-6">
           <h1 className="text-lg font-semibold">ТвойТренерБот</h1>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/dashboard" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-              Дашборд
-            </Link>
-            <Link href="/clients" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-              Клиенты
-            </Link>
-            <Link href="/programs" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-              Программы
-            </Link>
-            {profile?.role === "admin" || profile?.role === "coach" ? (
-              <Link href="/exercises" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-                Упражнения
-              </Link>
-            ) : null}
-          </nav>
+          <NavMenu role={profile?.role ?? null} />
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{profile?.name}</span>

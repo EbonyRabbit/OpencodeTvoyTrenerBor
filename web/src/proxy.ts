@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase-proxy";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const protectedRoutes = ["/dashboard", "/clients", "/programs", "/checkins", "/chat"];
+const protectedRoutes = ["/dashboard", "/clients", "/programs", "/checkins", "/chat", "/exercises"];
 const authRoutes = ["/login"];
 
 const CLIENT_ROUTE_EXCLUSIONS = ["/client/expired"];

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent, flattenLoggableExercises, type ParsedDay } from "@/lib/program-utils";
+import type { ExerciseLibraryRow } from "@/lib/exercise-library";
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { WorkoutForm } from "./workout-form";
@@ -86,9 +87,9 @@ export default async function WorkoutPage() {
 
   const { data: client } = await supabaseAdmin
     .from("clients")
-    .select("program_id, timezone, training_days")
+    .select("program_id, timezone, training_days, language")
     .eq("id", clientId)
-    .maybeSingle<Pick<ClientRow, "program_id" | "timezone" | "training_days">>();
+    .maybeSingle<Pick<ClientRow, "program_id" | "timezone" | "training_days"> & { language: string | null }>();
 
   if (!client?.program_id) {
     return (
@@ -218,6 +219,15 @@ export default async function WorkoutPage() {
     targets.length > 0 &&
     targets.every((ex) => loggedNames.has(ex.name.trim().toLowerCase()));
 
+  const { data: libraryRows } = await supabaseAdmin
+    .from("exercises")
+    .select("id, name, name_key, aliases, description_ru, description_en, technique_ru, technique_en, features_ru, features_en, video_url")
+    .order("name", { ascending: true })
+    .limit(1000);
+
+  const library = (libraryRows ?? []) as ExerciseLibraryRow[];
+  const portalLanguage: "ru" | "en" = client.language === "en" ? "en" : "ru";
+
   return (
     <div>
       <div className="mb-4">
@@ -243,6 +253,8 @@ export default async function WorkoutPage() {
           date={todayStr}
           week={currentWeek.week_number}
           dayOrder={matchedDay.day_order ?? null}
+          library={library}
+          language={portalLanguage}
         />
       )}
     </div>

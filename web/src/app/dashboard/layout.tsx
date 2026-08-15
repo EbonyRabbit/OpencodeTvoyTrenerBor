@@ -24,6 +24,11 @@ export default async function DashboardLayout({
             <Link href="/programs" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
               Программы
             </Link>
+            {profile?.role === "admin" || profile?.role === "coach" ? (
+              <Link href="/exercises" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                Упражнения
+              </Link>
+            ) : null}
           </nav>
         </div>
         <div className="flex items-center gap-4">

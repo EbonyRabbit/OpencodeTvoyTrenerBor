@@ -42,6 +42,7 @@ const resources = {
         settings: "/settings — настройки",
         myweb: "/myweb — мой веб-портал",
         schedule: "/schedule — расписание тренировок",
+        exercise: "/exercise — техника упражнений",
       },
       progress: {
         title: "Прогресс и замеры:",
@@ -106,6 +107,14 @@ const resources = {
         planned_duration: "Время: {{duration}}",
         planned_pace: "Темп: {{pace}}",
         planned_heart_rate: "Пульс: {{heart_rate}}",
+        exercise_info_button: "📚 Техника и видео",
+      },
+      exercise_lib: {
+        video_prefix: "📺 Видео:",
+        video_label: "техника выполнения",
+        not_found: "Упражнение не найдено в библиотеке",
+        search_none: "Не нашёл «{{name}}» в библиотеке. Попробуйте другое название.",
+        usage_hint: "Напишите название упражнения после команды, например:\n/exercise Жим штанги",
       },
       wizard: {
         step_sets: "📊 Сколько подходов выполнил?",
@@ -480,6 +489,7 @@ const resources = {
         settings: "/settings — settings",
         myweb: "/myweb — my web portal",
         schedule: "/schedule — training schedule",
+        exercise: "/exercise — exercise technique",
       },
       progress: {
         title: "Progress and measurements:",
@@ -544,6 +554,14 @@ const resources = {
         planned_duration: "Time: {{duration}}",
         planned_pace: "Pace: {{pace}}",
         planned_heart_rate: "Heart rate: {{heart_rate}}",
+        exercise_info_button: "📚 Technique & video",
+      },
+      exercise_lib: {
+        video_prefix: "📺 Video:",
+        video_label: "execution technique",
+        not_found: "Exercise not found in the library",
+        search_none: "Couldn't find \"{{name}}\" in the library. Try a different name.",
+        usage_hint: "Write the exercise name after the command, e.g.:\n/exercise Bench Press",
       },
       wizard: {
         step_sets: "📊 How many sets did you do?",

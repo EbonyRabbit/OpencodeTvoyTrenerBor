@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, ChevronDown, PlayCircle } from "lucide-react";
 import { logWorkoutFromWeb } from "../actions";
 import { flattenLoggableExercises, getCompositeLetters, type ParsedExercise } from "@/lib/program-utils";
+import { buildExerciseLibraryMap, findLibraryEntry, type ExerciseLibraryEntry, type ExerciseLibraryRow } from "@/lib/exercise-library";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 function toNum(v: string): number | null {
   if (!v.trim()) return null;
@@ -116,19 +118,89 @@ function Field({
   );
 }
 
+function TechniqueSection({ entry, lang }: { entry: ExerciseLibraryEntry; lang: "ru" | "en" }) {
+  const [open, setOpen] = useState(false);
+  const videoId = entry.videoUrl ? extractYouTubeVideoId(entry.videoUrl) : null;
+  const technique =
+    lang === "en"
+      ? (entry.techniqueEn ?? entry.techniqueRu)
+      : (entry.techniqueRu ?? entry.techniqueEn);
+  const nativeFeatures = lang === "en" ? entry.featuresEn : entry.featuresRu;
+  const fallbackFeatures = lang === "en" ? entry.featuresRu : entry.featuresEn;
+  const features =
+    nativeFeatures.length > 0 ? nativeFeatures : fallbackFeatures;
+  const hasContent = Boolean(technique || features.length > 0 || videoId);
+  if (!hasContent) return null;
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between rounded-md bg-muted px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        aria-expanded={open}
+        aria-controls={`technique-${entry.id}`}
+      >
+        <span className="inline-flex items-center gap-1">
+          <PlayCircle className="h-3 w-3" />
+          {lang === "en" ? "Technique and video" : "Техника и видео"}
+        </span>
+        <ChevronDown
+          className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div id={`technique-${entry.id}`} className="mt-2 space-y-2 text-xs">
+          {technique && (
+            <p className="whitespace-pre-line text-muted-foreground">{technique}</p>
+          )}
+          {features.length > 0 && (
+            <ul className="space-y-0.5 text-muted-foreground">
+              {features.map((feature, idx) => (
+                <li key={idx}>• {feature}</li>
+              ))}
+            </ul>
+          )}
+          {videoId && (
+            <div className="aspect-video w-full overflow-hidden rounded-md">
+              <iframe
+                src={`https://www.youtube.com/embed/${videoId}`}
+                title={entry.name}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+                loading="lazy"
+                className="h-full w-full"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WorkoutForm({
   exercises,
   date,
   week,
   dayOrder,
+  library = [],
+  language = "ru",
 }: {
   exercises: ParsedExercise[];
   date: string;
   week: number | null;
   dayOrder: number | null;
+  library?: ExerciseLibraryRow[];
+  language?: "ru" | "en";
 }) {
   const leaves = flattenLoggableExercises(exercises);
   const letters = getCompositeLetters(exercises);
+  const libraryMap = buildExerciseLibraryMap(library);
+
+  const entryFor = (programName: string): ExerciseLibraryEntry | undefined =>
+    findLibraryEntry(libraryMap, programName);
   const leafBadge = (leaf: ParsedExercise, leafIndex: number): string | null => {
     let offset = 0;
     for (let i = 0; i < exercises.length; i++) {
@@ -339,6 +411,10 @@ export function WorkoutForm({
                   className="h-8 text-xs"
                 />
               </div>
+              {(() => {
+                const entry = entryFor(ex.name);
+                return entry ? <TechniqueSection entry={entry} lang={language} /> : null;
+              })()}
             </CardContent>
           </Card>
         );

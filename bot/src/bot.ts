@@ -15,6 +15,7 @@ import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
 import { myWebHandler } from "./handlers/my-web.js";
+import { exerciseHandler } from "./handlers/exercise.js";
 import { settingsHandler, handleSettingsCallback } from "./handlers/settings.js";
 import { scheduleHandler } from "./handlers/training-days.js";
 import { progressHandler } from "./handlers/progress.js";
@@ -169,6 +170,16 @@ bot.command("mystats", async (ctx) => {
   }
   ctx.client = guard.client;
   await myStatsHandler(ctx);
+});
+
+bot.command("exercise", async (ctx) => {
+  const guard = await guardActiveClient(ctx);
+  if (typeof guard === "string") {
+    await ctx.reply(guard);
+    return;
+  }
+  ctx.client = guard.client;
+  await exerciseHandler(ctx);
 });
 
 bot.command("schedule", async (ctx) => {

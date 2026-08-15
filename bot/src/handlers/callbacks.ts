@@ -26,10 +26,12 @@ import { startMeasurements, showMeasurementHistory } from "./measurements.js";
 import { computeNextDayOfMonthDate, DEFERRED_MONTH_TTL_HOURS } from "../cron/measurement-reminder.js";
 import { handleScheduleStart, handleScheduleToggle, handleScheduleDone, handleScheduleCancel } from "./training-days.js";
 import { handleResumeCallback } from "./resume.js";
+import { buildExerciseInfoButton, handleExerciseInfoCallback, loadExerciseLibraryRows } from "./exercise-info.js";
+import { buildExerciseLibraryMap } from "../lib/exercise-library.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
-import { getCompositeLetters } from "../lib/program-utils.js";
+import { getCompositeLetters, type ParsedExercise } from "../lib/program-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { markAsSent } from "../cron/dedup.js";
 import { SKIP_MARKER } from "../lib/log-markers.js";
@@ -172,6 +174,7 @@ registerCallback("measurements_defer_set", async (ctx, params) => {
 });
 // registerCallback("photo_history", async (ctx) => { await ctx.answerCallbackQuery().catch(() => {}); await showPhotoHistory(ctx); }); // DISABLED: photo storage removed
 registerCallback("resume", async (ctx, strategy) => { await handleResumeCallback(ctx, strategy); });
+registerCallback("exercise_info", handleExerciseInfoCallback);
 registerCallback("sched_start", async (ctx) => { await handleScheduleStart(ctx); });
 registerCallback("sched_toggle", async (ctx, iso) => { await handleScheduleToggle(ctx, iso); });
 registerCallback("sched_done", async (ctx) => { await handleScheduleDone(ctx); });
@@ -197,6 +200,18 @@ function buildExerciseKeyboard(
   rows.push([{ text: t("workout.skip_button", lang), callback_data: "skip_workout" }]);
 
   return rows;
+}
+
+async function withLibraryButton(
+  rows: { text: string; callback_data: string }[][],
+  ex: ParsedExercise,
+  lang: Language,
+): Promise<{ text: string; callback_data: string }[][]> {
+  const libraryRows = await loadExerciseLibraryRows();
+  const map = buildExerciseLibraryMap(libraryRows);
+  const button = await buildExerciseInfoButton(ex, map, lang);
+  if (!button) return rows;
+  return [...rows, [button]];
 }
 
 export async function showExercise(
@@ -245,7 +260,11 @@ export async function showExercise(
     t("program.truncation_suffix", ctx.language),
     { html: true },
   );
-  const keyboard = buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language);
+  const keyboard = await withLibraryButton(
+    buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language),
+    currentExercise,
+    ctx.language,
+  );
 
   await ctx.reply(text, {
     reply_markup: { inline_keyboard: keyboard },

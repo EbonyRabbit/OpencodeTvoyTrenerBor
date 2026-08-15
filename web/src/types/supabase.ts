@@ -406,37 +406,64 @@ export type Database = {
       }
       exercises: {
         Row: {
+          aliases: string[]
           contraindications: string | null
           created_at: string
           demo_video_url: string | null
+          description_en: string | null
+          description_ru: string | null
           difficulty: string | null
           equipment: string | null
+          features_en: string[]
+          features_ru: string[]
           id: string
           muscle_group: string | null
           name: string
+          name_key: string
+          technique_en: string | null
+          technique_ru: string | null
           updated_at: string
+          video_url: string | null
         }
         Insert: {
+          aliases?: string[]
           contraindications?: string | null
           created_at?: string
           demo_video_url?: string | null
+          description_en?: string | null
+          description_ru?: string | null
           difficulty?: string | null
           equipment?: string | null
+          features_en?: string[]
+          features_ru?: string[]
           id?: string
           muscle_group?: string | null
           name: string
+          name_key: string
+          technique_en?: string | null
+          technique_ru?: string | null
           updated_at?: string
+          video_url?: string | null
         }
         Update: {
+          aliases?: string[]
           contraindications?: string | null
           created_at?: string
           demo_video_url?: string | null
+          description_en?: string | null
+          description_ru?: string | null
           difficulty?: string | null
           equipment?: string | null
+          features_en?: string[]
+          features_ru?: string[]
           id?: string
           muscle_group?: string | null
           name?: string
+          name_key?: string
+          technique_en?: string | null
+          technique_ru?: string | null
           updated_at?: string
+          video_url?: string | null
         }
         Relationships: []
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
 import { createPortal } from "react-dom";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase-browser";
@@ -237,8 +237,9 @@ export function ExerciseAutocomplete({
   }
 
   const showDropdown = isOpen && totalOptions > 0;
-  const activeId = highlightedIndex >= 0 ? `exercise-option-${highlightedIndex}` : undefined;
-  const listboxId = "exercise-listbox";
+  const listboxId = `exercise-listbox-${useId().replace(/:/g, "")}`;
+  const activeId =
+    highlightedIndex >= 0 ? `${listboxId}-option-${highlightedIndex}` : undefined;
 
   return (
     <div ref={containerRef} className="relative">
@@ -275,7 +276,7 @@ export function ExerciseAutocomplete({
             {results.map((exercise, idx) => (
               <li
                 key={exercise.id}
-                id={`exercise-option-${idx}`}
+                id={`${listboxId}-option-${idx}`}
                 data-index={idx}
                 role="option"
                 aria-selected={idx === highlightedIndex}
@@ -289,11 +290,23 @@ export function ExerciseAutocomplete({
                 onMouseEnter={() => setHighlightedIndex(idx)}
               >
                 <span className="font-medium">{exercise.name}</span>
-                {(exercise.muscle_group || exercise.equipment) && (
-                  <span className="text-muted-foreground">
-                    {[exercise.muscle_group, exercise.equipment].filter(Boolean).join(" · ")}
-                  </span>
-                )}
+                <span className="flex flex-wrap items-center gap-1">
+                  {(exercise.muscle_group || exercise.equipment) && (
+                    <span className="text-muted-foreground">
+                      {[exercise.muscle_group, exercise.equipment].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                  {(exercise.technique_ru || exercise.technique_en) && (
+                    <span className="rounded-sm bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      📚 техника
+                    </span>
+                  )}
+                  {exercise.video_url && (
+                    <span className="rounded-sm bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      📺 видео
+                    </span>
+                  )}
+                </span>
               </li>
             ))}
             {isLoading && (

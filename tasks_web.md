@@ -1070,3 +1070,80 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/lib/adherence.test.ts` | Изменение (тесты под новую семантику) |
 | `web/src/lib/__tests__/next-workout.test.ts` | Изменение (тесты hasTrainedOnDate) |
 | `supabase/migrations/20260813000000_count_trained_workout_days.sql` | Новый (заменяет логику RPC из 20260804010000) |
+
+## Фаза 20: Библиотека упражнений (описание, техника, особенности, видео)
+
+### Контекст
+
+Таблица `exercises` существует, но пуста и используется только как автокомплит в редакторе программ.
+Программы хранят упражнения как свободное имя (`ParsedExercise.name`), логи пишут имя текстом — связи с
+`exercises.id` нет. Клиенту нужна библиотека: описание, техника выполнения, особенности, видео-инструкция —
+доступная в боте во время тренировки и на клиентском портале.
+
+Цель:
+- Расширить `exercises` контентом (ru/en): описание, техника, особенности (буллеты), YouTube-видео, алиасы.
+- Связывание с программами — по нормализованному имени + алиасам (без правки контента программ и логов).
+- Бот `/today`: под карточкой упражнения компактная кнопка «Техника и видео» → отдельное сообщение
+  (техника + особенности + ссылка). Команда `/exercise <название>` — поиск по имени/алиасам.
+- Клиентский портал: под упражнением раскрывающаяся карточка: техника + особенности + встроенный YouTube-плеер.
+- Веб-панель: CRUD-страница `/exercises` + подсказка в редакторе программ при совпадении с библиотекой.
+
+### Осознанные решения
+
+| Решение | Выбор |
+|---------|-------|
+| Хостинг видео | Только YouTube-ссылки (`video_url`); на портале — iframe, в боте — ссылка |
+| Связывание | `name_key` (нормализация: lowercase, без пунктуации/пробелов) + `aliases TEXT[]`; матч в рантайме (JS-мап), без SQL-функций |
+| Поверхности | Бот (/today-кнопка, /exercise) + веб (CRUD, подсказка в редакторе) + портал (карточки) |
+| Бот: формат | Компактная кнопка → отдельное сообщение (не раздувать карточку /today); у суперсетов — кнопка на суперсет целиком |
+| Портал: формат | Раскрывающаяся карточка: текст техники + буллеты особенностей + YouTube iframe |
+| Языки | RU + EN (description_ru/en, technique_ru/en, features_ru/en) |
+| Резолвер | Дубликат `exercise-library.ts` в `web/src/lib/` и `bot/src/lib/` (keep-in-sync, как program-utils) |
+| Наполнение | Сид: топ-15 движений текущих программ с реальными публичными ссылками (Buff Dudes / Фитнес Преп) + полный ru/en текст (AI-черновик, тренер правит в CRUD); остальные — текст + плейсхолдер video_url |
+| Существующие поля | `muscle_group, equipment, difficulty, contraindications` сохраняются без изменений |
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **20.1** | Миграция БД + типы | `20260815000000_exercise_library.sql`: ALTER `exercises` — `name_key TEXT UNIQUE NOT NULL`, `aliases TEXT[] DEFAULT '{}'`, `description_ru TEXT`, `description_en TEXT`, `technique_ru TEXT`, `technique_en TEXT`, `features_ru TEXT[]`, `features_en TEXT[]`, `video_url TEXT`; бэкап `name_key` из существующих `name` при миграции. Обновить `web/src/types/supabase.ts`, `bot/src/lib/types.ts` | ✅ |
+| **20.2** | Резолвер библиотеки | `web/src/lib/exercise-library.ts` + `bot/src/lib/exercise-library.ts` (синк-комментарий): `normalizeExerciseName`, `buildExerciseLibraryMap(rows)`, `findLibraryEntry(map, programName)`, `formatExerciseInfo(ex, lang) → { text, videoUrl }` (техника буллетами + особенности + ссылка), `collectLibraryKeys(exercises)` | ✅ |
+| **20.3** | Сид библиотеки | `bot/scripts/seed-exercise-library.ts` — идемпотентный upsert по `name_key`: топ-15 движений программ (Гипертрофия FB, домашняя, HYROX) с реальными ссылками + ~35 с плейсхолдером; ru/en текст, алиасы (варианты/дети суперсетов) | ✅ |
+| **20.4** | Бот: кнопка в /today | `workout-utils.ts`: `formatWorkoutMessage` грузит карту библиотеки (1 запрос), передаёт в `formatExercise` (опц. параметр, дефолт без данных); строка кнопки + колбэк `exercise_info:<key>` | ✅ |
+| **20.5** | Бот: callback и сообщение | `callbacks.ts`: обработчик `exercise_info` — отдельное сообщение (техника + особенности + 📺 ссылка); суперсет/циркут — техника детей внутри | ✅ |
+| **20.6** | Бот: команда /exercise | Новый обработчик (поиск по имени/алиасам, `exercise_lib` не найдено → подсказка), регистрация команды в `bot.ts` и меню | ✅ |
+| **20.7** | Бот i18n | `bot/src/i18n/index.ts` ru/en: `workout.exercise_info_button`, секция `exercise_lib.*` (заголовки техники/особенностей/видео, not_found) | ✅ |
+| **20.8** | Веб: CRUD-страница | `web/src/app/exercises/page.tsx` (список + карточка) + `_components/exercise-form.tsx` (имя, алиасы, описание/техника/особенности ru/en, оборудование, сложность, группа мышц, contraindications, video_url) | ✅ |
+| **20.9** | Веб: server actions | `web/src/app/exercises/actions.ts`: валидация, вычисление `name_key`, guard admin/coach, revalidate | ✅ |
+| **20.10** | Веб: подсказка в редакторе | `program-editor.tsx` (рядом с autocomplete): при матче с библиотекой — коллапс «В библиотеке: ⇢ техника · 📺 видео» | ✅ |
+| **20.11** | Портал: карточки | `client/[token]/workout/page.tsx` (server: карта библиотеки) + `workout-form.tsx`: раскрывающаяся карточка под упражнением — техника + особенности + YouTube iframe (хелпер извлечения video ID из ссылки) | ✅ |
+| **20.12** | Тесты | Резолвер: `normalizeExerciseName` (регистр/пунктуация), матч по алиасам/детям суперсетов, `formatExerciseInfo` ru/en; бот: кнопка при матче, callback шлёт сообщение, карточка без данных не ломается, `/exercise` найден/не найден; веб: CRUD-валидация, guard, рендер карточки портала | ✅ |
+| **20.13** | Верификация + gate | tsc ✓, vitest web ✓, vitest bot ✓, eslint ✓; ревью `@code-reviewer` — гейт ≥9.5; отметка фазы в TASKS.md | ✅ |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/20260815000000_exercise_library.sql` | Новый (ALTER exercises) |
+| `web/src/types/supabase.ts` | Изменение (типы exercises) |
+| `bot/src/lib/types.ts` | Изменение (типы exercises) |
+| `web/src/lib/exercise-library.ts` | Новый (резолвер) |
+| `bot/src/lib/exercise-library.ts` | Новый (резолвер, keep-in-sync) |
+| `bot/scripts/seed-exercise-library.ts` | Новый (сид) |
+| `bot/src/lib/workout-utils.ts` | Изменение (карта библиотеки, кнопка в карточке) |
+| `bot/src/handlers/callbacks.ts` | Изменение (exercise_info callback) |
+| `bot/src/handlers/exercise.ts` | Новый (команда /exercise) |
+| `bot/src/bot.ts` | Изменение (регистрация /exercise) |
+| `bot/src/handlers/menu.ts` | Изменение (строка меню /exercise) |
+| `bot/src/i18n/index.ts` | Изменение (exercise_lib ru/en, кнопка) |
+| `web/src/app/exercises/page.tsx` | Новый (CRUD-список) |
+| `web/src/app/exercises/_components/exercise-form.tsx` | Новый (карточка/форма) |
+| `web/src/app/exercises/actions.ts` | Новый (server actions) |
+| `web/src/app/programs/[id]/edit/_components/program-editor.tsx` | Изменение (подсказка библиотеки) |
+| `web/src/app/client/[token]/workout/page.tsx` | Изменение (карта библиотеки server-side) |
+| `web/src/app/client/[token]/workout/workout-form.tsx` | Изменение (карточки с техникой + видео) |
+| `web/src/lib/__tests__/exercise-library.test.ts` | Новый (тесты резолвера) |
+| `bot/src/lib/__tests__/exercise-library.test.ts` | Новый (тесты резолвера) |
+| `bot/src/handlers/__tests__/exercise.test.ts` | Новый (тесты /exercise) |
+| `bot/src/handlers/__tests__/workout-info-button.test.ts` | Новый (кнопка + callback) |
+| `web/src/app/exercises/__tests__/actions.test.ts` | Новый (тесты CRUD) |

@@ -206,6 +206,15 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          name_key: string;
+          aliases: string[];
+          description_ru: string | null;
+          description_en: string | null;
+          technique_ru: string | null;
+          technique_en: string | null;
+          features_ru: string[];
+          features_en: string[];
+          video_url: string | null;
           muscle_group: string | null;
           equipment: string | null;
           difficulty: string | null;
@@ -214,8 +223,23 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["exercises"]["Row"], "id" | "created_at" | "updated_at"> & {
+        Insert: {
           id?: string;
+          name: string;
+          name_key?: string;
+          aliases?: string[];
+          description_ru?: string | null;
+          description_en?: string | null;
+          technique_ru?: string | null;
+          technique_en?: string | null;
+          features_ru?: string[];
+          features_en?: string[];
+          video_url?: string | null;
+          muscle_group?: string | null;
+          equipment?: string | null;
+          difficulty?: string | null;
+          demo_video_url?: string | null;
+          contraindications?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["exercises"]["Row"]>;
         Relationships: [];

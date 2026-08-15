@@ -6,7 +6,7 @@ import type { ClientRow } from "@/lib/clients";
 import type { Database } from "@/types/supabase";
 import { MeasurementsForm } from "./measurements-form";
 import { MeasurementHistory } from "./measurement-history";
-import { MeasurementTrends } from "@/app/clients/[id]/measurements/_components/measurement-trends";
+import { MeasurementTrends } from "@/app/(coach)/clients/[id]/measurements/_components/measurement-trends";
 
 const DEFAULT_TIMEZONE = "Europe/Moscow";
 const HISTORY_LIMIT = 10;

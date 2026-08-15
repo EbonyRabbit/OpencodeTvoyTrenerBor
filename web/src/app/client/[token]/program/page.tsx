@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent } from "@/lib/program-utils";
-import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
+import { ProgramWeekPreview } from "@/app/(coach)/programs/[id]/_components/program-week-preview";
 
 export default async function ClientProgramPage() {
   const h = await headers();

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { login } from "@/lib/auth-actions";
-import { NavMenu } from "@/app/dashboard/_components/nav-menu";
+import { NavMenu } from "@/app/(coach)/_components/nav-menu";
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, null);

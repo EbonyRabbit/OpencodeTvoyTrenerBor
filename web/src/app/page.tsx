@@ -1,4 +1,4 @@
-import { NavMenu } from "@/app/dashboard/_components/nav-menu";
+import { NavMenu } from "@/app/(coach)/_components/nav-menu";
 
 export default function Home() {
   return (

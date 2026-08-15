@@ -23,7 +23,7 @@ import {
   CHECKIN_DAY_OPTIONS,
 } from "@/lib/clients";
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
-import { ProgramWeekPreview } from "@/app/programs/[id]/_components/program-week-preview";
+import { ProgramWeekPreview } from "@/app/(coach)/programs/[id]/_components/program-week-preview";
 import { MiniLineChart } from "./mini-line-chart";
 // import { PHOTO_TYPE_LABELS } from "@/lib/photos"; // DISABLED: photo storage removed
 import { PauseSection } from "./pause-section";

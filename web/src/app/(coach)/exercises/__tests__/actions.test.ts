@@ -174,13 +174,19 @@ describe("updateExercise", () => {
     expect(result.error).toBe("Некорректный идентификатор");
   });
 
-  it("updates the row by id", async () => {
+  it("updates the row by id without touching name_key", async () => {
     const chain = mockTable({ error: null, data: { id: UUID } });
     const result = await updateExercise(UUID, VALID_DATA);
     expect(result.error).toBeUndefined();
     expect(chain.update).toHaveBeenCalledWith(
-      expect.objectContaining({ name_key: "жимлежа", updated_at: expect.any(String) }),
+      expect.objectContaining({
+        name: "Жим лёжа",
+        aliases: ["Bench Press", "жим штанги лёжа"],
+        updated_at: expect.any(String),
+      }),
     );
+    const payload = (chain.update.mock.calls[0] as unknown[])[0];
+    expect(payload).not.toHaveProperty("name_key");
     expect(chain.eq).toHaveBeenCalledWith("id", UUID);
     expect(revalidatePath).toHaveBeenCalledWith("/exercises");
   });

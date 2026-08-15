@@ -208,9 +208,11 @@ export async function updateExercise(
     const { payload, error } = validateAndBuild(data);
     if (error || !payload) return { error };
 
+    const { name_key: _unusedNameKey, ...updatePayload } = payload;
+
     const { data: updated, error: updateError } = await supabaseAdmin
       .from("exercises")
-      .update({ ...payload, updated_at: new Date().toISOString() })
+      .update({ ...updatePayload, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("id")
       .maybeSingle();

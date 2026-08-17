@@ -1120,6 +1120,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **20.12** | Тесты | Резолвер: `normalizeExerciseName` (регистр/пунктуация), матч по алиасам/детям суперсетов, `formatExerciseInfo` ru/en; бот: кнопка при матче, callback шлёт сообщение, карточка без данных не ломается, `/exercise` найден/не найден; веб: CRUD-валидация, guard, рендер карточки портала | ✅ |
 | **20.13** | Верификация + gate | tsc ✓, vitest web ✓, vitest bot ✓, eslint ✓; ревью `@code-reviewer` — гейт ≥9.5; отметка фазы в TASKS.md | ✅ |
 | **20.14** | Покрытие программ | Сид расширен 51 → 84 записи: все имена упражнений H/T/X покрыты (name/алиасы); заглушки «Бег», «Жим гантелей стоя», «Казак-приседания», «Тяга горилла», «Молотки» и др.; `check-exercise-coverage.ts` (collection child/ex/machine/inline); миграция применена к проду (`supabase db push`), сид в прод (84 записи), чистка «переехавших» алиасов; name_key заморожен при updateExercise (CRUD-переименование не ломает матчинг программ); ревью 9.5/10 | ✅ |
+| **20.15** | Фикс 500 на /exercises | Next.js 16 запрещает передавать функции через server→client границу: баг-фикс — `onDone` в `exercise-form.tsx` стал опциональным (`onDone?: () => void`), из `page.tsx:100` убран (`revalidatePath` в actions уже обновляет страницу). Коммит `e3b02b7`, продиагностировано curl-сессией (500 на проде), проверено: tsc ✓, vitest 169/169 ✓, HTTP 200 на проде; ревью `@code-reviewer` 9.5/10 | ✅ |
 
 ### Файлы для создания/изменения
 
@@ -1148,3 +1149,64 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `bot/src/handlers/__tests__/exercise.test.ts` | Новый (тесты /exercise) |
 | `bot/src/handlers/__tests__/workout-info-button.test.ts` | Новый (кнопка + callback) |
 | `web/src/app/exercises/__tests__/actions.test.ts` | Новый (тесты CRUD) |
+
+---
+
+## Фаза 21: Продамус — онлайн-оплата программ (разовая, доступ на срок программы)
+
+> **Флоу:** `/programs` → «Купить» у программы (цена обязательна) → согласие на обработку данных **до оплаты** (кнопка `consent_purchase:<request_id>`) → ссылка на payform (`do=pay&products[0][name]=<программа>&products[0][price]=<цена>&products[0][quantity]=1&order_id=<UUID заявки>`) → webhook (`Sign` = HMAC-SHA256) → создание/переактивация профиля + назначение выбранной программы на `duration_weeks` (напр. 10 нед.) + инструкции. Тренер получает «Заявка на покупку» и «Оплата подтверждена» (имя/фамилия из Telegram, @ник, TG ID, программа, цена).
+>
+> **Автоистечение:** доступ автоматически прекращается по `access_end_date` (бот + портал), за 5 дней — напоминание клиенту. Повторная покупка той же программы — новая заявка/оплата → новое окно доступа.
+>
+> **«Связаться с тренером»:** заявка на индивидуальное ведение/кураторство (sub_type='individ') из бота и со страниц каталога — уведомление тренеру со всеми данными клиента.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **21.1** | Миграция БД + типы | `20260816000000_prodamus_payments.sql`: таблица `purchase_requests` (id UUID PK, program_id UUID FK NULL, client_id UUID FK NULL, name TEXT, contact TEXT, telegram_id BIGINT NULL, first_name TEXT NULL, last_name TEXT NULL, status TEXT NOT NULL DEFAULT 'pending' (pending/paid/cancelled), order_id TEXT UNIQUE NULL, amount NUMERIC NULL, sub_type TEXT NOT NULL ('program'/'individ'), consent_given BOOL NOT NULL DEFAULT false, consent_at TIMESTAMPTZ, consent_version TEXT, created_at, updated_at) + индексы по status, telegram_id, order_id. Обновить `web/src/types/supabase.ts` + `bot/src/lib/types.ts` | ✅ (миграция +12 колонок: `amount NUMERIC(10,2)` + `CHECK (amount IS NULL OR amount > 0)`, `paid_at TIMESTAMPTZ`; FKs `ON DELETE SET NULL`; RLS: чтение только `profiles.role IN ('admin','coach')`, `REVOKE ALL FROM anon`, `REVOKE DML FROM authenticated`, GRANT SELECT authenticated + ALL service_role; типы web (Insert: name/contact/sub_type обязательны, status/consent_given опциональны) + bot (dedicated Insert по паттерну exercises); tsc web+bot ✓, vitest web 169 ✓, bot 367 ✓; ревью 2 раунда 8.5 → fix'ы (anon REVOKE, staff-политика, paid_at, bot Insert) → **10/10**) |
+| **21.2** | lib/prodamus.ts | `buildPaymentUrl({ payformUrl, orderId, amount, productName, customerPhone, urlSuccess, urlReturn })` — `do=pay&products[0][name]=...&products[0][price]=...&products[0][quantity]=1&order_id=...&customer_phone=...&urlSuccess=...` (развёрнутая ссылка, SYS-код не нужен); `verifyProdamusSignature(rawBody, signHeader, secretKey)` — значения к строкам, рекурсивная сортировка ключей, экранирование `/`, SHA-256, `crypto.timingSafeEqual`; `parseProdamusOrder` (order_id, sum, payment_status, products). Тесты на официальный пример payload докахов Продамуса | ⬜ |
+| **21.3** | Бот: покупка программы | `bot/src/handlers/purchase.ts`: в `/programs` кнопка «Купить» (только у программ с `price > 0`) → INSERT `purchase_requests` (sub_type='program', status pending, данные из `ctx.from.first_name/last_name/username/id`) → текст политики + кнопка `consent_purchase:<request_id>` **до оплаты**; у клиентов с `client_consent_given` шаг согласия пропускается → после приёма: consent в заявке + `buildPaymentUrl` + кнопка «Оплатить» (url); уведомление тренеру «Заявка на покупку» (имя + фамилия, @ник, TG ID, программа, цена); i18n ru/en, регистрация в `bot.ts` и меню | ⬜ |
+| **21.4** | Бот: кнопка «Связаться с тренером» | `purchase.ts` + меню (новые и активные клиенты): callback `coach_request` → согласие (если нет, `consent_purchase`-механика) → INSERT `purchase_requests` (sub_type='individ', данные из Telegram) → тренеру «Хочу индивидуальное ведение/кураторство» (имя, фамилия, @ник, TG ID, ссылка t.me) → клиенту «Тренер скоро свяжется с вами»; i18n ru/en | ⬜ |
+| **21.5** | Веб: заявка на страницах каталога | На `/buy/[id]` блок «Хотите индивидуальное ведение?» (текст + кнопка заявки): server action `createCoachRequest` в `web/src/app/buy/[id]/actions.ts` — реюз валидации, rate-limit и дедупликации `createPurchaseRequest` (имя, контакт, обязательный чекбокс согласия с /privacy из `lib/consent.ts`) → INSERT sub_type='individ' → уведомление тренеру | ⬜ |
+| **21.6** | Автоактивация | `web/src/lib/activate-purchase.ts`: вынос логики `markPurchased` (actions.ts) без проверки сессии — найти клиента по telegram_id, иначе создать (name из first_name+last_name, consent переносится в `client_consent_given/at/version`); если статус `access_expired`/`inactive` → переактивация (status active, заново `program_id`, `access_start_date=now`, `access_end_date=now+duration_weeks`); назначение через существующие `resetPlanAssignments` + `generateSchedule` + `deliverProgramInstructions`; клиенту «оплачено + инструкции», тренеру «Оплата подтверждена» (все данные клиента + программа + сумма). `markPurchased` и webhook вызывают её | ⬜ |
+| **21.7** | Вебхук | `web/src/app/api/webhooks/prodamus/route.ts` (runtime nodejs): POST, проверка `Sign` + секретный ключ → иначе 400; `payment_status=success` → активация по order_id (21.6), идемпотентность (заявка уже paid → 200); `order_canceled`/`order_denied` → status cancelled + уведомление тренеру | ⬜ |
+| **21.8** | Блок «Оплаты» в панели | `client-profile.tsx`: список `purchase_requests` клиента (тип — программа/индивидуальное, программа, сумма, статус, дата) | ⬜ |
+| **21.9** | Кнопка тренера | `client-actions.tsx`: «Ссылка на оплату» — выбор программы → `buildPaymentUrl` (с `customer_phone` клиента, если есть) → копирование и/или отправка клиенту в Telegram (кнопка «Оплатить программу») | ⬜ |
+| **21.10** | Автоистечение доступа | Бот: в `baseGuard` (guards.ts) у активных клиентов проверка `access_end_date < now` → сообщение `access_expired` (i18n есть) + ленивое проставление `status='access_expired'`; портал: серверный guard по `access_end_date` в `client/[token]/layout.tsx` → страница `/client/expired` (существует); панель: фильтр «Доступ истёк» уже работает | ⬜ |
+| **21.11** | Напоминание за 5 дней | `bot/src/cron/access-expiry.ts` (по образцу `measurement-reminder.ts`): ежедневный cron — активные клиенты с `access_end_date` в диапазоне [now+5д, now+5д+24ч], без записи в `notification_log` (type='access_expiring') → «Доступ заканчивается {дата}. Продлите программу в боте» + запись в `notification_log` (дедупликация — 1 раз); регистрация в `cron/scheduler.ts`; i18n ru/en | ⬜ |
+| **21.12** | Env + README | `web/env.example`: `PRODAMUS_PAYFORM_BASE_URL`, `PRODAMUS_SECRET_KEY`; инструкция настройки кабинета Продамуса (платёжная страница, urlNotification → `/api/webhooks/prodamus`, секретный ключ страницы, тестовая оплата тестовой картой) | ⬜ |
+| **21.13** | Тесты | prodamus.test.ts (подпись по офиц. payload, buildPaymentUrl, parse); webhook: валидная/битая подпись → 400, не POST, дубликат (идемпотентность), success, canceled; activate-purchase: клиент найден/создан, access_expired → переактивация, consent перенесён, без tg_id → connect_code; бот: покупка (согласие → ссылка), coach_request, автоблок по дате, i18n ru/en; cron: 5-дневное уведомление шлётся 1 раз (дедуп); веб: createCoachRequest (валидация, consent обязателен, дедупликация) | ⬜ |
+| **21.14** | Верификация + gate | tsc web+bot ✓, vitest web ✓, vitest bot ✓, eslint ✓; ревью `@code-reviewer` — гейт ≥9.5; отметка задач в этом файле | ⬜ |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/20260816000000_prodamus_payments.sql` | Новый (purchase_requests) |
+| `web/src/types/supabase.ts` | Изменение (purchase_requests) |
+| `bot/src/lib/types.ts` | Изменение (purchase_requests) |
+| `web/src/lib/prodamus.ts` | Новый (URL, подпись, парсер) |
+| `web/src/lib/__tests__/prodamus.test.ts` | Новый (тесты) |
+| `web/src/lib/activate-purchase.ts` | Новый (автоактивация) |
+| `web/src/lib/__tests__/activate-purchase.test.ts` | Новый (тесты) |
+| `web/src/app/api/webhooks/prodamus/route.ts` | Новый (вебхук) |
+| `web/src/app/api/webhooks/prodamus/__tests__/route.test.ts` | Новый (тесты) |
+| `bot/src/handlers/purchase.ts` | Новый (покупка + coach_request) |
+| `bot/src/handlers/menu.ts` | Изменение (кнопки покупки и тренера) |
+| `bot/src/handlers/programs.ts` | Изменение (кнопка «Купить» с ценой) |
+| `bot/src/bot.ts` | Изменение (регистрация callback'ов) |
+| `bot/src/i18n/index.ts` | Изменение (purchase.*, coach_request.* ru/en) |
+| `bot/src/handlers/__tests__/purchase.test.ts` | Новый (тесты) |
+| `bot/src/handlers/guards.ts` | Изменение (автоистечение) |
+| `bot/src/cron/access-expiry.ts` | Новый (напоминание за 5 дней) |
+| `bot/src/cron/scheduler.ts` | Изменение (регистрация cron) |
+| `bot/src/cron/__tests__/access-expiry.test.ts` | Новый (тесты) |
+| `web/src/app/buy/[id]/page.tsx` | Изменение (блок индивидуального ведения) |
+| `web/src/app/buy/[id]/buy-form.tsx` | Изменение (блок + чекбокс согласия) |
+| `web/src/app/buy/[id]/actions.ts` | Изменение (createCoachRequest) |
+| `web/src/app/(coach)/clients/[id]/_components/client-profile.tsx` | Изменение (блок «Оплаты») |
+| `web/src/app/(coach)/clients/[id]/_components/client-actions.tsx` | Изменение (кнопка ссылки на оплату) |
+| `web/src/app/(coach)/clients/[id]/actions.ts` | Изменение (markPurchased → activate-purchase) |
+| `web/src/app/client/[token]/layout.tsx` | Изменение (guard по дате) |
+| `web/env.example` | Изменение (PRODAMUS_*) |

@@ -79,6 +79,48 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["programs"]["Row"]>;
         Relationships: [];
       };
+      purchase_requests: {
+        Row: {
+          id: string;
+          program_id: string | null;
+          client_id: string | null;
+          name: string;
+          contact: string;
+          telegram_id: number | null;
+          first_name: string | null;
+          last_name: string | null;
+          status: string;
+          order_id: string | null;
+          amount: number | null;
+          sub_type: string;
+          consent_given: boolean;
+          consent_at: string | null;
+          consent_version: string | null;
+          paid_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          program_id?: string | null;
+          client_id?: string | null;
+          name: string;
+          contact: string;
+          telegram_id?: number | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          status?: string;
+          order_id?: string | null;
+          amount?: number | null;
+          sub_type: string;
+          consent_given?: boolean;
+          consent_at?: string | null;
+          consent_version?: string | null;
+          paid_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["purchase_requests"]["Row"]>;
+        Relationships: [];
+      };
       workout_logs: {
         Row: {
           id: string;

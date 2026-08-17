@@ -878,6 +878,84 @@ export type Database = {
           },
         ]
       }
+      purchase_requests: {
+        Row: {
+          amount: number | null
+          client_id: string | null
+          consent_at: string | null
+          consent_given: boolean
+          consent_version: string | null
+          contact: string
+          created_at: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          name: string
+          order_id: string | null
+          paid_at: string | null
+          program_id: string | null
+          status: string
+          sub_type: string
+          telegram_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          client_id?: string | null
+          consent_at?: string | null
+          consent_given?: boolean
+          consent_version?: string | null
+          contact: string
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          name: string
+          order_id?: string | null
+          paid_at?: string | null
+          program_id?: string | null
+          status?: string
+          sub_type: string
+          telegram_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          client_id?: string | null
+          consent_at?: string | null
+          consent_given?: boolean
+          consent_version?: string | null
+          contact?: string
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          name?: string
+          order_id?: string | null
+          paid_at?: string | null
+          program_id?: string | null
+          status?: string
+          sub_type?: string
+          telegram_id?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_requests_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_logs: {
         Row: {
           client_id: string

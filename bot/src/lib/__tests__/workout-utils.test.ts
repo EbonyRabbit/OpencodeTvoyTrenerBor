@@ -9,7 +9,6 @@ vi.mock("../../config.js", () => ({
     telegram: { botToken: "test", webhookSecret: "test" },
     supabase: { url: "http://localhost:54321", serviceRoleKey: "test" },
     coachChatId: 0n,
-    paymentBaseUrl: "",
     nodeEnv: "test",
     port: 3001,
     webhookPath: "/webhook",

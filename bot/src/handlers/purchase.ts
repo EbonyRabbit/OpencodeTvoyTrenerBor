@@ -24,6 +24,11 @@ interface ProgramRequest {
   id: string;
   status: string;
   consent_given: boolean;
+  amount: number | null;
+}
+
+function requestAmount(request: ProgramRequest, program: BuyableProgram): number {
+  return request.amount != null && request.amount > 0 ? request.amount : program.price;
 }
 
 function formatPrice(price: number): string {
@@ -97,7 +102,7 @@ async function findRequestForProgram(
 ): Promise<ProgramRequest | null> {
   const { data } = await supabaseAdmin
     .from("purchase_requests")
-    .select("id, status, consent_given")
+    .select("id, status, consent_given, amount")
     .eq("telegram_id", telegramId)
     .eq("program_id", programId)
     .eq("sub_type", "program")
@@ -108,11 +113,16 @@ async function findRequestForProgram(
 }
 
 async function countPendingRequests(telegramId: number): Promise<number> {
-  const { count } = await supabaseAdmin
+  const { count, error } = await supabaseAdmin
     .from("purchase_requests")
     .select("id", { count: "exact", head: true })
     .eq("telegram_id", telegramId)
+    .eq("sub_type", "program")
     .eq("status", "pending");
+  if (error) {
+    // fail-closed: ошибка счётчика не должна обходить антиспам
+    throw new Error(`Pending count failed: ${error.message}`);
+  }
   return count ?? 0;
 }
 
@@ -175,7 +185,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
       }
       if (latest.status === "pending") {
         if (latest.consent_given) {
-          await sendPaymentLink(ctx, latest.id, program);
+          await sendPaymentLink(ctx, latest.id, program, requestAmount(latest, program));
         } else {
           await sendConsentStep(ctx, latest.id, program);
         }
@@ -212,10 +222,14 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
         const winner = await findRequestForProgram(telegramId, program.id).catch(() => null);
         if (winner?.status === "pending") {
           if (winner.consent_given) {
-            await sendPaymentLink(ctx, winner.id, program);
+            await sendPaymentLink(ctx, winner.id, program, requestAmount(winner, program));
           } else {
             await sendConsentStep(ctx, winner.id, program);
           }
+          return;
+        }
+        if (winner?.status === "paid") {
+          await ctx.reply(t("purchase.already_paid", lang));
           return;
         }
       }
@@ -326,7 +340,7 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
   try {
     const { data: request, error: fetchError } = await supabaseAdmin
       .from("purchase_requests")
-      .select("id, program_id, status, consent_given, sub_type, telegram_id")
+      .select("id, program_id, status, consent_given, sub_type, telegram_id, amount")
       .eq("id", requestId)
       .maybeSingle<{
         id: string;
@@ -335,6 +349,7 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
         consent_given: boolean;
         sub_type: string;
         telegram_id: number | null;
+        amount: number | null;
       }>();
     if (fetchError || !request) {
       console.error(`[PURCHASE] Request fetch failed for ${telegramId}:`, fetchError?.message);
@@ -370,7 +385,7 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
     }
 
     if (!request.consent_given) {
-      const { data: updated, error: updateError } = await supabaseAdmin
+      const { error: updateError } = await supabaseAdmin
         .from("purchase_requests")
         .update({
           consent_given: true,
@@ -380,23 +395,63 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
         .eq("id", requestId)
         .eq("telegram_id", telegramId)
         .eq("status", "pending")
-        .eq("consent_given", false)
-        .select("id")
-        .maybeSingle();
+        .eq("consent_given", false);
       if (updateError) {
         console.error(`[PURCHASE] Consent update failed for ${telegramId}:`, updateError.message);
         await ctx.reply(t("purchase.error", lang));
         return;
       }
-      // 0 затронутых строк: статус/владелец изменились между чтением и
-      // записью (TOCTOU) — ссылку на оплату не выдаём
-      if (!updated) {
-        await ctx.reply(t("purchase.invalid_request", lang));
-        return;
-      }
+      // 0 затронутых строк не блокируем: двойной тап уже проставил согласие,
+      // а если статус изменился — это поймает финальная проверка ниже
     }
 
-    await sendPaymentLink(ctx, requestId, program);
+    // финальная проверка ПЕРЕД выдачей ссылки: статус и согласие могли
+    // измениться между чтением и записью (TOCTOU)
+    const { data: fresh, error: refreshError } = await supabaseAdmin
+      .from("purchase_requests")
+      .select("id, status, consent_given, amount")
+      .eq("id", requestId)
+      .maybeSingle<{
+        id: string;
+        status: string;
+        consent_given: boolean;
+        amount: number | null;
+      }>();
+    if (refreshError || !fresh || fresh.status !== "pending" || !fresh.consent_given) {
+      if (fresh?.status === "paid") {
+        await ctx.reply(t("purchase.already_paid", lang));
+        return;
+      }
+      await ctx.reply(t("purchase.invalid_request", lang));
+      return;
+    }
+
+    // защита от повторной оплаты: программа уже выдана клиенту или
+    // уже оплачена по другой заявке (панельные действия тренера)
+    let client: Client | null = null;
+    try {
+      client = await findClientByTelegramId(telegramId);
+    } catch (err) {
+      console.warn(`[PURCHASE] Client lookup failed for ${telegramId}:`, err);
+    }
+    if (client && client.program_id === request.program_id) {
+      await ctx.reply(t("purchase.already_owned", lang));
+      return;
+    }
+    const { data: paidRequest } = await supabaseAdmin
+      .from("purchase_requests")
+      .select("id")
+      .eq("telegram_id", telegramId)
+      .eq("program_id", request.program_id)
+      .eq("status", "paid")
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (paidRequest) {
+      await ctx.reply(t("purchase.already_paid", lang));
+      return;
+    }
+
+    await sendPaymentLink(ctx, requestId, program, requestAmount(fresh, program));
   } catch (err) {
     console.error(`[PURCHASE] handleConsentPurchase failed for ${telegramId}:`, err);
     await ctx.reply(t("purchase.error", lang));
@@ -407,6 +462,7 @@ async function sendPaymentLink(
   ctx: MyContext,
   requestId: string,
   program: BuyableProgram,
+  amount: number,
 ): Promise<void> {
   const lang = ctx.language;
   if (!config.prodamusPayformBaseUrl) {
@@ -418,13 +474,13 @@ async function sendPaymentLink(
     const paymentUrl = buildPaymentUrl({
       payformUrl: config.prodamusPayformBaseUrl,
       orderId: requestId,
-      amount: program.price,
+      amount,
       productName: program.title,
     });
     const payLabel = truncateButtonLabel(
       t("purchase.pay_button", lang, {
         title: program.title,
-        price: formatPrice(program.price),
+        price: formatPrice(amount),
       }),
       TELEGRAM_BUTTON_MAX_BYTES,
     );

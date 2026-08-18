@@ -9,7 +9,6 @@ vi.mock("../../config.js", () => ({
     telegram: { botToken: "test", webhookSecret: "test" },
     supabase: { url: "http://localhost:54321", serviceRoleKey: "test" },
     coachChatId: 0n,
-    paymentBaseUrl: "",
     nodeEnv: "test",
     port: 3001,
     webhookPath: "/webhook",
@@ -138,6 +137,32 @@ describe("programsHandler catalog query", () => {
     expect(keyboard).not.toContain("purchase_start:tpl-free");
     expect(keyboard).toContain("program_request:tpl-buy");
     expect(keyboard).toContain("program_request:tpl-free");
+  });
+
+  it("hides the buy button for a program the client already owns", async () => {
+    mockProgramsQuery(
+      [
+        {
+          id: "tpl-buy",
+          title: "Платная",
+          type: "template",
+          description: null,
+          duration_weeks: 12,
+          price: 9900,
+        },
+      ],
+      { id: "c-1", program_id: "tpl-buy", language: "ru" },
+    );
+    const ctx = makeCtx();
+
+    await programsHandler(ctx);
+
+    const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
+      reply_markup?: unknown;
+    };
+    const keyboard = JSON.stringify(options.reply_markup ?? []);
+    expect(keyboard).not.toContain("purchase_start:tpl-buy");
+    expect(keyboard).toContain("program_request:tpl-buy");
   });
 });
 

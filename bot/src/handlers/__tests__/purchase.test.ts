@@ -5,6 +5,8 @@ import { startPurchase, handleConsentPurchase, buildPurchaseCoachMessage } from 
 import { buildPaymentUrl } from "../../lib/prodamus.js";
 import type { MyContext } from "../../bot.js";
 
+const PAYFORM_URL = "https://pay.demo.prodamus.ru/payment";
+
 vi.mock("../../config.js", () => ({
   config: {
     telegram: { botToken: "test", webhookSecret: "test" },
@@ -25,7 +27,7 @@ vi.mock("../../lib/supabase-admin.js", () => ({
 }));
 
 type QueryCall = { method: string; args: unknown[] };
-type Row = { data: unknown; error: null };
+type Row = { data: unknown; error: unknown; count?: number };
 type Handler = (calls: QueryCall[], terminal: string) => Row;
 
 const captured: Record<string, QueryCall[]> = {};
@@ -34,9 +36,9 @@ function mockDb(handlers: Record<string, Handler>) {
   const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   fromMock.from.mockImplementation((table: string) => {
     const calls: QueryCall[] = [];
-    captured[table] = calls;
     const record = (method: string, args: unknown[]) => {
       calls.push({ method, args });
+      captured[table] = [...(captured[table] ?? []), { method, args }];
       return chain;
     };
     const resolve = (terminal: string) =>
@@ -63,6 +65,8 @@ function callsFor(table: string): QueryCall[] {
 }
 
 const BUYABLE_PROGRAM = { id: "prog-1", title: "Сила Новичка 12 недель", price: 9900 };
+const VALID_PROGRAM_ID = "11111111-1111-1111-1111-111111111111";
+const REQUEST_ID = "22222222-2222-2222-2222-222222222222";
 
 const ok = (data: unknown): Row => ({ data, error: null });
 
@@ -76,6 +80,10 @@ function makeCtx(overrides: Partial<MyContext> = {}) {
   } as unknown as MyContext;
 }
 
+function replyText(ctx: MyContext, index = 0): string {
+  return (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[index][0] as string;
+}
+
 function replyOptions(ctx: MyContext): Record<string, unknown> {
   return (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] ?? {};
 }
@@ -86,10 +94,12 @@ function keyboardJson(options: Record<string, unknown>): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  for (const key of Object.keys(captured)) delete captured[key];
 });
 
 afterEach(() => {
   (config as { coachChatId: bigint }).coachChatId = 0n;
+  (config as { prodamusPayformBaseUrl: string }).prodamusPayformBaseUrl = PAYFORM_URL;
 });
 
 describe("buildPurchaseCoachMessage", () => {
@@ -138,6 +148,19 @@ describe("buildPurchaseCoachMessage", () => {
 });
 
 describe("startPurchase", () => {
+  function defaultDb(latest: unknown = null, count = 0) {
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ok(null),
+      bot_logs: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok(latest);
+        return ok(null) as Row & { count };
+      },
+    });
+  }
+
   it("rejects malformed program id with an alert", async () => {
     mockDb({});
     const ctx = makeCtx();
@@ -155,7 +178,7 @@ describe("startPurchase", () => {
     mockDb({ programs: () => ok(null) });
     const ctx = makeCtx();
 
-    await startPurchase(ctx, "11111111-1111-1111-1111-111111111111");
+    await startPurchase(ctx, VALID_PROGRAM_ID);
 
     expect(ctx.reply).toHaveBeenCalledWith(
       "Программа недоступна для покупки. Свяжитесь с тренером.",
@@ -166,30 +189,38 @@ describe("startPurchase", () => {
     for (const price of [0, null]) {
       mockDb({ programs: () => ok({ ...BUYABLE_PROGRAM, price }) });
       const ctx = makeCtx();
-      await startPurchase(ctx, "11111111-1111-1111-1111-111111111111");
+      await startPurchase(ctx, VALID_PROGRAM_ID);
       expect(ctx.reply).toHaveBeenCalledWith(
         "Программа недоступна для покупки. Свяжитесь с тренером.",
       );
     }
   });
 
-  it("creates a request and shows the consent step", async () => {
+  it("blocks purchase of a program the client already owns", async () => {
     mockDb({
       programs: () => ok(BUYABLE_PROGRAM),
-      clients: () => ok(null),
-      bot_logs: () => ok(null),
-      purchase_requests: (_calls, terminal) => {
-        if (terminal === "single") return ok({ id: "req-1" });
-        return ok(null);
-      },
+      clients: () => ok({ id: "c-1", program_id: "prog-1", language: "ru" }),
     });
     const ctx = makeCtx();
 
-    await startPurchase(ctx, "11111111-1111-1111-1111-111111111111");
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Эта программа уже у вас есть. Свяжитесь с тренером, если нужна другая.",
+    );
+    expect(callsFor("purchase_requests")).toEqual([]);
+  });
+
+  it("creates a request (with order_id/amount/client_id) and shows the consent step", async () => {
+    defaultDb();
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
 
     const insert = callsFor("purchase_requests").find((c) => c.method === "insert");
     expect(insert).toBeDefined();
-    expect(insert?.args[0]).toMatchObject({
+    const payload = insert?.args[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
       program_id: "prog-1",
       name: "Иван Петров",
       contact: "@buyer",
@@ -197,51 +228,156 @@ describe("startPurchase", () => {
       first_name: "Иван",
       last_name: "Петров",
       sub_type: "program",
+      client_id: null,
+      amount: 9900,
     });
+    // order_id = id заявки (для матчинга вебхука Продамуса)
+    expect(payload.id).toEqual(expect.any(String));
+    expect(payload.order_id).toBe(payload.id);
+    expect(String(payload.id)).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
 
-    const text = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const text = replyText(ctx);
     expect(text).toContain("Согласие на обработку данных");
     expect(text).toContain("«Сила Новичка 12 недель»");
     expect(text).toContain(`9\u00A0900 ₽`);
     expect(text).toContain("portal.example.com");
-    expect(keyboardJson(replyOptions(ctx))).toContain("consent_purchase:req-1");
+    expect(keyboardJson(replyOptions(ctx))).toContain(`consent_purchase:${payload.id}`);
   });
 
   it("reuses a pending request without consent and re-shows the consent step", async () => {
-    mockDb({
-      programs: () => ok(BUYABLE_PROGRAM),
-      clients: () => ok(null),
-      purchase_requests: () => ok({ id: "req-1", consent_given: false }),
-    });
+    defaultDb({ id: "req-1", status: "pending", consent_given: false });
     const ctx = makeCtx();
 
-    await startPurchase(ctx, "11111111-1111-1111-1111-111111111111");
+    await startPurchase(ctx, VALID_PROGRAM_ID);
 
     expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
     expect(keyboardJson(replyOptions(ctx))).toContain("consent_purchase:req-1");
   });
 
   it("reuses a consented pending request and sends the payment link directly", async () => {
-    mockDb({
-      programs: () => ok(BUYABLE_PROGRAM),
-      clients: () => ok(null),
-      purchase_requests: () => ok({ id: "req-1", consent_given: true }),
-    });
+    defaultDb({ id: "req-1", status: "pending", consent_given: true });
     const ctx = makeCtx();
 
-    await startPurchase(ctx, "11111111-1111-1111-1111-111111111111");
+    await startPurchase(ctx, VALID_PROGRAM_ID);
 
     expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
     const buttons = keyboardJson(replyOptions(ctx));
-    expect(buttons).toContain(
-      `"url":"https://pay.demo.prodamus.ru/payment?do=pay&order_id=req-1`,
-    );
+    expect(buttons).toContain(`"url":"${PAYFORM_URL}?do=pay&order_id=req-1`);
     expect(buttons).toContain("%5B0%5D%5Bprice%5D=9900.00");
+  });
+
+  it("does not offer a second payment for an already paid request", async () => {
+    defaultDb({ id: "req-1", status: "paid", consent_given: true });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringContaining("Заявка уже оплачена"));
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+  });
+
+  it("allows a new request after the coach cancelled the previous one", async () => {
+    defaultDb({ id: "req-1", status: "cancelled", consent_given: true });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    const insert = callsFor("purchase_requests").find((c) => c.method === "insert");
+    expect(insert).toBeDefined();
+    expect(keyboardJson(replyOptions(ctx))).toContain("consent_purchase:");
+  });
+
+  it("blocks new requests when the user already has too many pending", async () => {
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ok(null),
+      purchase_requests: (_calls, terminal) => {
+        if (terminal === "maybeSingle") return ok(null);
+        return { data: null, error: null, count: 3 };
+      },
+    });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Слишком много активных заявок. Дождитесь ответа тренера.",
+    );
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+  });
+
+  it("falls back to the winning request on duplicate-key insert (double tap race)", async () => {
+    let maybeCalls = 0;
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ok(null),
+      bot_logs: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) {
+          return { data: null, error: { code: "23505", message: "duplicate key" } };
+        }
+        if (terminal === "maybeSingle") {
+          maybeCalls += 1;
+          // первый read — ничего нет; после failed insert возвращаем "победителя"
+          if (maybeCalls === 1) return ok(null);
+          return ok({ id: "req-1", status: "pending", consent_given: false });
+        }
+        return ok(null) as Row & { count: 0 };
+      },
+    });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(keyboardJson(replyOptions(ctx))).toContain("consent_purchase:req-1");
+    const inserts = callsFor("purchase_requests").filter((c) => c.method === "insert");
+    expect(inserts).toHaveLength(1);
+  });
+
+  it("replies with an error when the insert fails", async () => {
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) {
+          return { data: null, error: { code: "500", message: "boom" } };
+        }
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null) as Row & { count: 0 };
+      },
+    });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось оформить заявку. Попробуйте позже.",
+    );
   });
 });
 
 describe("handleConsentPurchase", () => {
-  const REQUEST_ID = "11111111-1111-1111-1111-111111111111";
+  const REQ = {
+    id: "req-1",
+    program_id: "prog-1",
+    status: "pending",
+    consent_given: false,
+    sub_type: "program",
+    telegram_id: 123456789,
+  };
+
+  function consentDb(request: unknown, updateResult: unknown = { id: "req-1" }) {
+    mockDb({
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "update")) return ok(updateResult);
+        if (terminal === "then") return ok([]);
+        return ok(request);
+      },
+      programs: () => ok(BUYABLE_PROGRAM),
+    });
+  }
 
   it("rejects malformed request id", async () => {
     mockDb({});
@@ -256,17 +392,7 @@ describe("handleConsentPurchase", () => {
   });
 
   it("refuses to consent for someone else's request", async () => {
-    mockDb({
-      purchase_requests: () =>
-        ok({
-          id: "req-1",
-          program_id: "prog-1",
-          status: "pending",
-          consent_given: false,
-          sub_type: "program",
-          telegram_id: 999,
-        }),
-    });
+    consentDb({ ...REQ, telegram_id: 999 });
     const ctx = makeCtx();
 
     await handleConsentPurchase(ctx, REQUEST_ID);
@@ -278,22 +404,26 @@ describe("handleConsentPurchase", () => {
   });
 
   it("warns when the request is already paid", async () => {
-    mockDb({
-      purchase_requests: () =>
-        ok({
-          id: "req-1",
-          program_id: "prog-1",
-          status: "paid",
-          consent_given: true,
-          sub_type: "program",
-          telegram_id: 123456789,
-        }),
-    });
+    consentDb({ ...REQ, status: "paid", consent_given: true });
     const ctx = makeCtx();
 
     await handleConsentPurchase(ctx, REQUEST_ID);
 
     expect(ctx.reply).toHaveBeenCalledWith(expect.stringContaining("Заявка уже оплачена"));
+    expect(callsFor("purchase_requests").some((c) => c.method === "update")).toBe(false);
+  });
+
+  it("refuses to revive a cancelled request", async () => {
+    consentDb({ ...REQ, status: "cancelled", consent_given: true });
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Заявка не найдена. Начните покупку заново через /programs.",
+    );
+    expect(callsFor("purchase_requests").some((c) => c.method === "update")).toBe(false);
+    expect(replyOptions(ctx)).toEqual({});
   });
 
   it("records consent with version and sends a payment link", async () => {
@@ -302,16 +432,9 @@ describe("handleConsentPurchase", () => {
       purchase_requests: (calls, terminal) => {
         const updateCall = calls.find((c) => c.method === "update");
         if (updateCall) updates.push(updateCall.args[0] as Record<string, unknown>);
+        if (updateCall) return ok({ id: "req-1" });
         if (terminal === "then") return ok([]);
-        if (updateCall) return ok(null);
-        return ok({
-          id: "req-1",
-          program_id: "prog-1",
-          status: "pending",
-          consent_given: false,
-          sub_type: "program",
-          telegram_id: 123456789,
-        });
+        return ok(REQ);
       },
       programs: () => ok(BUYABLE_PROGRAM),
     });
@@ -324,12 +447,19 @@ describe("handleConsentPurchase", () => {
     expect(updates[0].consent_version).toBe("2026-07-16");
     expect(updates[0].consent_at).toEqual(expect.any(String));
 
-    const text = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    // guard-фильтры на статус/владельца/дубль согласия + select для проверки
+    const eqs = callsFor("purchase_requests")
+      .filter((c) => c.method === "eq")
+      .map((c) => c.args);
+    expect(eqs).toContainEqual(["id", REQUEST_ID]);
+    expect(eqs).toContainEqual(["telegram_id", 123456789]);
+    expect(eqs).toContainEqual(["status", "pending"]);
+    expect(eqs).toContainEqual(["consent_given", false]);
+
+    const text = replyText(ctx);
     expect(text).toContain("Спасибо! Согласие принято.");
     const buttons = keyboardJson(replyOptions(ctx));
-    expect(buttons).toContain(
-      `"url":"https://pay.demo.prodamus.ru/payment?do=pay&order_id=${REQUEST_ID}`,
-    );
+    expect(buttons).toContain(`"url":"${PAYFORM_URL}?do=pay&order_id=${REQUEST_ID}`);
   });
 
   it("does not re-record consent when already given", async () => {
@@ -338,16 +468,9 @@ describe("handleConsentPurchase", () => {
       purchase_requests: (calls, terminal) => {
         const updateCall = calls.find((c) => c.method === "update");
         if (updateCall) updates.push(updateCall.args[0] as Record<string, unknown>);
+        if (updateCall) return ok({ id: "req-1" });
         if (terminal === "then") return ok([]);
-        if (updateCall) return ok(null);
-        return ok({
-          id: "req-1",
-          program_id: "prog-1",
-          status: "pending",
-          consent_given: true,
-          sub_type: "program",
-          telegram_id: 123456789,
-        });
+        return ok({ ...REQ, consent_given: true });
       },
       programs: () => ok(BUYABLE_PROGRAM),
     });
@@ -358,12 +481,55 @@ describe("handleConsentPurchase", () => {
     expect(updates).toHaveLength(0);
     expect(keyboardJson(replyOptions(ctx))).toContain(`order_id=${REQUEST_ID}`);
   });
+
+  it("aborts when the consent update affects 0 rows (status changed meanwhile)", async () => {
+    consentDb(REQ, null);
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Заявка не найдена. Начните покупку заново через /programs.",
+    );
+    expect(replyOptions(ctx)).toEqual({});
+  });
+
+  it("does not write consent when the program is no longer buyable", async () => {
+    mockDb({
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "update")) return ok(null);
+        if (terminal === "then") return ok([]);
+        return ok(REQ);
+      },
+      programs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Программа недоступна для покупки. Свяжитесь с тренером.",
+    );
+    expect(callsFor("purchase_requests").some((c) => c.method === "update")).toBe(false);
+  });
+
+  it("replies payment_unavailable when the payform URL is not configured", async () => {
+    (config as { prodamusPayformBaseUrl: string }).prodamusPayformBaseUrl = "";
+    consentDb({ ...REQ, consent_given: true });
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Оплата временно недоступна. Попробуйте позже или свяжитесь с тренером.",
+    );
+  });
 });
 
 describe("buildPaymentUrl (bot copy)", () => {
   it("produces a payform URL with order_id and product", () => {
     const url = buildPaymentUrl({
-      payformUrl: "https://pay.demo.prodamus.ru/payment",
+      payformUrl: PAYFORM_URL,
       orderId: "req-1",
       amount: 9900,
       productName: "Сила Новичка 12 недель",
@@ -378,7 +544,7 @@ describe("buildPaymentUrl (bot copy)", () => {
   it("rejects non-positive amounts", () => {
     expect(() =>
       buildPaymentUrl({
-        payformUrl: "https://pay.demo.prodamus.ru/payment",
+        payformUrl: PAYFORM_URL,
         orderId: "req-1",
         amount: 0,
         productName: "Программа",

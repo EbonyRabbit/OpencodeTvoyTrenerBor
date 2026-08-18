@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildBuyUrl, buildProgramRequestCoachMessage } from "../../lib/program-links.js";
+import { buildProgramRequestCoachMessage } from "../../lib/program-links.js";
 import { programsHandler } from "../programs.js";
 import { supabaseAdmin } from "../../lib/supabase-admin.js";
 import type { MyContext } from "../../bot.js";
@@ -23,7 +23,7 @@ vi.mock("../../lib/supabase-admin.js", () => ({
 
 type QueryCall = { method: string; args: unknown[] };
 
-function mockProgramsQuery(data: Record<string, unknown>[]) {
+function mockProgramsQuery(data: Record<string, unknown>[], clientData: unknown = null) {
   const calls: QueryCall[] = [];
   const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   const chain = {
@@ -46,8 +46,20 @@ function mockProgramsQuery(data: Record<string, unknown>[]) {
     then: (onFulfilled: (v: unknown) => unknown) =>
       Promise.resolve({ data, error: null }).then(onFulfilled),
   };
+  const clientChain = {
+    select: (...args: unknown[]) => {
+      calls.push({ method: "select", args });
+      return clientChain;
+    },
+    eq: (...args: unknown[]) => {
+      calls.push({ method: "eq", args });
+      return clientChain;
+    },
+    maybeSingle: () => Promise.resolve({ data: clientData, error: null }),
+  };
   fake.from.mockImplementation((table: string) => {
     if (table === "programs") return chain;
+    if (table === "clients") return clientChain;
     throw new Error(`Unexpected table: ${table}`);
   });
   return calls;
@@ -129,23 +141,6 @@ describe("programsHandler catalog query", () => {
   });
 });
 
-
-describe("buildBuyUrl", () => {
-  it("includes tg id and encoded username", () => {
-    const url = buildBuyUrl("https://shop.example.com", "prog-1", 123456789, "iurii");
-    expect(url).toBe("https://shop.example.com/buy/prog-1?tg=123456789&u=iurii");
-  });
-
-  it("omits username param when username is null", () => {
-    const url = buildBuyUrl("https://shop.example.com", "prog-1", 123456789, null);
-    expect(url).toBe("https://shop.example.com/buy/prog-1?tg=123456789");
-  });
-
-  it("encodes special characters in username", () => {
-    const url = buildBuyUrl("https://shop.example.com", "prog-1", 123456789, "a b&c");
-    expect(url).toBe("https://shop.example.com/buy/prog-1?tg=123456789&u=a%20b%26c");
-  });
-});
 
 describe("buildProgramRequestCoachMessage", () => {
   it("includes name, username link and tg id", () => {

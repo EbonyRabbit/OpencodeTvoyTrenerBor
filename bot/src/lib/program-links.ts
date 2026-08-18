@@ -1,15 +1,3 @@
-export function buildBuyUrl(
-  baseUrl: string,
-  programId: string,
-  buyerTelegramId: number,
-  buyerUsername: string | null,
-): string {
-  const usernameParam = buyerUsername
-    ? `&u=${encodeURIComponent(buyerUsername)}`
-    : "";
-  return `${baseUrl}/buy/${programId}?tg=${buyerTelegramId}${usernameParam}`;
-}
-
 export function buildProgramRequestCoachMessage({
   clientName,
   telegramId,

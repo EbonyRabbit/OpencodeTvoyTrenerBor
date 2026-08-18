@@ -1,6 +1,6 @@
 export interface StartupWarningsInput {
   clientPortalUrl?: string;
-  paymentBaseUrl?: string;
+  prodamusPayformBaseUrl?: string;
 }
 
 export function startupWarnings(cfg: StartupWarningsInput): string[] {
@@ -10,8 +10,10 @@ export function startupWarnings(cfg: StartupWarningsInput): string[] {
       "[CONFIG] CLIENT_PORTAL_URL is not set: /myweb will reply that the portal is unavailable.",
     );
   }
-  if (!cfg.paymentBaseUrl?.trim()) {
-    warnings.push("[CONFIG] PAYMENT_BASE_URL is not set: \"Buy\" buttons in /programs are hidden.");
+  if (!cfg.prodamusPayformBaseUrl?.trim()) {
+    warnings.push(
+      "[CONFIG] PRODAMUS_PAYFORM_BASE_URL is not set: the purchase flow cannot issue payment links.",
+    );
   }
   return warnings;
 }

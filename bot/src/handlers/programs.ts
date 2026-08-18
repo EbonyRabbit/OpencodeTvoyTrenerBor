@@ -88,6 +88,16 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
       return;
     }
 
+    // программы, которыми пользователь уже владеет, не предлагаем к покупке
+    let ownedProgramIds = new Set<string>();
+    try {
+      const { findClientByTelegramId } = await import("../lib/clients.js");
+      const client = await findClientByTelegramId(ctx.from.id);
+      if (client?.program_id) ownedProgramIds = new Set([client.program_id]);
+    } catch (err) {
+      console.warn(`[PROGRAMS] Client lookup failed for ${ctx.from.id}:`, err);
+    }
+
     const lines: string[] = [t("programs.title", lang), ""];
     const keyboard = new InlineKeyboard();
 
@@ -97,7 +107,8 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
       const requestLabel = truncateButtonLabel(
         `${t("programs.request_button", lang)} — ${program.title}`,
       );
-      const buyable = program.price != null && program.price > 0;
+      const buyable =
+        program.price != null && program.price > 0 && !ownedProgramIds.has(program.id);
       if (buyable) {
         const buyLabel = truncateButtonLabel(
           `${t("programs.buy_button", lang)} — ${program.title}`,

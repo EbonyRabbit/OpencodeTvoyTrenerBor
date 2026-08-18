@@ -2,7 +2,7 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
-import { buildBuyUrl, buildProgramRequestCoachMessage } from "../lib/program-links.js";
+import { buildProgramRequestCoachMessage } from "../lib/program-links.js";
 import { InlineKeyboard } from "grammy";
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
@@ -18,7 +18,7 @@ interface Program {
   price: number | null;
 }
 
-function truncateButtonLabel(label: string, maxBytes = TELEGRAM_BUTTON_MAX_BYTES): string {
+export function truncateButtonLabel(label: string, maxBytes = TELEGRAM_BUTTON_MAX_BYTES): string {
   const encoder = new TextEncoder();
   const bytes = encoder.encode(label);
   if (bytes.length <= maxBytes) return label;
@@ -90,8 +90,6 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
 
     const lines: string[] = [t("programs.title", lang), ""];
     const keyboard = new InlineKeyboard();
-    const buyerTelegramId = ctx.from.id;
-    const buyerUsername = ctx.from.username ?? null;
 
     programs.forEach((program, i) => {
       lines.push(formatProgram(i + 1, program, lang));
@@ -99,18 +97,13 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
       const requestLabel = truncateButtonLabel(
         `${t("programs.request_button", lang)} — ${program.title}`,
       );
-      if (config.paymentBaseUrl) {
+      const buyable = program.price != null && program.price > 0;
+      if (buyable) {
         const buyLabel = truncateButtonLabel(
           `${t("programs.buy_button", lang)} — ${program.title}`,
         );
-        const buyUrl = buildBuyUrl(
-          config.paymentBaseUrl,
-          program.id,
-          buyerTelegramId,
-          buyerUsername,
-        );
         keyboard.row()
-          .url(buyLabel, buyUrl)
+          .text(buyLabel, `purchase_start:${program.id}`)
           .text(requestLabel, `program_request:${program.id}`);
       } else {
         keyboard.row().text(requestLabel, `program_request:${program.id}`);

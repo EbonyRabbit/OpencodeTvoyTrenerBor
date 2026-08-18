@@ -44,6 +44,7 @@ export const config = {
   },
   coachChatId: BigInt(requireEnv("COACH_CHAT_ID")),
   paymentBaseUrl: optionalEnv("PAYMENT_BASE_URL", "").trim().replace(/\/+$/, ""),
+  prodamusPayformBaseUrl: optionalEnv("PRODAMUS_PAYFORM_BASE_URL", "").trim().replace(/\/+$/, ""),
   clientPortalUrl: optionalEnv("CLIENT_PORTAL_URL", "").trim().replace(/\/+$/, ""),
   nodeEnv: optionalEnv("NODE_ENV", "development"),
   port: optionalPort("PORT", 3001),

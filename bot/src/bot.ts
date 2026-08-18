@@ -13,6 +13,7 @@ import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
+import { startPurchase, handleConsentPurchase } from "./handlers/purchase.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
 import { myWebHandler } from "./handlers/my-web.js";
 import { exerciseHandler } from "./handlers/exercise.js";
@@ -235,6 +236,18 @@ bot.on("callback_query:data", async (ctx, next) => {
   if (data?.startsWith("program_request:")) {
     const programId = data.slice("program_request:".length);
     await handleProgramRequestCallback(ctx, programId);
+    return;
+  }
+  // purchase flow must bypass guardActiveClient: buyers may not be linked to a
+  // client yet (pending payment / no program assigned).
+  if (data?.startsWith("purchase_start:")) {
+    const programId = data.slice("purchase_start:".length);
+    await startPurchase(ctx, programId);
+    return;
+  }
+  if (data?.startsWith("consent_purchase:")) {
+    const requestId = data.slice("consent_purchase:".length);
+    await handleConsentPurchase(ctx, requestId);
     return;
   }
   if (data?.startsWith("chat_select:")) {

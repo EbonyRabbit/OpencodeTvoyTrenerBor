@@ -126,6 +126,64 @@ async function countPendingRequests(telegramId: number): Promise<number> {
   return count ?? 0;
 }
 
+type PriorPaymentCheck =
+  | { ok: true }
+  | { ok: false; reason: "error" | "owned" | "paid" };
+
+// Защита от повторной оплаты на пути выдачи ссылки: программа уже выдана
+// клиенту (clients.program_id) или оплачена по другой заявке (ведётся
+// тренером в панели). Fail-closed: ошибка запроса трактуется как «отказать».
+async function assertNoPriorPayment(
+  telegramId: number,
+  programId: string,
+): Promise<PriorPaymentCheck> {
+  let client: Client | null = null;
+  try {
+    client = await findClientByTelegramId(telegramId);
+  } catch (err) {
+    console.error(`[PURCHASE] Client lookup failed for ${telegramId}:`, err);
+    return { ok: false, reason: "error" };
+  }
+  if (client?.program_id === programId) {
+    return { ok: false, reason: "owned" };
+  }
+  const { data: paidRequest, error } = await supabaseAdmin
+    .from("purchase_requests")
+    .select("id")
+    .eq("telegram_id", telegramId)
+    .eq("program_id", programId)
+    .eq("status", "paid")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (error) {
+    console.error(`[PURCHASE] Paid-request check failed for ${telegramId}:`, error.message);
+    return { ok: false, reason: "error" };
+  }
+  if (paidRequest) {
+    return { ok: false, reason: "paid" };
+  }
+  return { ok: true };
+}
+
+// Возвращает false, если блокировка уже отправлена пользователю.
+async function ensureNoPriorPayment(
+  ctx: MyContext,
+  telegramId: number,
+  programId: string,
+  lang: MyContext["language"],
+): Promise<boolean> {
+  const check = await assertNoPriorPayment(telegramId, programId);
+  if (check.ok) return true;
+  if (check.reason === "paid") {
+    await ctx.reply(t("purchase.already_paid", lang));
+  } else if (check.reason === "owned") {
+    await ctx.reply(t("purchase.already_owned", lang));
+  } else {
+    await ctx.reply(t("purchase.error", lang));
+  }
+  return false;
+}
+
 // Кнопка «Купить» в каталоге: создаёт/переиспользует заявку и показывает
 // согласие ДО оплаты. Работает и для не-клиентов (без связки в clients):
 // доступ к покупке не блокируется guardActiveClient.
@@ -165,7 +223,10 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
   try {
     client = await findClientByTelegramId(telegramId);
   } catch (err) {
-    console.warn(`[PURCHASE] Client lookup failed for ${telegramId}:`, err);
+    // fail-closed: без проверки владения нельзя открывать ни согласие, ни ссылку
+    console.error(`[PURCHASE] Client lookup failed for ${telegramId}:`, err);
+    await ctx.reply(t("purchase.error", ctx.language));
+    return;
   }
   if (client) applyClientLanguage(ctx, client.language);
   const lang = ctx.language;
@@ -185,9 +246,14 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
       }
       if (latest.status === "pending") {
         if (latest.consent_given) {
+          // ссылка выдаётся напрямую — та же защита от повторной оплаты,
+          // что и в consent-пути
+          if (!(await ensureNoPriorPayment(ctx, telegramId, program.id, lang))) {
+            return;
+          }
           await sendPaymentLink(ctx, latest.id, program, requestAmount(latest, program));
         } else {
-          await sendConsentStep(ctx, latest.id, program);
+          await sendConsentStep(ctx, latest.id, program, requestAmount(latest, program));
         }
         return;
       }
@@ -202,7 +268,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
     // order_id = id заявки (как задумано в миграции); amount — снимок цены
     // на момент покупки, по нему вебхук Продамуса сверит фактическое списание.
     const requestId = randomUUID();
-    const { error } = await supabaseAdmin.from("purchase_requests").insert({
+    const requestPayload = {
       id: requestId,
       order_id: requestId,
       amount: program.price,
@@ -214,32 +280,42 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
       first_name: from.first_name ?? null,
       last_name: from.last_name ?? null,
       sub_type: "program",
-    });
+    };
+    const insertRequest = async () =>
+      supabaseAdmin.from("purchase_requests").insert(requestPayload);
+
+    let { error } = await insertRequest();
+
+    if (error?.code === "23505") {
+      // гонка двойного тапа: параллельная вставка победила — переиспользуем её
+      const winner = await findRequestForProgram(telegramId, program.id).catch(() => null);
+      if (winner?.status === "paid") {
+        await ctx.reply(t("purchase.already_paid", lang));
+        return;
+      }
+      if (winner?.status === "pending") {
+        if (winner.consent_given) {
+          if (!(await ensureNoPriorPayment(ctx, telegramId, program.id, lang))) {
+            return;
+          }
+          await sendPaymentLink(ctx, winner.id, program, requestAmount(winner, program));
+        } else {
+          await sendConsentStep(ctx, winner.id, program, requestAmount(winner, program));
+        }
+        return;
+      }
+      // winner пропал или отменён (гонка отмен тренером) — повторяем вставку
+      error = (await insertRequest()).error;
+    }
 
     if (error) {
-      if (error.code === "23505") {
-        // гонка двойного тапа: параллельная вставка победила — переиспользуем её
-        const winner = await findRequestForProgram(telegramId, program.id).catch(() => null);
-        if (winner?.status === "pending") {
-          if (winner.consent_given) {
-            await sendPaymentLink(ctx, winner.id, program, requestAmount(winner, program));
-          } else {
-            await sendConsentStep(ctx, winner.id, program);
-          }
-          return;
-        }
-        if (winner?.status === "paid") {
-          await ctx.reply(t("purchase.already_paid", lang));
-          return;
-        }
-      }
       console.error(`[PURCHASE] Insert failed for ${telegramId}:`, error.message);
       await ctx.reply(t("purchase.error", lang));
       return;
     }
 
     await notifyCoachAboutRequest(telegramId, from, program, requestId);
-    await sendConsentStep(ctx, requestId, program);
+    await sendConsentStep(ctx, requestId, program, program.price);
   } catch (err) {
     console.error(`[PURCHASE] startPurchase failed for ${telegramId}:`, err);
     await ctx.reply(t("purchase.error", lang));
@@ -296,6 +372,7 @@ function sendConsentStep(
   ctx: MyContext,
   requestId: string,
   program: BuyableProgram,
+  amount: number,
 ): Promise<unknown> {
   const lang = ctx.language;
   const text = [
@@ -303,7 +380,7 @@ function sendConsentStep(
     "",
     t("purchase.policy", lang, {
       title: program.title,
-      price: formatPrice(program.price),
+      price: formatPrice(amount),
       privacyUrl: buildPrivacyUrl(),
     }),
     "",
@@ -427,27 +504,9 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
     }
 
     // защита от повторной оплаты: программа уже выдана клиенту или
-    // уже оплачена по другой заявке (панельные действия тренера)
-    let client: Client | null = null;
-    try {
-      client = await findClientByTelegramId(telegramId);
-    } catch (err) {
-      console.warn(`[PURCHASE] Client lookup failed for ${telegramId}:`, err);
-    }
-    if (client && client.program_id === request.program_id) {
-      await ctx.reply(t("purchase.already_owned", lang));
-      return;
-    }
-    const { data: paidRequest } = await supabaseAdmin
-      .from("purchase_requests")
-      .select("id")
-      .eq("telegram_id", telegramId)
-      .eq("program_id", request.program_id)
-      .eq("status", "paid")
-      .limit(1)
-      .maybeSingle<{ id: string }>();
-    if (paidRequest) {
-      await ctx.reply(t("purchase.already_paid", lang));
+    // уже оплачена по другой заявке (панельные действия тренера);
+    // fail-closed: ошибка запроса блокирует выдачу ссылки
+    if (!(await ensureNoPriorPayment(ctx, telegramId, request.program_id, lang))) {
       return;
     }
 

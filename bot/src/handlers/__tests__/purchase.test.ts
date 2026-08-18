@@ -149,14 +149,19 @@ describe("buildPurchaseCoachMessage", () => {
 });
 
 describe("startPurchase", () => {
-  function defaultDb(latest: unknown = null, count = 0) {
+  function defaultDb(latest: unknown = null) {
+    let maybeReads = 0;
     mockDb({
       programs: () => ok(BUYABLE_PROGRAM),
       clients: () => ok(null),
       bot_logs: () => ok(null),
       purchase_requests: (calls, terminal) => {
         if (calls.some((c) => c.method === "insert")) return ok(null);
-        if (terminal === "maybeSingle") return ok(latest);
+        if (terminal === "maybeSingle") {
+          maybeReads += 1;
+          if (maybeReads === 1) return ok(latest);
+          return ok(null); // paid-request check перед выдачей ссылки
+        }
         return ok(null) as Row & { count: number };
       },
     });
@@ -280,6 +285,93 @@ describe("startPurchase", () => {
     expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
   });
 
+  it("fails closed when the client lookup errors", async () => {
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ({ data: null, error: { code: "500", message: "boom" } }),
+    });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось оформить заявку. Попробуйте позже.",
+    );
+    expect(callsFor("purchase_requests")).toEqual([]);
+  });
+
+  it("does not re-issue a link when a paid request exists (reuse path)", async () => {
+    let maybeReads = 0;
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ok(null),
+      purchase_requests: (_calls, terminal) => {
+        if (terminal === "maybeSingle") {
+          maybeReads += 1;
+          if (maybeReads === 1) {
+            return ok({ id: "req-1", status: "pending", consent_given: true, amount: 8900 });
+          }
+          return ok({ id: "paid-1" });
+        }
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringContaining("Заявка уже оплачена"));
+    expect(replyOptions(ctx)).toEqual({});
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+  });
+
+  it("fails closed when the paid-request check errors (reuse path)", async () => {
+    let maybeReads = 0;
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ok(null),
+      purchase_requests: (_calls, terminal) => {
+        if (terminal === "maybeSingle") {
+          maybeReads += 1;
+          if (maybeReads === 1) {
+            return ok({ id: "req-1", status: "pending", consent_given: true, amount: 8900 });
+          }
+          return { data: null, error: { code: "500", message: "boom" } };
+        }
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось оформить заявку. Попробуйте позже.",
+    );
+    expect(replyOptions(ctx)).toEqual({});
+  });
+
+  it("quotes the stored amount in the consent step when reusing a request", async () => {
+    // заявка зафиксировала 8900, цена программы с тех пор выросла до 9900
+    defaultDb({ id: "req-1", status: "pending", consent_given: false, amount: 8900 });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    const text = firstReplyText(ctx);
+    expect(text).toContain(`8\u00A0900 ₽`);
+    expect(text).not.toContain(`9\u00A0900 ₽`);
+  });
+
+  it("falls back to the current price for a legacy request without an amount (reuse path)", async () => {
+    defaultDb({ id: "req-1", status: "pending", consent_given: true, amount: null });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(keyboardJson(replyOptions(ctx))).toContain("%5B0%5D%5Bprice%5D=9900.00");
+  });
+
   it("allows a new request after the coach cancelled the previous one", async () => {
     defaultDb({ id: "req-1", status: "cancelled", consent_given: true, amount: 9900 });
     const ctx = makeCtx();
@@ -384,6 +476,37 @@ describe("startPurchase", () => {
     expect(ctx.reply).toHaveBeenCalledWith(expect.stringContaining("Заявка уже оплачена"));
   });
 
+  it("retries a fresh request when the duplicate-key winner was cancelled", async () => {
+    let maybeCalls = 0;
+    let insertCalls = 0;
+    mockDb({
+      programs: () => ok(BUYABLE_PROGRAM),
+      clients: () => ok(null),
+      bot_logs: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) {
+          insertCalls += 1;
+          if (insertCalls === 1) {
+            return { data: null, error: { code: "23505", message: "duplicate key" } };
+          }
+          return ok(null);
+        }
+        if (terminal === "maybeSingle") {
+          maybeCalls += 1;
+          if (maybeCalls === 1) return ok(null);
+          return ok({ id: "req-1", status: "cancelled", consent_given: true, amount: 9900 });
+        }
+        return { data: null, error: null, count: 0 };
+      },
+    });
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    expect(insertCalls).toBe(2);
+    expect(keyboardJson(replyOptions(ctx))).toContain("consent_purchase:");
+  });
+
   it("replies with an error when the insert fails", async () => {
     mockDb({
       programs: () => ok(BUYABLE_PROGRAM),
@@ -424,19 +547,34 @@ describe("handleConsentPurchase", () => {
     afterConsent = null,
     clientsData = null,
     paidRequest = null,
+    paidError = false,
+    clientsError = false,
+    updateError = false,
     programsData = BUYABLE_PROGRAM,
   }: {
     request?: unknown;
     afterConsent?: unknown;
     clientsData?: unknown;
     paidRequest?: unknown;
+    paidError?: boolean;
+    clientsError?: boolean;
+    updateError?: boolean;
     programsData?: unknown;
   } = {}) {
     let reads = 0;
     mockDb({
       purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "update")) {
+          return updateError
+            ? { data: null, error: { code: "500", message: "boom" } }
+            : ok(null);
+        }
         if (terminal === "then") return ok(null);
-        if (calls.some((c) => c.method === "limit")) return ok(paidRequest);
+        if (calls.some((c) => c.method === "limit")) {
+          return paidError
+            ? { data: null, error: { code: "500", message: "boom" } }
+            : ok(paidRequest);
+        }
         if (terminal === "maybeSingle") {
           reads += 1;
           if (reads === 1) return ok(request);
@@ -444,7 +582,10 @@ describe("handleConsentPurchase", () => {
         }
         return ok(null);
       },
-      clients: () => ok(clientsData),
+      clients: () =>
+        clientsError
+          ? { data: null, error: { code: "500", message: "boom" } }
+          : ok(clientsData),
       programs: () => ok(programsData),
     });
   }
@@ -621,6 +762,54 @@ describe("handleConsentPurchase", () => {
 
     expect(ctx.reply).toHaveBeenCalledWith(expect.stringContaining("Заявка уже оплачена"));
     expect(replyOptions(ctx)).toEqual({});
+  });
+
+  it("fails closed when the paid-request check errors", async () => {
+    consentDb({ request: { ...REQ, consent_given: true }, paidError: true });
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось оформить заявку. Попробуйте позже.",
+    );
+    expect(replyOptions(ctx)).toEqual({});
+  });
+
+  it("fails closed when the client ownership lookup errors", async () => {
+    consentDb({ request: { ...REQ, consent_given: true }, clientsError: true });
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось оформить заявку. Попробуйте позже.",
+    );
+    expect(replyOptions(ctx)).toEqual({});
+  });
+
+  it("replies with an error when the consent update fails", async () => {
+    consentDb({ updateError: true });
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось оформить заявку. Попробуйте позже.",
+    );
+    expect(replyOptions(ctx)).toEqual({});
+  });
+
+  it("falls back to the current price for a legacy request without an amount", async () => {
+    consentDb({
+      request: { ...REQ, amount: null },
+      afterConsent: { ...REQ, consent_given: true, amount: null },
+    });
+    const ctx = makeCtx();
+
+    await handleConsentPurchase(ctx, REQUEST_ID);
+
+    expect(keyboardJson(replyOptions(ctx))).toContain("%5B0%5D%5Bprice%5D=9900.00");
   });
 
   it("does not write consent when the program is no longer buyable", async () => {

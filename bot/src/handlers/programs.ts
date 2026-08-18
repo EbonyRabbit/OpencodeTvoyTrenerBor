@@ -84,7 +84,11 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
     }
 
     if (!programs || programs.length === 0) {
-      await ctx.reply(t("programs.empty", lang));
+      const emptyKeyboard = new InlineKeyboard().text(
+        t("coach_request.button", lang),
+        "coach_request",
+      );
+      await ctx.reply(t("programs.empty", lang), { reply_markup: emptyKeyboard });
       return;
     }
 
@@ -120,6 +124,9 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
         keyboard.row().text(requestLabel, `program_request:${program.id}`);
       }
     });
+
+    // отдельная строка внизу каталога: заявка на индивидуальное ведение
+    keyboard.row().text(t("coach_request.button", lang), "coach_request");
 
     const message = lines.join("\n");
     const truncated = message.length > TELEGRAM_MAX_MESSAGE_LENGTH

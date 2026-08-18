@@ -103,7 +103,9 @@ describe("programsHandler catalog query", () => {
 
     await programsHandler(ctx);
 
-    expect(ctx.reply).toHaveBeenCalledWith("Нет доступных программ.");
+    const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(options[0]).toBe("Нет доступных программ.");
+    expect(JSON.stringify(options[1]?.reply_markup ?? [])).toContain("coach_request");
   });
 
   it("adds a purchase_start button only for priced programs", async () => {
@@ -163,6 +165,41 @@ describe("programsHandler catalog query", () => {
     const keyboard = JSON.stringify(options.reply_markup ?? []);
     expect(keyboard).not.toContain("purchase_start:tpl-buy");
     expect(keyboard).toContain("program_request:tpl-buy");
+  });
+
+  it("adds a coach_request button at the bottom of the catalog", async () => {
+    mockProgramsQuery([
+      {
+        id: "tpl-buy",
+        title: "Платная",
+        type: "template",
+        description: null,
+        duration_weeks: 12,
+        price: 9900,
+      },
+    ]);
+    const ctx = makeCtx();
+
+    await programsHandler(ctx);
+
+    const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
+      reply_markup?: unknown;
+    };
+    const keyboard = JSON.stringify(options.reply_markup ?? []);
+    expect(keyboard).toContain(`"text":"📞 Связаться с тренером","callback_data":"coach_request"`);
+  });
+
+  it("adds a coach_request button when the catalog is empty", async () => {
+    mockProgramsQuery([]);
+    const ctx = makeCtx();
+
+    await programsHandler(ctx);
+
+    const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
+      reply_markup?: unknown;
+    };
+    const keyboard = JSON.stringify(options.reply_markup ?? []);
+    expect(keyboard).toContain("coach_request");
   });
 });
 

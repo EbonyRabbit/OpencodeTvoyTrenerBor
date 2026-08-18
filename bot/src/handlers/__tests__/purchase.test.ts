@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { supabaseAdmin } from "../../lib/supabase-admin.js";
 import { config } from "../../config.js";
-import { startPurchase, handleConsentPurchase, buildPurchaseCoachMessage } from "../purchase.js";
+import {
+  startPurchase,
+  handleConsentPurchase,
+  buildPurchaseCoachMessage,
+  startCoachRequest,
+  handleConsentCoachRequest,
+  buildCoachRequestCoachMessage,
+} from "../purchase.js";
 import { buildPaymentUrl } from "../../lib/prodamus.js";
 import type { MyContext } from "../../bot.js";
+
+vi.mock("../../bot.js", () => ({
+  bot: { api: { sendMessage: vi.fn().mockResolvedValue({}) } },
+}));
 
 vi.mock("../../config.js", () => ({
   config: {
@@ -833,6 +844,331 @@ describe("handleConsentPurchase", () => {
 
     expect(ctx.reply).toHaveBeenCalledWith(
       "Оплата временно недоступна. Попробуйте позже или свяжитесь с тренером.",
+    );
+  });
+});
+
+describe("buildCoachRequestCoachMessage", () => {
+  it("includes name, username link and TG id", () => {
+    const msg = buildCoachRequestCoachMessage({
+      firstName: "Иван",
+      lastName: "Петров",
+      username: "buyer",
+      telegramId: 123456789,
+    });
+    expect(msg).toContain("🤝 Хочу индивидуальное ведение/кураторство");
+    expect(msg).toContain("👤 Иван Петров");
+    expect(msg).toContain("🔗 @buyer (https://t.me/buyer)");
+    expect(msg).toContain("🆔 TG ID: 123456789");
+    expect(msg).toContain("Свяжитесь с клиентом в Telegram.");
+  });
+
+  it("handles missing username and last name", () => {
+    const msg = buildCoachRequestCoachMessage({
+      firstName: "Иван",
+      lastName: null,
+      username: null,
+      telegramId: 1,
+    });
+    expect(msg).toContain("👤 Иван");
+    expect(msg).not.toContain("@");
+  });
+
+  it("shows a dash when no name is available", () => {
+    const msg = buildCoachRequestCoachMessage({
+      firstName: null,
+      lastName: null,
+      username: null,
+      telegramId: 1,
+    });
+    expect(msg).toContain("👤 —");
+  });
+});
+
+describe("startCoachRequest", () => {
+  const INDIVID_PAYLOAD = {
+    id: expect.any(String),
+    program_id: null,
+    client_id: null,
+    name: "Иван Петров",
+    contact: "@buyer",
+    telegram_id: 123456789,
+    first_name: "Иван",
+    last_name: "Петров",
+    sub_type: "individ",
+    consent_given: true,
+  };
+
+  it("answers the callback and sends nothing when from.id is absent", async () => {
+    mockDb({});
+    const ctx = makeCtx({ from: undefined });
+
+    await startCoachRequest(ctx);
+
+    expect(ctx.answerCallbackQuery).toHaveBeenCalled();
+    expect(ctx.reply).not.toHaveBeenCalled();
+  });
+
+  it("shows the consent step to a non-client without consent", async () => {
+    mockDb({
+      clients: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+      bot_logs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+    const text = firstReplyText(ctx);
+    expect(text).toContain("Согласие на обработку данных");
+    expect(text).toContain("portal.example.com");
+    expect(keyboardJson(replyOptions(ctx))).toContain("coach_request:consent");
+  });
+
+  it("creates a request directly for a client who already consented", async () => {
+    mockDb({
+      clients: () =>
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_given_at: "2026-01-01T00:00:00Z",
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+      bot_logs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    const insert = callsFor("purchase_requests").find((c) => c.method === "insert");
+    expect(insert).toBeDefined();
+    expect(insert?.args[0]).toMatchObject({
+      ...INDIVID_PAYLOAD,
+      client_id: "c-1",
+      consent_at: "2026-01-01T00:00:00Z",
+      consent_version: "2026-07-16",
+    });
+    expect(firstReplyText(ctx)).toContain("Тренер скоро свяжется с вами");
+    const log = callsFor("bot_logs").find((c) => c.method === "insert");
+    expect(log?.args[0]).toMatchObject({
+      action: "coach_request:coach_notification_failed",
+      status: "error",
+      telegram_id: 123456789,
+    });
+  });
+
+  it("notifies the coach chat with the individ request message", async () => {
+    (config as { coachChatId: bigint }).coachChatId = 123n;
+    mockDb({
+      clients: () =>
+        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+      bot_logs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    const { bot } = await import("../../bot.js");
+    expect(bot.api.sendMessage).toHaveBeenCalledWith(
+      "123",
+      expect.stringContaining("🤝 Хочу индивидуальное ведение/кураторство"),
+    );
+    expect(firstReplyText(ctx)).toContain("Тренер скоро свяжется с вами");
+    const log = callsFor("bot_logs").find((c) => c.method === "insert");
+    expect(log?.args[0]).toMatchObject({ action: "coach_request", status: "info" });
+  });
+
+  it("does not create a second request when one is already pending", async () => {
+    mockDb({
+      clients: () =>
+        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok({ id: "ind-1" });
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Вы уже отправили заявку. Тренер скоро свяжется с вами.",
+    );
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+  });
+
+  it("fails closed when the client lookup errors", async () => {
+    mockDb({
+      clients: () => ({ data: null, error: { code: "500", message: "boom" } }),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось отправить заявку. Попробуйте позже.",
+    );
+    expect(callsFor("purchase_requests")).toEqual([]);
+  });
+
+  it("replies with an error when the insert fails", async () => {
+    mockDb({
+      clients: () =>
+        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) {
+          return { data: null, error: { code: "500", message: "boom" } };
+        }
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось отправить заявку. Попробуйте позже.",
+    );
+  });
+
+  it("reports already_sent when a parallel request won the race (23505)", async () => {
+    let maybeReads = 0;
+    let insertCalls = 0;
+    mockDb({
+      clients: () =>
+        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) {
+          insertCalls += 1;
+          return { data: null, error: { code: "23505", message: "duplicate key" } };
+        }
+        if (terminal === "maybeSingle") {
+          maybeReads += 1;
+          if (maybeReads === 1) return ok(null);
+          return ok({ id: "ind-1" });
+        }
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(insertCalls).toBe(1);
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Вы уже отправили заявку. Тренер скоро свяжется с вами.",
+    );
+  });
+
+  it("retries the insert once when the raced winner disappeared", async () => {
+    let maybeReads = 0;
+    let insertCalls = 0;
+    mockDb({
+      clients: () =>
+        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) {
+          insertCalls += 1;
+          if (insertCalls === 1) {
+            return { data: null, error: { code: "23505", message: "duplicate key" } };
+          }
+          return ok(null);
+        }
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+      bot_logs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(insertCalls).toBe(2);
+    expect(firstReplyText(ctx)).toContain("Тренер скоро свяжется с вами");
+  });
+});
+
+describe("handleConsentCoachRequest", () => {
+  it("creates a request with consent recorded on the row", async () => {
+    mockDb({
+      clients: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+      bot_logs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await handleConsentCoachRequest(ctx, "ignored");
+
+    const insert = callsFor("purchase_requests").find((c) => c.method === "insert");
+    expect(insert).toBeDefined();
+    expect(insert?.args[0]).toMatchObject({
+      sub_type: "individ",
+      consent_given: true,
+      consent_version: "2026-07-16",
+      consent_at: expect.any(String),
+      client_id: null,
+    });
+    expect(firstReplyText(ctx)).toContain("Тренер скоро свяжется с вами");
+  });
+
+  it("does not create a second request on a stale or double tap", async () => {
+    mockDb({
+      clients: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok({ id: "ind-1" });
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await handleConsentCoachRequest(ctx, "ignored");
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "Вы уже отправили заявку. Тренер скоро свяжется с вами.",
+    );
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+  });
+
+  it("replies with an error when the insert fails", async () => {
+    mockDb({
+      clients: () => ok(null),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) {
+          return { data: null, error: { code: "500", message: "boom" } };
+        }
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await handleConsentCoachRequest(ctx, "ignored");
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось отправить заявку. Попробуйте позже.",
     );
   });
 });

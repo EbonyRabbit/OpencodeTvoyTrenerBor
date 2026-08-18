@@ -13,7 +13,12 @@ import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramRequestCallback } from "./handlers/programs.js";
-import { startPurchase, handleConsentPurchase } from "./handlers/purchase.js";
+import {
+  startPurchase,
+  handleConsentPurchase,
+  startCoachRequest,
+  handleConsentCoachRequest,
+} from "./handlers/purchase.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
 import { myWebHandler } from "./handlers/my-web.js";
 import { exerciseHandler } from "./handlers/exercise.js";
@@ -248,6 +253,16 @@ bot.on("callback_query:data", async (ctx, next) => {
   if (data?.startsWith("consent_purchase:")) {
     const requestId = data.slice("consent_purchase:".length);
     await handleConsentPurchase(ctx, requestId);
+    return;
+  }
+  // coach_request must bypass guardActiveClient: new users (no clients row)
+  // and active clients both use it — same rationale as purchase_start.
+  if (data === "coach_request") {
+    await startCoachRequest(ctx);
+    return;
+  }
+  if (data === "coach_request:consent") {
+    await handleConsentCoachRequest(ctx);
     return;
   }
   if (data?.startsWith("chat_select:")) {

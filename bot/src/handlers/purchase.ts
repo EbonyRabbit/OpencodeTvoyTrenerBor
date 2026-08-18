@@ -553,3 +553,210 @@ async function sendPaymentLink(
     await ctx.reply(t("purchase.error", lang));
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Заявка «Связаться с тренером» (sub_type='individ'): согласие получаем ДО
+// вставки (для не-клиентов единственное хранилище согласия — строка заявки),
+// поэтому кнопка подтверждения и создаёт заявку сразу с consent_given=true.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function buildCoachRequestCoachMessage({
+  firstName,
+  lastName,
+  username,
+  telegramId,
+}: {
+  firstName: string | null;
+  lastName: string | null;
+  username: string | null;
+  telegramId: number;
+}): string {
+  const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "—";
+  const usernameLine = username ? `🔗 @${username} (https://t.me/${username})` : null;
+  const lines = [
+    "🤝 Хочу индивидуальное ведение/кураторство",
+    "",
+    `👤 ${name}`,
+    usernameLine,
+    `🆔 TG ID: ${telegramId}`,
+    "",
+    "Свяжитесь с клиентом в Telegram.",
+  ];
+  return lines.filter((line) => line !== null).join("\n");
+}
+
+// Соло-лимит: у пользователя может быть только одна активная individ-заявка
+// (уникальный индекс purchase_requests_unique_pending_individ_per_user).
+async function findPendingIndividRequest(telegramId: number): Promise<{ id: string } | null> {
+  const { data } = await supabaseAdmin
+    .from("purchase_requests")
+    .select("id")
+    .eq("telegram_id", telegramId)
+    .eq("sub_type", "individ")
+    .eq("status", "pending")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  return data ?? null;
+}
+
+function sendCoachRequestConsentStep(ctx: MyContext): Promise<unknown> {
+  const lang = ctx.language;
+  const text = [
+    t("client.consent_title", lang),
+    "",
+    t("coach_request.policy", lang, { privacyUrl: buildPrivacyUrl() }),
+    "",
+    t("client.consent_required", lang),
+  ].join("\n");
+  const keyboard = new InlineKeyboard().text(
+    t("purchase.consent_button", lang),
+    "coach_request:consent",
+  );
+  return ctx.reply(text, { reply_markup: keyboard });
+}
+
+async function submitIndividRequest(
+  ctx: MyContext,
+  from: { id: number; first_name?: string; last_name?: string; username?: string },
+  client: Client | null,
+): Promise<void> {
+  const telegramId = from.id;
+  const lang = ctx.language;
+
+  if (await findPendingIndividRequest(telegramId)) {
+    await ctx.reply(t("coach_request.already_sent", lang));
+    return;
+  }
+
+  const requestId = randomUUID();
+  // согласие фиксируется атомарно при создании заявки: у не-клиентов другого
+  // хранилища согласия нет (clients-строка отсутствует)
+  const payload = {
+    id: requestId,
+    program_id: null,
+    client_id: client?.id ?? null,
+    name: buyerName(from, telegramId),
+    contact: buyerContact(from.username, telegramId),
+    telegram_id: telegramId,
+    first_name: from.first_name ?? null,
+    last_name: from.last_name ?? null,
+    sub_type: "individ",
+    consent_given: true,
+    consent_at: client?.client_consent_given_at ?? new Date().toISOString(),
+    consent_version: client?.client_consent_version ?? PRIVACY_POLICY_VERSION,
+  };
+  const insert = async () => supabaseAdmin.from("purchase_requests").insert(payload);
+
+  let { error } = await insert();
+  if (error?.code === "23505") {
+    // гонка двойного тапа: параллельная заявка победила
+    const winner = await findPendingIndividRequest(telegramId).catch(() => null);
+    if (winner) {
+      await ctx.reply(t("coach_request.already_sent", lang));
+      return;
+    }
+    // winner пропал (гонка отмен тренером) — повторяем вставку один раз
+    error = (await insert()).error;
+  }
+  if (error) {
+    console.error(`[COACH_REQUEST] Insert failed for ${telegramId}:`, error.message);
+    await ctx.reply(t("coach_request.error", lang));
+    return;
+  }
+
+  await notifyCoachAboutIndividRequest(telegramId, from, requestId);
+  await ctx.reply(t("coach_request.sent", lang));
+}
+
+// Уведомление тренеру, как notifyCoachAboutRequest: не блокирует клиента
+// при сбое — заявка уже в БД и видна в панели (фиксируем в bot_logs).
+async function notifyCoachAboutIndividRequest(
+  telegramId: number,
+  from: { first_name?: string; last_name?: string; username?: string },
+  requestId: string,
+): Promise<void> {
+  let notificationFailed = false;
+  if (config.coachChatId !== 0n) {
+    try {
+      const bot = (await import("../bot.js")).bot;
+      await bot.api.sendMessage(
+        String(config.coachChatId),
+        buildCoachRequestCoachMessage({
+          firstName: from.first_name ?? null,
+          lastName: from.last_name ?? null,
+          username: from.username ?? null,
+          telegramId,
+        }),
+      );
+    } catch (err) {
+      console.warn(`[COACH_REQUEST] Coach notification failed for ${telegramId}:`, err);
+      notificationFailed = true;
+    }
+  } else {
+    notificationFailed = true;
+  }
+
+  const { error: logError } = await supabaseAdmin.from("bot_logs").insert({
+    action: notificationFailed ? "coach_request:coach_notification_failed" : "coach_request",
+    status: notificationFailed ? "error" : "info",
+    telegram_id: telegramId,
+    details: JSON.stringify({ purchase_request_id: requestId, sub_type: "individ" }),
+  });
+  if (logError) {
+    console.warn(`[COACH_REQUEST] Failed to log request for ${telegramId}:`, logError.message);
+  }
+}
+
+async function findClientOrFail(
+  ctx: MyContext,
+  telegramId: number,
+): Promise<Client | null | undefined> {
+  try {
+    const client = await findClientByTelegramId(telegramId);
+    if (client) applyClientLanguage(ctx, client.language);
+    return client;
+  } catch (err) {
+    // fail-closed: без проверки нельзя решить, нужен ли шаг согласия
+    console.error(`[COACH_REQUEST] Client lookup failed for ${telegramId}:`, err);
+    await ctx.reply(t("coach_request.error", ctx.language));
+    return undefined;
+  }
+}
+
+// Кнопка «Связаться с тренером»: доступна и новым пользователям (без clients),
+// и активным клиентам, поэтому живёт в pre-guard ветке bot.ts.
+export async function startCoachRequest(ctx: MyContext): Promise<void> {
+  const from = ctx.from;
+  if (!from?.id) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    return;
+  }
+  const telegramId = from.id;
+  await ctx.answerCallbackQuery().catch(() => {});
+
+  const client = await findClientOrFail(ctx, telegramId);
+  if (client === undefined) return;
+
+  if (client?.client_consent_given) {
+    await submitIndividRequest(ctx, from, client);
+    return;
+  }
+  await sendCoachRequestConsentStep(ctx);
+}
+
+// Подтверждение согласия на кнопке: согласие записывается атомарно вместе
+// с созданием заявки; повторные тапы идемпотентны (дедуп + 23505).
+export async function handleConsentCoachRequest(ctx: MyContext): Promise<void> {
+  const from = ctx.from;
+  if (!from?.id) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    return;
+  }
+  const telegramId = from.id;
+  await ctx.answerCallbackQuery().catch(() => {});
+
+  const client = await findClientOrFail(ctx, telegramId);
+  if (client === undefined) return;
+
+  await submitIndividRequest(ctx, from, client);
+}

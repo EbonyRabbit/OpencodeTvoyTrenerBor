@@ -62,10 +62,10 @@ export async function startHandler(ctx: MyContext): Promise<void> {
     const client = await findClientByTelegramId(telegramId);
 
     if (!client) {
-      const keyboard = new InlineKeyboard().text(
-        t("programs.view_button", ctx.language),
-        "programs_open",
-      );
+      const keyboard = new InlineKeyboard()
+        .text(t("programs.view_button", ctx.language), "programs_open")
+        .row()
+        .text(t("coach_request.button", ctx.language), "coach_request");
       await ctx.reply(t("greeting.welcome_new", ctx.language), { reply_markup: keyboard });
       return;
     }

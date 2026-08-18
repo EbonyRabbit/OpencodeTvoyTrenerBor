@@ -3,6 +3,7 @@ import { findClientByTelegramId } from "../lib/clients.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { t } from "../i18n/index.js";
 import { guardActiveClient } from "./guards.js";
+import { InlineKeyboard } from "grammy";
 
 export async function menuHandler(ctx: MyContext): Promise<void> {
   const telegramId = ctx.from?.id;
@@ -53,7 +54,12 @@ export async function menuHandler(ctx: MyContext): Promise<void> {
       }
     }
 
-    await ctx.reply(lines.join("\n"));
+    await ctx.reply(lines.join("\n"), {
+      reply_markup: new InlineKeyboard().text(
+        t("coach_request.button", ctx.language),
+        "coach_request",
+      ),
+    });
   } catch (err) {
     console.error(`[MENU] Error for ${ctx.from?.id}:`, err);
     try {

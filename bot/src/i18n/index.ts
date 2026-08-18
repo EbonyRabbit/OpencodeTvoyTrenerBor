@@ -373,6 +373,13 @@ const resources = {
         payment_unavailable: "Оплата временно недоступна. Попробуйте позже или свяжитесь с тренером.",
         error: "❌ Не удалось оформить заявку. Попробуйте позже.",
       },
+      coach_request: {
+        button: "📞 Связаться с тренером",
+        policy: "Для заявки на индивидуальное ведение/кураторство необходимо согласие на обработку персональных данных (152-ФЗ).\n\nМы собираем: имя, контактные данные (Telegram), данные о тренировках и самочувствии.\n\nПолитика конфиденциальности: {{privacyUrl}}",
+        sent: "✅ Заявка отправлена! Тренер скоро свяжется с вами.",
+        already_sent: "Вы уже отправили заявку. Тренер скоро свяжется с вами.",
+        error: "❌ Не удалось отправить заявку. Попробуйте позже.",
+      },
       chat: {
         coach_prefix: "💬 Сообщение от тренера:",
         message_too_long: "❌ Сообщение слишком длинное. Максимум 4000 символов.",
@@ -833,6 +840,13 @@ const resources = {
         too_many: "❌ Too many active purchase requests. Wait for your coach's reply.",
         payment_unavailable: "Payment is temporarily unavailable. Try again later or contact your coach.",
         error: "❌ Failed to create the purchase request. Please try again later.",
+      },
+      coach_request: {
+        button: "📞 Contact coach",
+        policy: "To send a request for individual coaching/mentoring, we need your consent to process personal data.\n\nWe collect: your name, contact details (Telegram), workout and wellbeing data.\n\nPrivacy policy: {{privacyUrl}}",
+        sent: "✅ Request sent! Your coach will contact you soon.",
+        already_sent: "You have already sent a request. Your coach will contact you soon.",
+        error: "❌ Failed to send the request. Please try again later.",
       },
       chat: {
         coach_prefix: "💬 Message from coach:",

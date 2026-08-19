@@ -588,7 +588,7 @@ export function buildCoachRequestCoachMessage({
 // Соло-лимит: у пользователя может быть только одна активная individ-заявка
 // (уникальный индекс purchase_requests_unique_pending_individ_per_user).
 async function findPendingIndividRequest(telegramId: number): Promise<{ id: string } | null> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("purchase_requests")
     .select("id")
     .eq("telegram_id", telegramId)
@@ -596,6 +596,10 @@ async function findPendingIndividRequest(telegramId: number): Promise<{ id: stri
     .eq("status", "pending")
     .limit(1)
     .maybeSingle<{ id: string }>();
+  if (error) {
+    // fail-closed: если нельзя проверить отсутствие заявки — заявку не создаём
+    throw new Error(`Pending individ check failed: ${error.message}`);
+  }
   return data ?? null;
 }
 
@@ -623,49 +627,63 @@ async function submitIndividRequest(
   const telegramId = from.id;
   const lang = ctx.language;
 
-  if (await findPendingIndividRequest(telegramId)) {
-    await ctx.reply(t("coach_request.already_sent", lang));
-    return;
-  }
-
-  const requestId = randomUUID();
-  // согласие фиксируется атомарно при создании заявки: у не-клиентов другого
-  // хранилища согласия нет (clients-строка отсутствует)
-  const payload = {
-    id: requestId,
-    program_id: null,
-    client_id: client?.id ?? null,
-    name: buyerName(from, telegramId),
-    contact: buyerContact(from.username, telegramId),
-    telegram_id: telegramId,
-    first_name: from.first_name ?? null,
-    last_name: from.last_name ?? null,
-    sub_type: "individ",
-    consent_given: true,
-    consent_at: client?.client_consent_given_at ?? new Date().toISOString(),
-    consent_version: client?.client_consent_version ?? PRIVACY_POLICY_VERSION,
-  };
-  const insert = async () => supabaseAdmin.from("purchase_requests").insert(payload);
-
-  let { error } = await insert();
-  if (error?.code === "23505") {
-    // гонка двойного тапа: параллельная заявка победила
-    const winner = await findPendingIndividRequest(telegramId).catch(() => null);
-    if (winner) {
+  try {
+    if (await findPendingIndividRequest(telegramId)) {
       await ctx.reply(t("coach_request.already_sent", lang));
       return;
     }
-    // winner пропал (гонка отмен тренером) — повторяем вставку один раз
-    error = (await insert()).error;
-  }
-  if (error) {
-    console.error(`[COACH_REQUEST] Insert failed for ${telegramId}:`, error.message);
-    await ctx.reply(t("coach_request.error", lang));
-    return;
-  }
 
-  await notifyCoachAboutIndividRequest(telegramId, from, requestId);
-  await ctx.reply(t("coach_request.sent", lang));
+    // согласие фиксируется атомарно при создании заявки: у не-клиентов другого
+    // хранилища согласия нет (clients-строка отсутствует). Для клиента берём
+    // его постоянное согласие только если оно действует под текущей версией
+    // политики, иначе фиксируем свежее (пользователь только что видел политику).
+    const standingConsent =
+      client != null &&
+      client.client_consent_given &&
+      client.client_consent_version === PRIVACY_POLICY_VERSION;
+
+    const requestId = randomUUID();
+    const payload = {
+      id: requestId,
+      program_id: null,
+      client_id: client?.id ?? null,
+      name: buyerName(from, telegramId),
+      contact: buyerContact(from.username, telegramId),
+      telegram_id: telegramId,
+      first_name: from.first_name ?? null,
+      last_name: from.last_name ?? null,
+      sub_type: "individ",
+      consent_given: true,
+      consent_at: standingConsent && client.client_consent_given_at
+        ? client.client_consent_given_at
+        : new Date().toISOString(),
+      consent_version: standingConsent ? client.client_consent_version : PRIVACY_POLICY_VERSION,
+    };
+    const insert = async () => supabaseAdmin.from("purchase_requests").insert(payload);
+
+    let { error } = await insert();
+    if (error?.code === "23505") {
+      // гонка двойного тапа: параллельная заявка победила
+      const winner = await findPendingIndividRequest(telegramId).catch(() => null);
+      if (winner) {
+        await ctx.reply(t("coach_request.already_sent", lang));
+        return;
+      }
+      // winner пропал (гонка отмен тренером) — повторяем вставку один раз
+      error = (await insert()).error;
+    }
+    if (error) {
+      console.error(`[COACH_REQUEST] Insert failed for ${telegramId}:`, error.message);
+      await ctx.reply(t("coach_request.error", lang));
+      return;
+    }
+
+    await notifyCoachAboutIndividRequest(telegramId, from, requestId);
+    await ctx.reply(t("coach_request.sent", lang));
+  } catch (err) {
+    console.error(`[COACH_REQUEST] submitIndividRequest failed for ${telegramId}:`, err);
+    await ctx.reply(t("coach_request.error", lang));
+  }
 }
 
 // Уведомление тренеру, как notifyCoachAboutRequest: не блокирует клиента
@@ -707,19 +725,21 @@ async function notifyCoachAboutIndividRequest(
   }
 }
 
+type ClientLookupResult = { ok: true; client: Client | null } | { ok: false };
+
 async function findClientOrFail(
   ctx: MyContext,
   telegramId: number,
-): Promise<Client | null | undefined> {
+): Promise<ClientLookupResult> {
   try {
     const client = await findClientByTelegramId(telegramId);
     if (client) applyClientLanguage(ctx, client.language);
-    return client;
+    return { ok: true, client };
   } catch (err) {
     // fail-closed: без проверки нельзя решить, нужен ли шаг согласия
     console.error(`[COACH_REQUEST] Client lookup failed for ${telegramId}:`, err);
     await ctx.reply(t("coach_request.error", ctx.language));
-    return undefined;
+    return { ok: false };
   }
 }
 
@@ -734,10 +754,17 @@ export async function startCoachRequest(ctx: MyContext): Promise<void> {
   const telegramId = from.id;
   await ctx.answerCallbackQuery().catch(() => {});
 
-  const client = await findClientOrFail(ctx, telegramId);
-  if (client === undefined) return;
+  const lookup = await findClientOrFail(ctx, telegramId);
+  if (!lookup.ok) return;
+  const client = lookup.client;
 
-  if (client?.client_consent_given) {
+  // быстрый путь — только если постоянное согласие действует под текущей
+  // версией политики; иначе показываем свежий шаг согласия
+  if (
+    client &&
+    client.client_consent_given &&
+    client.client_consent_version === PRIVACY_POLICY_VERSION
+  ) {
     await submitIndividRequest(ctx, from, client);
     return;
   }
@@ -755,8 +782,8 @@ export async function handleConsentCoachRequest(ctx: MyContext): Promise<void> {
   const telegramId = from.id;
   await ctx.answerCallbackQuery().catch(() => {});
 
-  const client = await findClientOrFail(ctx, telegramId);
-  if (client === undefined) return;
+  const lookup = await findClientOrFail(ctx, telegramId);
+  if (!lookup.ok) return;
 
-  await submitIndividRequest(ctx, from, client);
+  await submitIndividRequest(ctx, from, lookup.client);
 }

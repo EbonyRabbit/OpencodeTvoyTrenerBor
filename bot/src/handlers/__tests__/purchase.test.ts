@@ -930,6 +930,70 @@ describe("startCoachRequest", () => {
     expect(keyboardJson(replyOptions(ctx))).toContain("coach_request:consent");
   });
 
+  it("shows the consent step to a linked client without consent", async () => {
+    mockDb({
+      clients: () =>
+        ok({
+          id: "c-1",
+          client_consent_given: false,
+          client_consent_given_at: null,
+          client_consent_version: null,
+          language: "ru",
+        }),
+      purchase_requests: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+    expect(keyboardJson(replyOptions(ctx))).toContain("coach_request:consent");
+  });
+
+  it("asks for consent again when the client's consent is under an old policy version", async () => {
+    mockDb({
+      clients: () =>
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_given_at: "2025-01-01T00:00:00Z",
+          client_consent_version: "2025-06-01",
+          language: "ru",
+        }),
+      purchase_requests: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+    expect(keyboardJson(replyOptions(ctx))).toContain("coach_request:consent");
+  });
+
+  it("replies with an error when the pending-request check fails", async () => {
+    mockDb({
+      clients: () =>
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
+      purchase_requests: (_calls, terminal) => {
+        if (terminal === "maybeSingle") throw new Error("boom");
+        return ok(null);
+      },
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      "❌ Не удалось отправить заявку. Попробуйте позже.",
+    );
+    expect(callsFor("purchase_requests").some((c) => c.method === "insert")).toBe(false);
+  });
+
   it("creates a request directly for a client who already consented", async () => {
     mockDb({
       clients: () =>
@@ -972,7 +1036,12 @@ describe("startCoachRequest", () => {
     (config as { coachChatId: bigint }).coachChatId = 123n;
     mockDb({
       clients: () =>
-        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
       purchase_requests: (calls, terminal) => {
         if (calls.some((c) => c.method === "insert")) return ok(null);
         if (terminal === "maybeSingle") return ok(null);
@@ -994,10 +1063,48 @@ describe("startCoachRequest", () => {
     expect(log?.args[0]).toMatchObject({ action: "coach_request", status: "info" });
   });
 
+  it("still confirms the request when the coach notification fails", async () => {
+    const { bot } = await import("../../bot.js");
+    (vi.mocked(bot.api.sendMessage) as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("telegram down"),
+    );
+    (config as { coachChatId: bigint }).coachChatId = 123n;
+    mockDb({
+      clients: () =>
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+      bot_logs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await startCoachRequest(ctx);
+
+    expect(firstReplyText(ctx)).toContain("Тренер скоро свяжется с вами");
+    const log = callsFor("bot_logs").find((c) => c.method === "insert");
+    expect(log?.args[0]).toMatchObject({
+      action: "coach_request:coach_notification_failed",
+      status: "error",
+    });
+  });
+
   it("does not create a second request when one is already pending", async () => {
     mockDb({
       clients: () =>
-        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
       purchase_requests: (calls, terminal) => {
         if (calls.some((c) => c.method === "insert")) return ok(null);
         if (terminal === "maybeSingle") return ok({ id: "ind-1" });
@@ -1031,7 +1138,12 @@ describe("startCoachRequest", () => {
   it("replies with an error when the insert fails", async () => {
     mockDb({
       clients: () =>
-        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
       purchase_requests: (calls, terminal) => {
         if (calls.some((c) => c.method === "insert")) {
           return { data: null, error: { code: "500", message: "boom" } };
@@ -1054,7 +1166,12 @@ describe("startCoachRequest", () => {
     let insertCalls = 0;
     mockDb({
       clients: () =>
-        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
       purchase_requests: (calls, terminal) => {
         if (calls.some((c) => c.method === "insert")) {
           insertCalls += 1;
@@ -1083,7 +1200,12 @@ describe("startCoachRequest", () => {
     let insertCalls = 0;
     mockDb({
       clients: () =>
-        ok({ id: "c-1", client_consent_given: true, language: "ru" }),
+        ok({
+          id: "c-1",
+          client_consent_given: true,
+          client_consent_version: "2026-07-16",
+          language: "ru",
+        }),
       purchase_requests: (calls, terminal) => {
         if (calls.some((c) => c.method === "insert")) {
           insertCalls += 1;
@@ -1107,6 +1229,16 @@ describe("startCoachRequest", () => {
 });
 
 describe("handleConsentCoachRequest", () => {
+  it("answers the callback and sends nothing when from.id is absent", async () => {
+    mockDb({});
+    const ctx = makeCtx({ from: undefined });
+
+    await handleConsentCoachRequest(ctx, "ignored");
+
+    expect(ctx.answerCallbackQuery).toHaveBeenCalled();
+    expect(ctx.reply).not.toHaveBeenCalled();
+  });
+
   it("creates a request with consent recorded on the row", async () => {
     mockDb({
       clients: () => ok(null),
@@ -1131,6 +1263,36 @@ describe("handleConsentCoachRequest", () => {
       client_id: null,
     });
     expect(firstReplyText(ctx)).toContain("Тренер скоро свяжется с вами");
+  });
+
+  it("records a fresh consent for a linked client without standing consent", async () => {
+    mockDb({
+      clients: () =>
+        ok({
+          id: "c-1",
+          client_consent_given: false,
+          client_consent_given_at: null,
+          client_consent_version: null,
+          language: "ru",
+        }),
+      purchase_requests: (calls, terminal) => {
+        if (calls.some((c) => c.method === "insert")) return ok(null);
+        if (terminal === "maybeSingle") return ok(null);
+        return ok(null);
+      },
+      bot_logs: () => ok(null),
+    });
+    const ctx = makeCtx();
+
+    await handleConsentCoachRequest(ctx, "ignored");
+
+    const insert = callsFor("purchase_requests").find((c) => c.method === "insert");
+    expect(insert?.args[0]).toMatchObject({
+      client_id: "c-1",
+      consent_given: true,
+      consent_version: "2026-07-16",
+      consent_at: expect.any(String),
+    });
   });
 
   it("does not create a second request on a stale or double tap", async () => {

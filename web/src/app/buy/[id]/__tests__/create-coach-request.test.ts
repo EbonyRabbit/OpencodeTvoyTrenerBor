@@ -15,9 +15,7 @@ vi.mock("@/lib/telegram", () => ({
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
-import {
-  createCoachRequest,
-} from "../actions";
+import { createCoachRequest } from "../actions";
 import { COACH_REQUEST_ALREADY_SENT_MESSAGE } from "@/lib/purchase";
 import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 
@@ -26,11 +24,11 @@ type QueryCall = { method: string; args: unknown[] };
 type InsertEntry = { data?: unknown; error?: unknown };
 
 type MockOptions = {
-  pendingIndivid?: unknown;
   pendingIndividRows?: unknown[];
   insertEntries?: InsertEntry[];
   tgDedupError?: unknown;
-  purgeError?: unknown;
+  pendingContactError?: unknown;
+  logError?: unknown;
 };
 
 const captured = new Map<string, QueryCall[]>();
@@ -55,16 +53,21 @@ function mockDb(opts: MockOptions = {}) {
     const resolveFor = (kind: "single" | "list") => {
       if (table === "purchase_requests") {
         if (chainInsertEntry || chainCalls.some((c) => c.method === "insert")) {
-          return { data: chainInsertEntry?.data ?? null, error: chainInsertEntry?.error ?? null };
+          return {
+            data: chainInsertEntry?.data ?? null,
+            error: chainInsertEntry?.error ?? null,
+          };
         }
         return kind === "single"
-          ? { data: opts.pendingIndivid ?? null, error: null }
-          : { data: opts.pendingIndividRows ?? [], error: null };
+          ? { data: null, error: null }
+          : {
+              data: opts.pendingIndividRows ?? [],
+              error: opts.pendingContactError ?? null,
+            };
       }
       return {
         data: null,
-        error:
-          table === "bot_dedup" ? (opts.tgDedupError ?? null) : null,
+        error: table === "bot_dedup" ? (opts.tgDedupError ?? null) : null,
       };
     };
 
@@ -74,6 +77,7 @@ function mockDb(opts: MockOptions = {}) {
       lt: (...args: unknown[]) => push("lt", args),
       delete: (...args: unknown[]) => push("delete", args),
       limit: (...args: unknown[]) => push("limit", args),
+      order: (...args: unknown[]) => push("order", args),
       insert: (...args: unknown[]) => {
         push("insert", args);
         if (table === "purchase_requests") {
@@ -84,8 +88,16 @@ function mockDb(opts: MockOptions = {}) {
         return chain;
       },
       maybeSingle: () => Promise.resolve(resolveFor("single")),
-      then: (onFulfilled: (v: unknown) => unknown) =>
-        Promise.resolve(resolveFor("list")).then(onFulfilled),
+      then: (
+        onFulfilled: (v: unknown) => unknown,
+        onRejected?: (e: unknown) => unknown,
+      ) => {
+        const value = resolveFor("list");
+        if (opts.logError && table === "bot_logs") {
+          return Promise.reject(opts.logError).then(onFulfilled, onRejected);
+        }
+        return Promise.resolve(value).then(onFulfilled, onRejected);
+      },
     };
     return chain;
   });
@@ -103,9 +115,9 @@ beforeEach(() => {
   (headers as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
     get: () => `10.1.0.${ipCounter}`,
   });
-  (sendTelegramMessage as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
-    true,
-  );
+  (
+    sendTelegramMessage as unknown as ReturnType<typeof vi.fn>
+  ).mockResolvedValue(true);
 });
 
 const baseInput = {
@@ -117,7 +129,10 @@ const baseInput = {
 describe("createCoachRequest", () => {
   it("rejects a request without consent", async () => {
     mockDb();
-    const result = await createCoachRequest({ ...baseInput, consentGiven: false });
+    const result = await createCoachRequest({
+      ...baseInput,
+      consentGiven: false,
+    });
     expect(result.error).toBe(
       "Необходимо согласие на обработку персональных данных.",
     );
@@ -137,11 +152,7 @@ describe("createCoachRequest", () => {
   it("creates an individ request for a web user and notifies the coach", async () => {
     const { calls } = mockDb();
 
-    const result = await createCoachRequest({
-      ...baseInput,
-      telegramId: null,
-      telegramUsername: "ivan_web",
-    });
+    const result = await createCoachRequest(baseInput);
 
     expect(result.error).toBeUndefined();
 
@@ -165,11 +176,14 @@ describe("createCoachRequest", () => {
       dedupCalls.indexOf("insert"),
     );
 
-    const logInserts = calls("bot_logs").filter(
-      (c) => c.method === "insert",
-    );
-    expect(logInserts.some((c) => (c.args[0] as { action: string }).action === "coach_request")).toBe(
-      true,
+    const logInserts = calls("bot_logs").filter((c) => c.method === "insert");
+    expect(
+      logInserts.some(
+        (c) => (c.args[0] as { action: string }).action === "coach_request",
+      ),
+    ).toBe(true);
+    expect((logInserts[0].args[0] as { details: string }).details).toContain(
+      "req-1",
     );
 
     expect(sendTelegramMessage).toHaveBeenCalledWith(
@@ -180,6 +194,15 @@ describe("createCoachRequest", () => {
       "123",
       expect.stringContaining("ivan"),
     );
+  });
+
+  it("orders the pending-contact pre-read by recency", async () => {
+    const { calls } = mockDb();
+    await createCoachRequest(baseInput);
+    const orderArgs = calls("purchase_requests")
+      .filter((c) => c.method === "order")
+      .map((c) => c.args);
+    expect(orderArgs).toContainEqual(["created_at", { ascending: false }]);
   });
 
   it("deduplicates a new web submission by pending contact", async () => {
@@ -193,29 +216,15 @@ describe("createCoachRequest", () => {
     ).toBe(false);
   });
 
-  it("deduplicates a submission by pending telegram id", async () => {
-    mockDb({ pendingIndivid: { id: "r1", contact: "ivan" } });
+  it("fails closed when the pending-contact pre-read errors out", async () => {
+    mockDb({ pendingContactError: { message: "db down" } });
 
-    const result = await createCoachRequest({
-      ...baseInput,
-      telegramId: "987654321",
-    });
+    const result = await createCoachRequest(baseInput);
 
-    expect(result.error).toBe(COACH_REQUEST_ALREADY_SENT_MESSAGE);
-  });
-
-  it("stores the telegram id on the row when provided by the bot", async () => {
-    const { calls } = mockDb();
-
-    const result = await createCoachRequest({
-      ...baseInput,
-      telegramId: "987654321",
-    });
-
-    expect(result.error).toBeUndefined();
-    const payload = calls("purchase_requests").filter((c) => c.method === "insert")[0]
-      .args[0] as Record<string, unknown>;
-    expect(payload.telegram_id).toBe(987654321);
+    expect(result.error).toBe("Произошла ошибка. Попробуйте позже.");
+    expect(
+      captured.get("purchase_requests")?.some((c) => c.method === "insert"),
+    ).toBe(false);
   });
 
   it("treats a pending bot_dedup collision as already sent", async () => {
@@ -228,38 +237,13 @@ describe("createCoachRequest", () => {
     );
   });
 
-  it("maps a unique-index collision to already sent when a pending row exists", async () => {
-    mockDb({
-      pendingIndivid: { id: "winner", contact: "ivan" },
-      insertEntries: [{ data: null, error: { code: "23505" } }],
-    });
+  it("keeps the request successful even if the bot_logs insert rejects", async () => {
+    mockDb({ logError: new Error("network down") });
 
-    const result = await createCoachRequest({
-      ...baseInput,
-      telegramId: "987654321",
-    });
-
-    expect(result.error).toBe(COACH_REQUEST_ALREADY_SENT_MESSAGE);
-  });
-
-  it("retries once when a unique index collision has no winner", async () => {
-    const { calls } = mockDb({
-      insertEntries: [
-        { data: null, error: { code: "23505" } },
-        { data: { id: "req-2" }, error: null },
-      ],
-    });
-
-    const result = await createCoachRequest({
-      ...baseInput,
-      telegramId: "987654321",
-    });
+    const result = await createCoachRequest(baseInput);
 
     expect(result.error).toBeUndefined();
-    const inserts = calls("purchase_requests").filter(
-      (c) => c.method === "insert",
-    );
-    expect(inserts).toHaveLength(2);
+    expect(sendTelegramMessage).toHaveBeenCalled();
   });
 
   it("returns a generic error when the storage insert fails", async () => {

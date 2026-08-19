@@ -74,32 +74,16 @@ export function buildPurchaseCoachMessage({
 export function buildCoachRequestCoachMessage({
   name,
   contact,
-  telegramUsername,
-  telegramId,
   formatContact,
 }: {
   name: string;
   contact: string;
-  telegramUsername?: string | null;
-  telegramId?: number | null;
   formatContact: (value: string) => string;
 }): string {
-  const contactIsSameUser =
-    telegramUsername != null &&
-    contact.replace(/^@/, "").toLowerCase() === telegramUsername.toLowerCase();
-  const nickLine =
-    telegramUsername && !contactIsSameUser
-      ? `\n🔗 @${telegramUsername} (https://t.me/${telegramUsername})`
-      : "";
-  const tgLine =
-    telegramId !== null && telegramId !== undefined
-      ? `\n🆔 TG ID: ${telegramId}`
-      : "";
-
   return (
     `🤝 Хочу индивидуальное ведение/кураторство\n\n` +
     `👤 Имя: ${name}\n` +
-    `📱 Контакт: ${formatContact(contact)}${nickLine}${tgLine}\n\n` +
+    `📱 Контакт: ${formatContact(contact)}\n\n` +
     `Свяжитесь с клиентом в Telegram.`
   );
 }

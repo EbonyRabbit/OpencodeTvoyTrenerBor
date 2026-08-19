@@ -21,7 +21,11 @@ const UUID = "11111111-2222-3333-4444-555555555555";
 
 type QueryCall = { method: string; args: unknown[] };
 
-function buildTable(calls: QueryCall[], programData: unknown) {
+function buildTable(
+  calls: QueryCall[],
+  tableName: string,
+  programData: unknown,
+) {
   const chain = {
     select: (...args: unknown[]) => {
       calls.push({ method: "select", args });
@@ -49,7 +53,8 @@ function buildTable(calls: QueryCall[], programData: unknown) {
     }),
     insert: vi.fn((...args: unknown[]) => {
       calls.push({ method: "insert", args });
-      return Promise.resolve({ error: null });
+      const insertError = tableName === "bot_logs" ? botLogsInsertError : null;
+      return Promise.resolve({ error: insertError });
     }),
     then: (onFulfilled: (v: unknown) => unknown) =>
       Promise.resolve({ error: null }).then(onFulfilled),
@@ -58,13 +63,18 @@ function buildTable(calls: QueryCall[], programData: unknown) {
 }
 
 let ipCounter = 0;
+let botLogsInsertError: unknown = null;
 
 function mockDb(programData: unknown) {
   const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   const byTable = new Map<string, QueryCall[]>();
   fake.from.mockImplementation((table: string) => {
     if (!byTable.has(table)) byTable.set(table, []);
-    return buildTable(byTable.get(table)!, table === "programs" ? programData : null);
+    return buildTable(
+      byTable.get(table)!,
+      table,
+      table === "programs" ? programData : null,
+    );
   });
   return { calls: (table: string) => byTable.get(table) ?? [] };
 }
@@ -73,12 +83,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.COACH_CHAT_ID = "123";
   ipCounter += 1;
+  botLogsInsertError = null;
   (headers as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
     get: () => `10.0.0.${ipCounter}`,
   });
-  (sendTelegramMessage as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
-    true,
-  );
+  (
+    sendTelegramMessage as unknown as ReturnType<typeof vi.fn>
+  ).mockResolvedValue(true);
 });
 
 describe("createPurchaseRequest", () => {
@@ -151,5 +162,26 @@ describe("createPurchaseRequest", () => {
       contact: "ivan",
     });
     expect(result.error).toBe("Некорректная программа.");
+  });
+
+  it("fails closed when the purchase log cannot be stored", async () => {
+    mockDb({
+      id: UUID,
+      title: "Сила Новичка 12 недель",
+      type: "template",
+      description: null,
+      duration_weeks: 12,
+      price: 9900,
+    });
+    botLogsInsertError = { message: "db down" };
+
+    const result = await createPurchaseRequest({
+      programId: UUID,
+      name: "Иван",
+      contact: "ivan",
+    });
+
+    expect(result.error).toBe("Не удалось сохранить заявку. Попробуйте позже.");
+    expect(sendTelegramMessage).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, ShoppingCart, Sparkles } from "lucide-react";
 import { createPurchaseRequest, createCoachRequest } from "./actions";
 import { formatPrice } from "@/lib/format-price";
-import { DEDUP_ERROR_MESSAGE } from "@/lib/purchase";
+import {
+  DEDUP_ERROR_MESSAGE,
+  COACH_REQUEST_ALREADY_SENT_MESSAGE,
+} from "@/lib/purchase";
 import type { Database } from "@/types/supabase";
 
 export type BuyProgram = Pick<
@@ -77,10 +80,12 @@ export function BuyForm({
         name,
         contact,
         consentGiven: coachConsent,
-        telegramId: tgId.trim() !== "" ? tgId.trim() : null,
-        telegramUsername,
       });
-      if (result.error && result.error !== DEDUP_ERROR_MESSAGE) {
+      if (
+        result.error &&
+        result.error !== DEDUP_ERROR_MESSAGE &&
+        result.error !== COACH_REQUEST_ALREADY_SENT_MESSAGE
+      ) {
         setCoachError(result.error);
       } else {
         setCoachSubmitted(true);
@@ -297,6 +302,7 @@ export function BuyForm({
                 <input
                   type="checkbox"
                   id="coach-consent"
+                  required
                   checked={coachConsent}
                   onChange={(e) => setCoachConsent(e.target.checked)}
                   disabled={coachLoading}

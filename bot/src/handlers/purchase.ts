@@ -714,14 +714,20 @@ async function notifyCoachAboutIndividRequest(
     notificationFailed = true;
   }
 
-  const { error: logError } = await supabaseAdmin.from("bot_logs").insert({
-    action: notificationFailed ? "coach_request:coach_notification_failed" : "coach_request",
-    status: notificationFailed ? "error" : "info",
-    telegram_id: telegramId,
-    details: JSON.stringify({ purchase_request_id: requestId, sub_type: "individ" }),
-  });
-  if (logError) {
-    console.warn(`[COACH_REQUEST] Failed to log request for ${telegramId}:`, logError.message);
+  try {
+    const { error: logError } = await supabaseAdmin.from("bot_logs").insert({
+      action: notificationFailed ? "coach_request:coach_notification_failed" : "coach_request",
+      status: notificationFailed ? "error" : "info",
+      telegram_id: telegramId,
+      details: JSON.stringify({ purchase_request_id: requestId, sub_type: "individ" }),
+    });
+    if (logError) {
+      console.warn(`[COACH_REQUEST] Failed to log request for ${telegramId}:`, logError.message);
+    }
+  } catch (err) {
+    // лог не должен ломать контракт «не блокируем клиента»: rejection сети
+    // здесь не должна превращаться в ошибку «не удалось отправить»
+    console.warn(`[COACH_REQUEST] Failed to log request for ${telegramId}:`, err);
   }
 }
 

@@ -4,8 +4,21 @@ import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { formatPrice } from "@/lib/format-price";
-import { UUID_REGEX, sanitizeText, isValidContact, formatContact } from "@/lib/validation";
-import { DEDUP_ERROR_MESSAGE, parseTelegramId, buildPurchaseCoachMessage, TELEGRAM_USERNAME_REGEX } from "@/lib/purchase";
+import {
+  UUID_REGEX,
+  sanitizeText,
+  isValidContact,
+  formatContact,
+} from "@/lib/validation";
+import {
+  DEDUP_ERROR_MESSAGE,
+  COACH_REQUEST_ALREADY_SENT_MESSAGE,
+  parseTelegramId,
+  buildPurchaseCoachMessage,
+  buildCoachRequestCoachMessage,
+  TELEGRAM_USERNAME_REGEX,
+} from "@/lib/purchase";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import type { BuyProgram } from "./buy-form";
 
 const NAME_MAX_LENGTH = 200;
@@ -41,6 +54,25 @@ function isRateLimited(ip: string): boolean {
   }
   entry.count++;
   return entry.count > RATE_LIMIT_MAX;
+}
+
+async function insertBotLog(
+  action: string,
+  status: string,
+  telegramId: number | null,
+  details: unknown,
+): Promise<boolean> {
+  const { error } = await supabaseAdmin.from("bot_logs").insert({
+    action,
+    status,
+    telegram_id: telegramId,
+    details: JSON.stringify(details),
+  });
+  if (error) {
+    console.error(`[BOT_LOG] Failed to log ${action}:`, error.message);
+    return false;
+  }
+  return true;
 }
 
 export type PurchaseRequestInput = {
@@ -89,11 +121,16 @@ export async function createPurchaseRequest(
       return { error: "Telegram ID — только цифры (от 5 до 15)." };
     }
     const usernameRaw = input.telegramUsername?.trim() ?? "";
-    const telegramUsername = TELEGRAM_USERNAME_REGEX.test(usernameRaw) ? usernameRaw : null;
+    const telegramUsername = TELEGRAM_USERNAME_REGEX.test(usernameRaw)
+      ? usernameRaw
+      : null;
 
     const now = Date.now();
     dedupKey = `${ip}:${programId}:${contact}`;
-    if (dedupMap.has(dedupKey) && now - (dedupMap.get(dedupKey) ?? 0) < DEDUP_WINDOW_MS) {
+    if (
+      dedupMap.has(dedupKey) &&
+      now - (dedupMap.get(dedupKey) ?? 0) < DEDUP_WINDOW_MS
+    ) {
       return { error: DEDUP_ERROR_MESSAGE };
     }
     dedupMap.set(dedupKey, now);
@@ -125,7 +162,10 @@ export async function createPurchaseRequest(
       .eq("key", dbDedupKey)
       .lt("expires_at", nowIso);
     if (purgeError) {
-      console.error("[PURCHASE] Failed to purge expired dedup key:", purgeError.message);
+      console.error(
+        "[PURCHASE] Failed to purge expired dedup key:",
+        purgeError.message,
+      );
     }
 
     const { error: dedupError } = await supabaseAdmin.from("bot_dedup").insert({
@@ -136,25 +176,20 @@ export async function createPurchaseRequest(
       return { error: DEDUP_ERROR_MESSAGE };
     }
     if (dedupError) {
-      console.error("[PURCHASE] Failed to write dedup key:", dedupError.message);
+      console.error(
+        "[PURCHASE] Failed to write dedup key:",
+        dedupError.message,
+      );
     }
 
-    const details = JSON.stringify({
+    const logged = await insertBotLog("purchase_request", "info", telegramId, {
       program_id: program.id,
       program_title: program.title,
       name,
       contact,
       telegram_username: telegramUsername ?? null,
     });
-
-    const { error: logError } = await supabaseAdmin.from("bot_logs").insert({
-      action: "purchase_request",
-      status: "info",
-      telegram_id: telegramId,
-      details,
-    });
-    if (logError) {
-      console.error("[PURCHASE] Failed to log purchase request:", logError.message);
+    if (!logged) {
       dedupMap.delete(dedupKey);
       await supabaseAdmin.from("bot_dedup").delete().eq("key", dbDedupKey);
       return { error: "Не удалось сохранить заявку. Попробуйте позже." };
@@ -162,20 +197,17 @@ export async function createPurchaseRequest(
     const coachChatId = process.env.COACH_CHAT_ID;
 
     const logNotificationFailure = async (reason: string) => {
-      const { error: logErr } = await supabaseAdmin.from("bot_logs").insert({
-        action: "purchase_request:coach_notification_failed",
-        status: "error",
-        telegram_id: telegramId,
-        details: JSON.stringify({
+      await insertBotLog(
+        "purchase_request:coach_notification_failed",
+        "error",
+        telegramId,
+        {
           program_id: program.id,
           contact,
           telegram_username: telegramUsername ?? null,
           reason,
-        }),
-      });
-      if (logErr) {
-        console.error("[PURCHASE] Failed to log notification failure:", logErr.message);
-      }
+        },
+      );
     };
 
     if (coachChatId) {
@@ -207,10 +239,311 @@ export async function createPurchaseRequest(
     console.error("[PURCHASE] createPurchaseRequest error:", e);
     if (dedupKey) dedupMap.delete(dedupKey);
     if (dbDedupKey) {
-      await supabaseAdmin.from("bot_dedup").delete().eq("key", dbDedupKey).then(
-        () => {},
-        (delErr) => console.error("[PURCHASE] Failed to delete dedup key:", delErr),
+      await supabaseAdmin
+        .from("bot_dedup")
+        .delete()
+        .eq("key", dbDedupKey)
+        .then(
+          () => {},
+          (delErr) =>
+            console.error("[PURCHASE] Failed to delete dedup key:", delErr),
+        );
+    }
+    return { error: "Произошла ошибка. Попробуйте позже." };
+  }
+}
+
+export type CoachRequestInput = {
+  name: string;
+  contact: string;
+  consentGiven: boolean;
+  telegramId?: string | null;
+  telegramUsername?: string | null;
+};
+
+function normalizeContactKey(value: string): string {
+  return value.replace(/^@/, "").trim().toLowerCase();
+}
+
+async function findPendingIndividRequest(
+  telegramId: number,
+): Promise<{ id: string; contact: string | null } | null> {
+  const { data, error } = await supabaseAdmin
+    .from("purchase_requests")
+    .select("id, contact")
+    .eq("sub_type", "individ")
+    .eq("status", "pending")
+    .eq("telegram_id", telegramId)
+    .limit(1)
+    .maybeSingle<{ id: string; contact: string | null }>();
+  if (error) {
+    throw new Error(`Pending individ request check failed: ${error.message}`);
+  }
+  return data;
+}
+
+async function findPendingIndividByContact(
+  contactNorm: string,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("purchase_requests")
+    .select("id, contact")
+    .eq("sub_type", "individ")
+    .eq("status", "pending")
+    .limit(50);
+  if (error) {
+    throw new Error(`Pending individ contact check failed: ${error.message}`);
+  }
+  return (data ?? []).some(
+    (row) => normalizeContactKey(row.contact ?? "") === contactNorm,
+  );
+}
+
+export async function createCoachRequest(
+  input: CoachRequestInput,
+): Promise<{ error?: string }> {
+  let dedupKey = "";
+  let dbDedupKey = "";
+  try {
+    const h = await headers();
+    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    if (isRateLimited(ip)) {
+      return { error: "Слишком много заявок. Попробуйте позже." };
+    }
+
+    const name = sanitizeText(input.name);
+    if (!name) return { error: "Укажите ваше имя." };
+    if (name.length > NAME_MAX_LENGTH) {
+      return { error: "Имя слишком длинное." };
+    }
+
+    const contact = sanitizeText(input.contact).replace(/^@/, "");
+    if (!contact) return { error: "Укажите контакт для связи (Telegram)." };
+    if (contact.length > CONTACT_MAX_LENGTH) {
+      return { error: "Контакт слишком длинный." };
+    }
+    if (!isValidContact(contact)) {
+      return { error: "Укажите @username или номер телефона." };
+    }
+
+    if (!input.consentGiven) {
+      return { error: "Необходимо согласие на обработку персональных данных." };
+    }
+
+    const tgRaw = input.telegramId?.trim() ?? "";
+    const telegramId = parseTelegramId(tgRaw);
+    if (tgRaw !== "" && telegramId === null) {
+      return { error: "Telegram ID — только цифры (от 5 до 15)." };
+    }
+    const usernameRaw = input.telegramUsername?.trim() ?? "";
+    const telegramUsername = TELEGRAM_USERNAME_REGEX.test(usernameRaw)
+      ? usernameRaw
+      : null;
+
+    const now = Date.now();
+    const contactNorm = normalizeContactKey(contact);
+    dedupKey = `${ip}:individ:${contactNorm}`;
+    if (
+      dedupMap.has(dedupKey) &&
+      now - (dedupMap.get(dedupKey) ?? 0) < DEDUP_WINDOW_MS
+    ) {
+      return { error: DEDUP_ERROR_MESSAGE };
+    }
+    dedupMap.set(dedupKey, now);
+
+    if (telegramId !== null) {
+      let existing: { id: string; contact: string | null } | null = null;
+      try {
+        existing = await findPendingIndividRequest(telegramId);
+      } catch (e) {
+        console.error("[COACH_REQUEST] Pending request check failed:", e);
+      }
+      if (existing) {
+        dedupMap.delete(dedupKey);
+        return { error: COACH_REQUEST_ALREADY_SENT_MESSAGE };
+      }
+    } else {
+      let pendingExists = false;
+      try {
+        pendingExists = await findPendingIndividByContact(contactNorm);
+      } catch (e) {
+        console.error("[COACH_REQUEST] Pending contact check failed:", e);
+      }
+      if (pendingExists) {
+        dedupMap.delete(dedupKey);
+        return { error: COACH_REQUEST_ALREADY_SENT_MESSAGE };
+      }
+    }
+
+    dbDedupKey = `individ:${contactNorm}`;
+    const nowIso = new Date().toISOString();
+    const { error: purgeError } = await supabaseAdmin
+      .from("bot_dedup")
+      .delete()
+      .eq("key", dbDedupKey)
+      .lt("expires_at", nowIso);
+    if (purgeError) {
+      console.error(
+        "[COACH_REQUEST] Failed to purge expired dedup key:",
+        purgeError.message,
       );
+    }
+
+    const { error: dedupError } = await supabaseAdmin.from("bot_dedup").insert({
+      key: dbDedupKey,
+      expires_at: new Date(Date.now() + DEDUP_WINDOW_MS).toISOString(),
+    });
+    if (dedupError?.code === "23505") {
+      return { error: DEDUP_ERROR_MESSAGE };
+    }
+    if (dedupError) {
+      console.error(
+        "[COACH_REQUEST] Failed to write dedup key:",
+        dedupError.message,
+      );
+    }
+
+    const buildPayload = () => ({
+      sub_type: "individ" as const,
+      name,
+      contact,
+      status: "pending" as const,
+      consent_given: true,
+      consent_at: new Date().toISOString(),
+      consent_version: PRIVACY_POLICY_VERSION,
+      telegram_id: telegramId,
+    });
+
+    const { data: request, error: insertError } = await supabaseAdmin
+      .from("purchase_requests")
+      .insert(buildPayload())
+      .select("id")
+      .maybeSingle<{ id: string }>();
+
+    let requestId: string | null = null;
+    if (insertError) {
+      if (insertError.code === "23505" && telegramId !== null) {
+        await supabaseAdmin.from("bot_dedup").delete().eq("key", dbDedupKey);
+        let existing: { id: string; contact: string | null } | null = null;
+        try {
+          existing = await findPendingIndividRequest(telegramId);
+        } catch (e) {
+          console.error("[COACH_REQUEST] 23505 re-check failed:", e);
+        }
+        if (existing) {
+          dedupMap.delete(dedupKey);
+          return { error: COACH_REQUEST_ALREADY_SENT_MESSAGE };
+        }
+        const { data: retryRequest, error: retryError } = await supabaseAdmin
+          .from("purchase_requests")
+          .insert(buildPayload())
+          .select("id")
+          .maybeSingle<{ id: string }>();
+        if (retryError) {
+          console.error(
+            "[COACH_REQUEST] Retry insert failed:",
+            retryError.message,
+          );
+          dedupMap.delete(dedupKey);
+          await supabaseAdmin
+            .from("bot_dedup")
+            .delete()
+            .eq("key", dbDedupKey)
+            .then(
+              () => {},
+              (delErr) =>
+                console.error(
+                  "[COACH_REQUEST] Failed to delete dedup key:",
+                  delErr,
+                ),
+            );
+          return { error: "Произошла ошибка. Попробуйте позже." };
+        }
+        requestId = retryRequest?.id ?? null;
+      } else {
+        console.error(
+          "[COACH_REQUEST] Failed to insert request:",
+          insertError.message,
+        );
+        dedupMap.delete(dedupKey);
+        await supabaseAdmin
+          .from("bot_dedup")
+          .delete()
+          .eq("key", dbDedupKey)
+          .then(
+            () => {},
+            (delErr) =>
+              console.error(
+                "[COACH_REQUEST] Failed to delete dedup key:",
+                delErr,
+              ),
+          );
+        return { error: "Произошла ошибка. Попробуйте позже." };
+      }
+    } else {
+      requestId = request?.id ?? null;
+    }
+
+    await insertBotLog("coach_request", "info", telegramId, {
+      purchase_request_id: requestId,
+      sub_type: "individ",
+      name,
+      contact,
+      telegram_username: telegramUsername ?? null,
+    });
+
+    const coachChatId = process.env.COACH_CHAT_ID;
+    const logNotificationFailure = async (reason: string) => {
+      await insertBotLog(
+        "coach_request:coach_notification_failed",
+        "error",
+        telegramId,
+        {
+          purchase_request_id: requestId,
+          contact,
+          telegram_username: telegramUsername ?? null,
+          reason,
+        },
+      );
+    };
+
+    if (coachChatId) {
+      const sent = await sendTelegramMessage(
+        coachChatId,
+        buildCoachRequestCoachMessage({
+          name,
+          contact,
+          telegramUsername,
+          telegramId,
+          formatContact,
+        }),
+      );
+      if (!sent) {
+        console.error("[COACH_REQUEST] Coach notification failed");
+        await logNotificationFailure("telegram_send_failed");
+      }
+    } else {
+      console.error("[COACH_REQUEST] COACH_CHAT_ID is not set");
+      await logNotificationFailure("COACH_CHAT_ID_not_set");
+    }
+
+    return {};
+  } catch (e) {
+    console.error("[COACH_REQUEST] createCoachRequest error:", e);
+    if (dedupKey) dedupMap.delete(dedupKey);
+    if (dbDedupKey) {
+      await supabaseAdmin
+        .from("bot_dedup")
+        .delete()
+        .eq("key", dbDedupKey)
+        .then(
+          () => {},
+          (delErr) =>
+            console.error(
+              "[COACH_REQUEST] Failed to delete dedup key:",
+              delErr,
+            ),
+        );
     }
     return { error: "Произошла ошибка. Попробуйте позже." };
   }

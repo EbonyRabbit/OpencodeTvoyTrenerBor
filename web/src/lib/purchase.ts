@@ -1,9 +1,16 @@
-export const DEDUP_ERROR_MESSAGE = "Заявка уже отправлена. Тренер скоро свяжется с вами.";
+export const DEDUP_ERROR_MESSAGE =
+  "Заявка уже отправлена. Тренер скоро свяжется с вами.";
+
+export const COACH_REQUEST_ALREADY_SENT_MESSAGE =
+  "Вы уже отправили заявку. Тренер скоро свяжется с вами.";
 
 export const TELEGRAM_ID_REGEX = /^\d{5,15}$/;
 export const TELEGRAM_USERNAME_REGEX = /^[A-Za-z0-9_]{3,32}$/;
 
-export function parseBuyParams(tgRaw: string, uRaw: string): {
+export function parseBuyParams(
+  tgRaw: string,
+  uRaw: string,
+): {
   telegramId: number | null;
   telegramUsername: string | null;
 } {
@@ -42,10 +49,12 @@ export function buildPurchaseCoachMessage({
   formatContact: (value: string) => string;
   formatPrice: (price: number) => string;
 }): string {
-  const priceLine = price != null && price > 0 ? `\nЦена: ${formatPrice(price)}` : "";
-  const tgLine = telegramId !== null && telegramId !== undefined
-    ? `\nTG ID: ${telegramId}`
-    : "";
+  const priceLine =
+    price != null && price > 0 ? `\nЦена: ${formatPrice(price)}` : "";
+  const tgLine =
+    telegramId !== null && telegramId !== undefined
+      ? `\nTG ID: ${telegramId}`
+      : "";
   const contactIsSameUser =
     telegramUsername != null &&
     contact.replace(/^@/, "").toLowerCase() === telegramUsername.toLowerCase();
@@ -59,5 +68,38 @@ export function buildPurchaseCoachMessage({
     `Длительность: ${durationWeeks} нед.\n\n👤 Имя: ${name}\n` +
     `📱 Контакт: ${formatContact(contact)}${nickLine}${tgLine}\n\n` +
     `Подтвердите оплату в панели управления.`
+  );
+}
+
+export function buildCoachRequestCoachMessage({
+  name,
+  contact,
+  telegramUsername,
+  telegramId,
+  formatContact,
+}: {
+  name: string;
+  contact: string;
+  telegramUsername?: string | null;
+  telegramId?: number | null;
+  formatContact: (value: string) => string;
+}): string {
+  const contactIsSameUser =
+    telegramUsername != null &&
+    contact.replace(/^@/, "").toLowerCase() === telegramUsername.toLowerCase();
+  const nickLine =
+    telegramUsername && !contactIsSameUser
+      ? `\n🔗 @${telegramUsername} (https://t.me/${telegramUsername})`
+      : "";
+  const tgLine =
+    telegramId !== null && telegramId !== undefined
+      ? `\n🆔 TG ID: ${telegramId}`
+      : "";
+
+  return (
+    `🤝 Хочу индивидуальное ведение/кураторство\n\n` +
+    `👤 Имя: ${name}\n` +
+    `📱 Контакт: ${formatContact(contact)}${nickLine}${tgLine}\n\n` +
+    `Свяжитесь с клиентом в Telegram.`
   );
 }

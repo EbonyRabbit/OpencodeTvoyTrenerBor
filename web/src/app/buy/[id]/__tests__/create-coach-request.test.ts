@@ -266,6 +266,39 @@ describe("createCoachRequest", () => {
     );
   });
 
+  it("fails closed when the dedup key cannot be written", async () => {
+    mockDb({ tgDedupError: { message: "db down" } });
+
+    const result = await createCoachRequest(baseInput);
+
+    expect(result.error).toBe("Произошла ошибка. Попробуйте позже.");
+    expect(
+      captured.get("purchase_requests")?.some((c) => c.method === "insert"),
+    ).toBe(false);
+  });
+
+  it("does not paginate the pending-contact pre-read", async () => {
+    const { calls } = mockDb();
+    await createCoachRequest(baseInput);
+    expect(calls("purchase_requests").some((c) => c.method === "limit")).toBe(
+      false,
+    );
+  });
+
+  it("treats a digit-led username as a username, not a phone", async () => {
+    const { calls } = mockDb();
+    const result = await createCoachRequest({
+      name: "Иван",
+      contact: "900ivan",
+      consentGiven: true,
+    });
+    expect(result.error).toBeUndefined();
+    const dedupInsertKey = calls("bot_dedup")
+      .filter((c) => c.method === "insert")
+      .map((c) => (c.args[0] as { key: string }).key);
+    expect(dedupInsertKey).toContain("individ:900ivan");
+  });
+
   it("keeps the request successful even if the bot_logs insert rejects", async () => {
     mockDb({ logError: new Error("network down") });
 

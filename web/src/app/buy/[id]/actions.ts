@@ -9,6 +9,7 @@ import {
   sanitizeText,
   isValidContact,
   formatContact,
+  PHONE_REGEX,
 } from "@/lib/validation";
 import {
   DEDUP_ERROR_MESSAGE,
@@ -272,7 +273,7 @@ export type CoachRequestInput = {
 
 function normalizeContactKey(value: string): string {
   const trimmed = value.replace(/^@/, "").trim().toLowerCase();
-  if (/^\+?\d/.test(trimmed)) {
+  if (PHONE_REGEX.test(trimmed)) {
     const digits = trimmed.replace(/[^\d]/g, "");
     return trimmed.startsWith("+") ? `+${digits}` : digits;
   }

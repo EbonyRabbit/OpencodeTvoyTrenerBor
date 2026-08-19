@@ -6,7 +6,7 @@ export function sanitizeText(value: string): string {
 }
 
 const TELEGRAM_USERNAME_REGEX = /^[A-Za-z0-9_]{3,32}$/;
-const PHONE_REGEX = /^\+?\d[\d\s()-]{6,19}$/;
+export const PHONE_REGEX = /^\+?\d[\d\s()-]{6,19}$/;
 
 export function isValidContact(value: string): boolean {
   return TELEGRAM_USERNAME_REGEX.test(value) || PHONE_REGEX.test(value);

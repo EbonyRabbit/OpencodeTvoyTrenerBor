@@ -367,6 +367,8 @@ export async function createCoachRequest(
         "[COACH_REQUEST] Failed to write dedup key:",
         dedupError.message,
       );
+      dedupMap.delete(dedupKey);
+      return { error: GENERIC_ERROR_MESSAGE };
     }
 
     const { data: request, error: insertError } = await supabaseAdmin

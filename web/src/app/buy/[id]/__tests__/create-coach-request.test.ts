@@ -185,6 +185,9 @@ describe("createCoachRequest", () => {
     expect((logInserts[0].args[0] as { details: string }).details).toContain(
       "req-1",
     );
+    expect(
+      (logInserts[0].args[0] as { details: string }).details,
+    ).not.toContain("telegram_");
 
     expect(sendTelegramMessage).toHaveBeenCalledWith(
       "123",
@@ -193,6 +196,14 @@ describe("createCoachRequest", () => {
     expect(sendTelegramMessage).toHaveBeenCalledWith(
       "123",
       expect.stringContaining("ivan"),
+    );
+    expect(sendTelegramMessage).toHaveBeenCalledWith(
+      "123",
+      expect.not.stringContaining("TG ID"),
+    );
+    expect(sendTelegramMessage).toHaveBeenCalledWith(
+      "123",
+      expect.not.stringContaining("t.me/"),
     );
   });
 

@@ -144,7 +144,8 @@ export async function createPurchaseRequest(
       : null;
 
     const now = Date.now();
-    dedupKey = `${ip}:${programId}:${contact}`;
+    const contactNorm = normalizeContactKey(contact);
+    dedupKey = `${ip}:${programId}:${contactNorm}`;
     if (
       dedupMap.has(dedupKey) &&
       now - (dedupMap.get(dedupKey) ?? 0) < DEDUP_WINDOW_MS
@@ -172,7 +173,7 @@ export async function createPurchaseRequest(
       return { error: "Программа недоступна для покупки." };
     }
 
-    dbDedupKey = `purchase:${programId}:${contact.toLowerCase()}`;
+    dbDedupKey = `purchase:${programId}:${contactNorm}`;
     const nowIso = new Date().toISOString();
     const { error: purgeError } = await supabaseAdmin
       .from("bot_dedup")
@@ -198,6 +199,8 @@ export async function createPurchaseRequest(
         "[PURCHASE] Failed to write dedup key:",
         dedupError.message,
       );
+      dedupMap.delete(dedupKey);
+      return { error: GENERIC_ERROR_MESSAGE };
     }
 
     const logged = await insertBotLog("purchase_request", "info", telegramId, {
@@ -268,7 +271,12 @@ export type CoachRequestInput = {
 };
 
 function normalizeContactKey(value: string): string {
-  return value.replace(/^@/, "").trim().toLowerCase();
+  const trimmed = value.replace(/^@/, "").trim().toLowerCase();
+  if (/^\+?\d/.test(trimmed)) {
+    const digits = trimmed.replace(/[^\d]/g, "");
+    return trimmed.startsWith("+") ? `+${digits}` : digits;
+  }
+  return trimmed;
 }
 
 async function findPendingIndividByContact(
@@ -279,8 +287,7 @@ async function findPendingIndividByContact(
     .select("id, contact")
     .eq("sub_type", "individ")
     .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false });
   if (error) {
     throw new Error(`Pending individ contact check failed: ${error.message}`);
   }
@@ -316,7 +323,7 @@ export async function createCoachRequest(
       return { error: "Укажите @username или номер телефона." };
     }
 
-    if (!input.consentGiven) {
+    if (typeof input.consentGiven !== "boolean" || !input.consentGiven) {
       return { error: "Необходимо согласие на обработку персональных данных." };
     }
 

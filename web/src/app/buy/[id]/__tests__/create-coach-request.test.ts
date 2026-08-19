@@ -175,6 +175,10 @@ describe("createCoachRequest", () => {
     expect(dedupCalls.indexOf("delete")).toBeLessThan(
       dedupCalls.indexOf("insert"),
     );
+    const dedupInsertKey = calls("bot_dedup")
+      .filter((c) => c.method === "insert")
+      .map((c) => (c.args[0] as { key: string }).key);
+    expect(dedupInsertKey).toContain("individ:ivan");
 
     const logInserts = calls("bot_logs").filter((c) => c.method === "insert");
     expect(
@@ -225,6 +229,20 @@ describe("createCoachRequest", () => {
     expect(
       captured.get("purchase_requests")?.some((c) => c.method === "insert"),
     ).toBe(false);
+  });
+
+  it("deduplicates by pending contact across phone formats", async () => {
+    mockDb({
+      pendingIndividRows: [{ id: "r1", contact: "+7 (900) 123-45-67" }],
+    });
+
+    const result = await createCoachRequest({
+      name: "Иван",
+      contact: "+79001234567",
+      consentGiven: true,
+    });
+
+    expect(result.error).toBe(COACH_REQUEST_ALREADY_SENT_MESSAGE);
   });
 
   it("fails closed when the pending-contact pre-read errors out", async () => {

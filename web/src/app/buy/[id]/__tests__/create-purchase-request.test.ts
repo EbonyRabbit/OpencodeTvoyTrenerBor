@@ -53,7 +53,12 @@ function buildTable(
     }),
     insert: vi.fn((...args: unknown[]) => {
       calls.push({ method: "insert", args });
-      const insertError = tableName === "bot_logs" ? botLogsInsertError : null;
+      const insertError =
+        tableName === "bot_logs"
+          ? botLogsInsertError
+          : tableName === "bot_dedup"
+            ? botDedupInsertError
+            : null;
       return Promise.resolve({ error: insertError });
     }),
     then: (onFulfilled: (v: unknown) => unknown) =>
@@ -64,6 +69,7 @@ function buildTable(
 
 let ipCounter = 0;
 let botLogsInsertError: unknown = null;
+let botDedupInsertError: unknown = null;
 
 function mockDb(programData: unknown) {
   const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
@@ -84,6 +90,7 @@ beforeEach(() => {
   process.env.COACH_CHAT_ID = "123";
   ipCounter += 1;
   botLogsInsertError = null;
+  botDedupInsertError = null;
   (headers as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
     get: () => `10.0.0.${ipCounter}`,
   });
@@ -183,5 +190,49 @@ describe("createPurchaseRequest", () => {
 
     expect(result.error).toBe("Не удалось сохранить заявку. Попробуйте позже.");
     expect(sendTelegramMessage).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the dedup key cannot be written", async () => {
+    const { calls } = mockDb({
+      id: UUID,
+      title: "Сила Новичка 12 недель",
+      type: "template",
+      description: null,
+      duration_weeks: 12,
+      price: 9900,
+    });
+    botDedupInsertError = { message: "db down" };
+
+    const result = await createPurchaseRequest({
+      programId: UUID,
+      name: "Иван",
+      contact: "ivan",
+    });
+
+    expect(result.error).toBe("Произошла ошибка. Попробуйте позже.");
+    expect(calls("bot_logs").some((c) => c.method === "insert")).toBe(false);
+  });
+
+  it("normalizes phone formats in the dedup key", async () => {
+    const { calls } = mockDb({
+      id: UUID,
+      title: "Сила Новичка 12 недель",
+      type: "template",
+      description: null,
+      duration_weeks: 12,
+      price: 9900,
+    });
+
+    const result = await createPurchaseRequest({
+      programId: UUID,
+      name: "Иван",
+      contact: "+7 (900) 123-45-67",
+    });
+
+    expect(result.error).toBeUndefined();
+    const dedupKeys = calls("bot_dedup")
+      .filter((c) => c.method === "insert")
+      .map((c) => (c.args[0] as { key: string }).key);
+    expect(dedupKeys).toContain(`purchase:${UUID}:+79001234567`);
   });
 });

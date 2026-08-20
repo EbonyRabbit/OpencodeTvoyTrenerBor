@@ -13,6 +13,7 @@ import {
   notifyClientForProgram,
   generateConnectCodeFor,
   applyProgramActivation,
+  toPositiveNumber,
   type ClientForInstructions,
 } from "@/lib/activate-purchase";
 import type { ActivityEvent } from "./activity-types";
@@ -384,14 +385,12 @@ export async function generateClientToken(
 
     for (let i = 0; i < 5; i++) {
       const token = generateToken(TOKEN_LENGTH);
-      const { error } = await supabaseAdmin
-        .from("client_tokens")
-        .insert({
-          client_id: clientId,
-          token,
-          expires_at: expiresAt,
-          last_used_at: null,
-        });
+      const { error } = await supabaseAdmin.from("client_tokens").insert({
+        client_id: clientId,
+        token,
+        expires_at: expiresAt,
+        last_used_at: null,
+      });
       if (!error) {
         revalidatePath(`/clients/${clientId}`);
         return { token };
@@ -550,7 +549,7 @@ export async function markPurchased(
       client,
       programId,
       programTitle: program.title,
-      price: typeof program.price === "number" ? program.price : null,
+      price: toPositiveNumber(program.price),
       durationWeeks: program.duration_weeks,
       amount: null,
       contact: null,

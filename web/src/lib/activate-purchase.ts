@@ -2,8 +2,10 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateSchedule } from "@/lib/plan-adjustment";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { buildProgramInstructions } from "@/lib/program-instructions";
-import { UUID_REGEX, formatContact } from "@/lib/validation";
+import { UUID_REGEX, formatContact, sanitizeText } from "@/lib/validation";
 import { formatPrice } from "@/lib/format-price";
+
+const MAX_NAME_LENGTH = 120;
 
 export async function generateConnectCodeFor(
   clientId: string,
@@ -39,16 +41,19 @@ export async function resetPlanAssignments(
     .delete()
     .eq("client_id", clientId);
   if (scheduleError) {
-    return {
-      error: `Не удалось сбросить старое расписание: ${scheduleError.message}`,
-    };
+    console.error("[ACTIVATION] schedule reset failed:", scheduleError.message);
+    return { error: "Не удалось сбросить старое расписание." };
   }
   const { error: pausesError } = await supabaseAdmin
     .from("plan_pauses")
     .delete()
     .eq("client_id", clientId);
   if (pausesError) {
-    return { error: `Не удалось сбросить паузы плана: ${pausesError.message}` };
+    console.error(
+      "[ACTIVATION] plan pauses reset failed:",
+      pausesError.message,
+    );
+    return { error: "Не удалось сбросить паузы плана." };
   }
   return {};
 }
@@ -88,8 +93,12 @@ export async function assignProgramAndNotify(
 
   const scheduleError = await generateSchedule(input.clientId, input.programId);
   if (scheduleError.error) {
+    console.error(
+      "[ACTIVATION] schedule generation failed:",
+      scheduleError.error,
+    );
     return {
-      error: `Программа назначена, но не удалось создать расписание: ${scheduleError.error}`,
+      error: "Программа назначена, но не удалось создать расписание.",
       programAssigned: true,
     };
   }
@@ -149,9 +158,9 @@ export async function deliverProgramInstructions(
   input: DeliverInstructionsInput,
 ): Promise<{ warning?: string }> {
   const text = buildProgramInstructions({
-    name: input.clientName,
+    name: sanitizeText(input.clientName).slice(0, MAX_NAME_LENGTH),
     language: input.clientLanguage,
-    programTitle: input.programTitle,
+    programTitle: sanitizeText(input.programTitle).slice(0, MAX_NAME_LENGTH),
     accessEndDate: input.accessEndDate,
     connectCode: input.connectCode,
     botUsername: process.env.TELEGRAM_BOT_USERNAME ?? null,
@@ -200,6 +209,17 @@ export async function deliverProgramInstructions(
   };
 }
 
+function toPositiveNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+export { toPositiveNumber };
+
 export function buildActivationCoachMessage({
   clientName,
   telegramId,
@@ -219,6 +239,9 @@ export function buildActivationCoachMessage({
   durationWeeks: number;
   accessEndDate: string;
 }): string {
+  const cleanName =
+    sanitizeText(clientName).slice(0, MAX_NAME_LENGTH) || "Клиент";
+  const cleanProgram = sanitizeText(programTitle).slice(0, MAX_NAME_LENGTH);
   const priceLine =
     price !== null && price !== undefined
       ? `\nЦена: ${formatPrice(price)} ₽`
@@ -236,9 +259,9 @@ export function buildActivationCoachMessage({
 
   return (
     `✅ Оплата подтверждена\n\n` +
-    `Программа: ${programTitle}${priceLine}${amountLine}\n` +
+    `Программа: ${cleanProgram}${priceLine}${amountLine}\n` +
     `Длительность: ${durationWeeks} нед.\n\n` +
-    `👤 Клиент: ${clientName}${contactLine}${dateLine}`
+    `👤 Клиент: ${cleanName}${contactLine}${dateLine}`
   );
 }
 
@@ -291,7 +314,10 @@ export async function applyProgramActivation({
       access_end_date: accessEndDate,
     })
     .eq("id", clientId);
-  if (updateError) return { error: updateError.message };
+  if (updateError) {
+    console.error("[ACTIVATION] Client update failed:", updateError.message);
+    return { error: "Не удалось обновить данные клиента." };
+  }
 
   const assignment = await assignProgramAndNotify({
     clientId,
@@ -340,7 +366,7 @@ export async function activatePurchaseByOrder({
   ActivationResult & {
     alreadyActivated?: boolean;
     requestId?: string;
-    clientId?: string;
+    clientId?: string | null;
   }
 > {
   try {
@@ -358,9 +384,6 @@ export async function activatePurchaseByOrder({
       return { error: "Ошибка при обработке заказа." };
     }
     if (!request) return { error: "Заявка не найдена." };
-    if (request.status === "paid") {
-      return { alreadyActivated: true, requestId: request.id };
-    }
     if (request.status === "cancelled") {
       return { error: "Заявка отменена." };
     }
@@ -369,6 +392,9 @@ export async function activatePurchaseByOrder({
     }
     if (request.program_id === null) {
       return { error: "Программа недоступна для активации." };
+    }
+    if (!request.consent_given) {
+      return { error: "Не подтверждено согласие на обработку данных." };
     }
 
     const { data: program, error: programError } = await supabaseAdmin
@@ -386,119 +412,14 @@ export async function activatePurchaseByOrder({
       return { error: "Некорректная длительность программы" };
     }
 
-    let clientId = request.client_id;
-    let client: ClientForInstructions | null = null;
-
-    if (
-      !clientId &&
-      request.telegram_id !== null &&
-      request.telegram_id !== undefined
-    ) {
-      const { data: existing, error: lookupError } = await supabaseAdmin
-        .from("clients")
-        .select("id, name, language, telegram_id, connect_code, timezone")
-        .eq("telegram_id", request.telegram_id)
-        .maybeSingle();
-      if (lookupError) {
-        console.error("[ACTIVATION] Client lookup error:", lookupError.message);
-        return { error: "Ошибка при поиске клиента." };
-      }
-      clientId = existing?.id ?? null;
-      client = existing as ClientForInstructions | null;
-    }
-
-    if (clientId && !client) {
-      const { data: c, error: cErr } = await supabaseAdmin
-        .from("clients")
-        .select("id, name, language, telegram_id, connect_code, timezone")
-        .eq("id", clientId)
-        .maybeSingle();
-      if (cErr) {
-        console.error("[ACTIVATION] Client lookup error:", cErr.message);
-        return { error: "Ошибка при поиске клиента." };
-      }
-      client = c as ClientForInstructions | null;
-    }
-
-    if (!clientId || !client) {
-      const now = new Date();
-      const endDate = new Date(
-        now.getTime() + program.duration_weeks * 7 * 24 * 60 * 60 * 1000,
-      );
-      const name =
-        [request.first_name, request.last_name]
-          .filter(Boolean)
-          .join(" ")
-          .trim() ||
-        request.name ||
-        "Клиент";
-      const consentAt = request.consent_at ?? null;
-
-      const { data: created, error: createError } = await supabaseAdmin
-        .from("clients")
-        .insert({
-          name,
-          telegram_id: request.telegram_id,
-          status: "active",
-          payment_status: "paid",
-          program_id: request.program_id,
-          purchased_program_id: request.program_id,
-          purchase_date: now.toISOString(),
-          access_start_date: now.toISOString(),
-          access_end_date: endDate.toISOString(),
-          consent_given: request.consent_given,
-          consent_given_at: consentAt,
-          client_consent_given: request.consent_given,
-          client_consent_given_at: consentAt,
-          client_consent_version: request.consent_version,
-          language: "ru",
-          timezone: "UTC",
-          connect_code: null,
-        })
-        .select("id")
-        .maybeSingle();
-      if (createError?.code === "23505" && request.telegram_id !== null) {
-        const { data: existing, error: lookupError } = await supabaseAdmin
-          .from("clients")
-          .select("id, name, language, telegram_id, connect_code, timezone")
-          .eq("telegram_id", request.telegram_id)
-          .maybeSingle();
-        if (lookupError) {
-          console.error(
-            "[ACTIVATION] Client lookup error:",
-            lookupError.message,
-          );
-          return { error: "Ошибка при поиске клиента." };
-        }
-        clientId = existing?.id ?? null;
-        client = existing as ClientForInstructions | null;
-      } else if (createError) {
-        console.error(
-          "[ACTIVATION] Client creation failed:",
-          createError.message,
-        );
-        return { error: "Не удалось создать карточку клиента." };
-      } else {
-        clientId = created?.id ?? null;
-        client = {
-          name,
-          language: "ru",
-          telegram_id: request.telegram_id,
-          connect_code: null,
-          timezone: "UTC",
-        };
-      }
-    }
-    if (!clientId || !client) {
-      return { error: "Не удалось определить клиента." };
-    }
+    const price = toPositiveNumber(program.price);
+    const amount = toPositiveNumber(request.amount);
 
     const { data: claimed, error: claimError } = await supabaseAdmin
       .from("purchase_requests")
       .update({
         status: "paid",
         paid_at: new Date().toISOString(),
-        client_id: clientId,
       })
       .eq("id", request.id)
       .eq("status", "pending")
@@ -508,47 +429,72 @@ export async function activatePurchaseByOrder({
       console.error("[ACTIVATION] Claim failed:", claimError.message);
       return { error: "Ошибка обновления статуса заказа." };
     }
+
     if (!claimed) {
       const { data: current } = await supabaseAdmin
         .from("purchase_requests")
-        .select("status")
+        .select("status, client_id")
         .eq("id", request.id)
         .maybeSingle();
-      if (current?.status === "paid") {
-        return { alreadyActivated: true, requestId: request.id, clientId };
+      if (current?.status !== "paid") {
+        return { error: "Заявка уже была обработана.", requestId: request.id };
       }
-      return {
-        error: "Заявка уже была обработана.",
-        requestId: request.id,
-        clientId,
-      };
+      const complete =
+        current.client_id !== null &&
+        (await isClientActivated(current.client_id, request.program_id));
+      if (complete) {
+        return {
+          alreadyActivated: true,
+          requestId: request.id,
+          clientId: current.client_id,
+        };
+      }
     }
+
+    const resolution = await resolveOrCreateClient(
+      {
+        client_id: request.client_id,
+        telegram_id: request.telegram_id,
+        name: request.name,
+        first_name: request.first_name,
+        last_name: request.last_name,
+        consent_given: request.consent_given,
+        consent_at: request.consent_at,
+        consent_version: request.consent_version,
+      },
+      request.program_id,
+      program.duration_weeks,
+    );
+    if (!resolution.ok) return { ...resolution, requestId: request.id };
+    const clientId = resolution.clientId;
+    const client = resolution.client;
 
     const activation = await applyProgramActivation({
       clientId,
       client,
       programId: program.id,
       programTitle: program.title,
-      price: typeof program.price === "number" ? program.price : null,
+      price,
       durationWeeks: program.duration_weeks,
-      amount: request.amount,
+      amount,
       contact: request.contact,
       coachId,
     });
     if (activation.error) {
-      const { error: revertError } = await supabaseAdmin
-        .from("purchase_requests")
-        .update({ status: "pending", paid_at: null })
-        .eq("id", request.id)
-        .eq("status", "paid")
-        .eq("client_id", clientId);
-      if (revertError) {
-        console.error(
-          "[ACTIVATION] Claim rollback failed:",
-          revertError.message,
-        );
-      }
+      await rollbackClaim(request.id, clientId, resolution.created);
       return { ...activation, requestId: request.id, clientId };
+    }
+
+    const { error: linkError } = await supabaseAdmin
+      .from("purchase_requests")
+      .update({ client_id: clientId })
+      .eq("id", request.id)
+      .eq("status", "paid");
+    if (linkError) {
+      console.error(
+        "[ACTIVATION] request->client link failed:",
+        linkError.message,
+      );
     }
 
     return { ...activation, requestId: request.id, clientId };
@@ -556,4 +502,183 @@ export async function activatePurchaseByOrder({
     console.error("[ACTIVATION] activatePurchaseByOrder error:", e);
     return { error: "Произошла ошибка при активации." };
   }
+}
+
+async function rollbackClaim(
+  requestId: string,
+  clientId: string,
+  clientCreated: boolean,
+): Promise<void> {
+  const { error: revertError } = await supabaseAdmin
+    .from("purchase_requests")
+    .update({ status: "pending", paid_at: null, client_id: null })
+    .eq("id", requestId)
+    .eq("status", "paid");
+  if (revertError) {
+    console.error("[ACTIVATION] Claim rollback failed:", revertError.message);
+  }
+  if (clientCreated) {
+    const { error: deleteError } = await supabaseAdmin
+      .from("clients")
+      .delete()
+      .eq("id", clientId);
+    if (deleteError) {
+      console.error(
+        "[ACTIVATION] Created client cleanup failed:",
+        deleteError.message,
+      );
+    }
+  }
+}
+
+async function isClientActivated(
+  clientId: string,
+  programId: string | null,
+): Promise<boolean> {
+  const { data: client, error } = await supabaseAdmin
+    .from("clients")
+    .select("payment_status, program_id, access_end_date")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (error) return false;
+  if (client?.program_id !== programId || client.payment_status !== "paid") {
+    return false;
+  }
+  if (
+    client.access_end_date &&
+    new Date(client.access_end_date).getTime() > Date.now()
+  ) {
+    return true;
+  }
+  return false;
+}
+
+async function resolveOrCreateClient(
+  request: {
+    client_id: string | null;
+    telegram_id: number | null;
+    name: string;
+    first_name: string | null;
+    last_name: string | null;
+    consent_given: boolean;
+    consent_at: string | null;
+    consent_version: string | null;
+  },
+  programId: string,
+  durationWeeks: number,
+): Promise<
+  | {
+      ok: true;
+      clientId: string;
+      client: ClientForInstructions;
+      created: boolean;
+    }
+  | { ok: false; error: string }
+> {
+  let clientId = request.client_id;
+  let client: ClientForInstructions | null = null;
+  let created = false;
+
+  if (
+    !clientId &&
+    request.telegram_id !== null &&
+    request.telegram_id !== undefined
+  ) {
+    const { data: existing, error: lookupError } = await supabaseAdmin
+      .from("clients")
+      .select("id, name, language, telegram_id, connect_code, timezone")
+      .eq("telegram_id", request.telegram_id)
+      .maybeSingle();
+    if (lookupError) {
+      console.error("[ACTIVATION] Client lookup error:", lookupError.message);
+      return { ok: false, error: "Ошибка при поиске клиента." };
+    }
+    clientId = existing?.id ?? null;
+    client = existing as ClientForInstructions | null;
+  }
+
+  if (clientId && !client) {
+    const { data: c, error: cErr } = await supabaseAdmin
+      .from("clients")
+      .select("id, name, language, telegram_id, connect_code, timezone")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (cErr) {
+      console.error("[ACTIVATION] Client lookup error:", cErr.message);
+      return { ok: false, error: "Ошибка при поиске клиента." };
+    }
+    client = c as ClientForInstructions | null;
+  }
+
+  if (!clientId || !client) {
+    const now = new Date();
+    const endDate = new Date(
+      now.getTime() + durationWeeks * 7 * 24 * 60 * 60 * 1000,
+    );
+    const name =
+      sanitizeText(
+        [request.first_name, request.last_name]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || request.name,
+      ).slice(0, MAX_NAME_LENGTH) || "Клиент";
+    const consentAt = request.consent_at ?? null;
+
+    const { data: createdClient, error: createError } = await supabaseAdmin
+      .from("clients")
+      .insert({
+        name,
+        telegram_id: request.telegram_id,
+        status: "active",
+        payment_status: "paid",
+        program_id: programId,
+        purchased_program_id: programId,
+        purchase_date: now.toISOString(),
+        access_start_date: now.toISOString(),
+        access_end_date: endDate.toISOString(),
+        consent_given: request.consent_given,
+        consent_given_at: consentAt,
+        client_consent_given: request.consent_given,
+        client_consent_given_at: consentAt,
+        client_consent_version: request.consent_version,
+        language: "ru",
+        timezone: "UTC",
+        connect_code: null,
+      })
+      .select("id")
+      .maybeSingle();
+    if (createError?.code === "23505" && request.telegram_id !== null) {
+      const { data: existing, error: lookupError } = await supabaseAdmin
+        .from("clients")
+        .select("id, name, language, telegram_id, connect_code, timezone")
+        .eq("telegram_id", request.telegram_id)
+        .maybeSingle();
+      if (lookupError) {
+        console.error("[ACTIVATION] Client lookup error:", lookupError.message);
+        return { ok: false, error: "Ошибка при поиске клиента." };
+      }
+      clientId = existing?.id ?? null;
+      client = existing as ClientForInstructions | null;
+    } else if (createError) {
+      console.error(
+        "[ACTIVATION] Client creation failed:",
+        createError.message,
+      );
+      return { ok: false, error: "Не удалось создать карточку клиента." };
+    } else {
+      created = true;
+      clientId = createdClient?.id ?? null;
+      client = {
+        name,
+        language: "ru",
+        telegram_id: request.telegram_id,
+        connect_code: null,
+        timezone: "UTC",
+      };
+    }
+  }
+  if (!clientId || !client) {
+    return { ok: false, error: "Не удалось определить клиента." };
+  }
+  return { ok: true, clientId, client, created };
 }

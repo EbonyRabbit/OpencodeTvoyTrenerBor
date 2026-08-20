@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import type { Database } from "@/types/supabase";
 import { generateSchedule } from "@/lib/plan-adjustment";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { buildProgramInstructions } from "@/lib/program-instructions";
@@ -64,6 +65,8 @@ export type ClientForInstructions = {
   telegram_id: number | null;
   connect_code: string | null;
   timezone: string | null;
+  program_id?: string | null;
+  access_end_date?: string | null;
 };
 
 type ProgramAssignment = {
@@ -73,6 +76,7 @@ type ProgramAssignment = {
   programTitle: string;
   accessEndDate: string;
   coachId: string | null;
+  telegramIdToRecord?: number | null;
 };
 
 export async function assignProgramAndNotify(
@@ -109,6 +113,7 @@ export async function assignProgramAndNotify(
     input.programTitle,
     input.accessEndDate,
     input.coachId,
+    input.telegramIdToRecord,
   );
 
   return { connectCode, warning };
@@ -120,9 +125,11 @@ export async function notifyClientForProgram(
   programTitle: string,
   accessEndDate: string | null,
   coachId: string | null,
+  telegramIdToRecord?: number | null,
 ): Promise<{ connectCode?: string; warning?: string }> {
+  const deliveryTelegramId = telegramIdToRecord ?? client.telegram_id;
   let connectCode: string | null = null;
-  if (!client.telegram_id) {
+  if (!deliveryTelegramId) {
     connectCode =
       resolveConnectCode(client) ?? (await generateConnectCodeFor(clientId));
   }
@@ -131,7 +138,7 @@ export async function notifyClientForProgram(
     clientId,
     clientName: client.name ?? "",
     clientLanguage: client.language,
-    clientTelegramId: client.telegram_id,
+    clientTelegramId: deliveryTelegramId,
     connectCode,
     programTitle,
     accessEndDate,
@@ -215,7 +222,10 @@ export async function deliverProgramInstructions(
 export function toFiniteNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
-    const parsed = Number(value);
+    const cleaned = value.trim();
+    if (cleaned === "") return null;
+    if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return null;
+    const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
@@ -259,7 +269,7 @@ export function buildActivationCoachMessage({
       ? `\nСумма оплаты: ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`
       : "";
   const contactLine = contact
-    ? `\n📱 Контакт: ${formatContact(contact)}`
+    ? `\n📱 Контакт: ${sanitizeText(formatContact(contact))}`
     : telegramId !== null && telegramId !== undefined
       ? `\n🆔 TG ID: ${telegramId}`
       : "";
@@ -290,6 +300,7 @@ export async function applyProgramActivation({
   amount,
   contact,
   coachId,
+  telegramIdToRecord,
 }: {
   clientId: string;
   client: ClientForInstructions;
@@ -300,6 +311,7 @@ export async function applyProgramActivation({
   amount: number | null;
   contact: string | null;
   coachId: string | null;
+  telegramIdToRecord?: number | null;
 }): Promise<ActivationResult> {
   if (durationWeeks <= 0)
     return { error: "Некорректная длительность программы" };
@@ -310,17 +322,34 @@ export async function applyProgramActivation({
   );
   const accessEndDate = endDate.toISOString();
 
+  const sameActiveProgram =
+    client.program_id === programId &&
+    client.access_end_date !== null &&
+    client.access_end_date !== undefined &&
+    new Date(client.access_end_date).getTime() > now.getTime();
+
+  const update: Database["public"]["Tables"]["clients"]["Update"] = {
+    program_id: programId,
+    purchased_program_id: programId,
+    payment_status: "paid",
+    purchase_date: now.toISOString(),
+    status: "active",
+  };
+  if (
+    telegramIdToRecord !== null &&
+    telegramIdToRecord !== undefined &&
+    client.telegram_id === null
+  ) {
+    update.telegram_id = telegramIdToRecord;
+  }
+  if (!sameActiveProgram) {
+    update.access_start_date = now.toISOString();
+    update.access_end_date = accessEndDate;
+  }
+
   const { error: updateError } = await supabaseAdmin
     .from("clients")
-    .update({
-      program_id: programId,
-      purchased_program_id: programId,
-      payment_status: "paid",
-      purchase_date: now.toISOString(),
-      status: "active",
-      access_start_date: now.toISOString(),
-      access_end_date: accessEndDate,
-    })
+    .update(update)
     .eq("id", clientId);
   if (updateError) {
     console.error("[ACTIVATION] Client update failed:", updateError.message);
@@ -334,6 +363,7 @@ export async function applyProgramActivation({
     programTitle,
     accessEndDate,
     coachId,
+    telegramIdToRecord: telegramIdToRecord ?? null,
   });
   if (assignment.error) return assignment;
 
@@ -472,6 +502,9 @@ export async function activatePurchaseByOrder({
       return { error: "Ошибка обновления статуса заказа." };
     }
 
+    let clientId: string | null = null;
+    let client: ClientForInstructions | null = null;
+
     if (!claimed) {
       const { data: current } = await supabaseAdmin
         .from("purchase_requests")
@@ -481,65 +514,131 @@ export async function activatePurchaseByOrder({
       if (current?.status !== "paid") {
         return { error: "Заявка уже была обработана.", requestId: request.id };
       }
-      const complete =
-        current.client_id !== null &&
-        (await isClientActivated(current.client_id, request.program_id));
-      if (complete) {
-        return {
-          alreadyActivated: true,
+      if (current.client_id) {
+        const recovered = await recoverLinkedRequest({
           requestId: request.id,
           clientId: current.client_id,
-        };
+          programId: request.program_id,
+          programTitle: program.title,
+          price,
+          amount,
+          durationWeeks: program.duration_weeks,
+          contact: request.contact,
+          coachId,
+          telegramIdToRecord: request.telegram_id,
+        });
+        if (recovered.kind === "alreadyActivated") {
+          return {
+            alreadyActivated: true,
+            requestId: request.id,
+            clientId: recovered.clientId,
+          };
+        }
+        if (recovered.kind === "inProgress") {
+          return {
+            error: "Активация уже выполняется. Повторите запрос позднее.",
+            requestId: request.id,
+            clientId: recovered.clientId,
+          };
+        }
+        clientId = recovered.clientId;
+        client = recovered.client;
       }
     }
 
-    const resolution = await resolveOrCreateClient(
-      {
-        client_id: request.client_id,
-        telegram_id: request.telegram_id,
-        name: request.name,
-        first_name: request.first_name,
-        last_name: request.last_name,
-        consent_given: request.consent_given,
-        consent_at: request.consent_at,
-        consent_version: request.consent_version,
-      },
-      request.program_id,
-      program.duration_weeks,
-    );
-    if (!resolution.ok) return { ...resolution, requestId: request.id };
-    const clientId = resolution.clientId;
-    const client = resolution.client;
-
-    const { data: linked, error: linkError } = await supabaseAdmin
-      .from("purchase_requests")
-      .update({ client_id: clientId })
-      .eq("id", request.id)
-      .eq("status", "paid")
-      .is("client_id", null)
-      .select("id")
-      .maybeSingle();
-    if (linkError) {
-      console.error(
-        "[ACTIVATION] request->client link failed:",
-        linkError.message,
+    if (!clientId || !client) {
+      const resolution = await resolveOrCreateClient(
+        {
+          client_id: request.client_id,
+          telegram_id: request.telegram_id,
+          name: request.name,
+          first_name: request.first_name,
+          last_name: request.last_name,
+          consent_given: request.consent_given,
+          consent_at: request.consent_at,
+          consent_version: request.consent_version,
+        },
+        request.program_id,
+        program.duration_weeks,
       );
-      return { error: "Ошибка обновления заказа.", requestId: request.id };
-    }
-    if (!linked) {
-      const complete = await isClientActivated(clientId, request.program_id);
-      if (complete) {
-        return {
-          alreadyActivated: true,
-          requestId: request.id,
-          clientId,
-        };
+      if (!resolution.ok) return { ...resolution, requestId: request.id };
+      clientId = resolution.clientId;
+      client = resolution.client;
+
+      const { data: linked, error: linkError } = await supabaseAdmin
+        .from("purchase_requests")
+        .update({ client_id: clientId })
+        .eq("id", request.id)
+        .eq("status", "paid")
+        .is("client_id", null)
+        .select("id")
+        .maybeSingle();
+      if (linkError) {
+        console.error(
+          "[ACTIVATION] request->client link failed:",
+          linkError.message,
+        );
+        return { error: "Ошибка обновления заказа.", requestId: request.id };
       }
-      return {
-        error: "Активация уже выполняется. Повторите запрос позднее.",
-        requestId: request.id,
-        clientId,
-      };
+      if (!linked) {
+        const { data: current } = await supabaseAdmin
+          .from("purchase_requests")
+          .select("client_id")
+          .eq("id", request.id)
+          .maybeSingle();
+        const linkedClientId = current?.client_id ?? null;
+        if (
+          linkedClientId !== null &&
+          linkedClientId !== clientId &&
+          resolution.created
+        ) {
+          const { error: cleanupError } = await supabaseAdmin
+            .from("clients")
+            .delete()
+            .eq("id", clientId);
+          if (cleanupError) {
+            console.error(
+              "[ACTIVATION] Phantom client cleanup failed:",
+              cleanupError.message,
+            );
+          }
+        }
+        if (!linkedClientId) {
+          return {
+            error: "Активация уже выполняется. Повторите запрос позднее.",
+            requestId: request.id,
+            clientId,
+          };
+        }
+        const recovered = await recoverLinkedRequest({
+          requestId: request.id,
+          clientId: linkedClientId,
+          programId: request.program_id,
+          programTitle: program.title,
+          price,
+          amount,
+          durationWeeks: program.duration_weeks,
+          contact: request.contact,
+          coachId,
+          telegramIdToRecord: request.telegram_id,
+        });
+        if (recovered.kind === "alreadyActivated") {
+          return {
+            alreadyActivated: true,
+            requestId: request.id,
+            clientId: recovered.clientId,
+          };
+        }
+        if (recovered.kind === "inProgress") {
+          return {
+            error: "Активация уже выполняется. Повторите запрос позднее.",
+            requestId: request.id,
+            clientId: recovered.clientId,
+          };
+        }
+        clientId = recovered.clientId;
+        client = recovered.client;
+      }
     }
 
     const activation = await applyProgramActivation({
@@ -552,6 +651,7 @@ export async function activatePurchaseByOrder({
       amount,
       contact: request.contact,
       coachId,
+      telegramIdToRecord: request.telegram_id,
     });
 
     return { ...activation, requestId: request.id, clientId };
@@ -559,6 +659,91 @@ export async function activatePurchaseByOrder({
     console.error("[ACTIVATION] activatePurchaseByOrder error:", e);
     return { error: "Произошла ошибка при активации." };
   }
+}
+
+const STALE_LINK_MS = 10 * 60 * 1000;
+
+type RecoveryOutcome =
+  | { kind: "alreadyActivated"; clientId: string }
+  | { kind: "takeover"; clientId: string; client: ClientForInstructions }
+  | { kind: "inProgress"; clientId: string };
+
+async function recoverLinkedRequest({
+  requestId,
+  clientId,
+  programId,
+  programTitle,
+  price,
+  amount,
+  durationWeeks,
+  contact,
+  coachId,
+  telegramIdToRecord,
+}: {
+  requestId: string;
+  clientId: string;
+  programId: string;
+  programTitle: string;
+  price: number | null;
+  amount: number | null;
+  durationWeeks: number;
+  contact: string | null;
+  coachId: string | null;
+  telegramIdToRecord: number | null;
+}): Promise<RecoveryOutcome> {
+  const linkedClient = await loadClientForInstructions(clientId);
+  if (!linkedClient) return { kind: "inProgress", clientId };
+
+  const activated = await isClientActivated(clientId, programId);
+  if (activated) {
+    const hasSchedule = await hasScheduleFor(clientId);
+    if (hasSchedule) return { kind: "alreadyActivated", clientId };
+  }
+
+  const staleCutoff = new Date(Date.now() - STALE_LINK_MS).toISOString();
+  const { data: takenOver, error: takeoverError } = await supabaseAdmin
+    .from("purchase_requests")
+    .update({ paid_at: new Date().toISOString() })
+    .eq("id", requestId)
+    .eq("status", "paid")
+    .eq("client_id", clientId)
+    .lt("paid_at", staleCutoff)
+    .select("id")
+    .maybeSingle();
+  if (takeoverError) {
+    console.error("[ACTIVATION] Takeover failed:", takeoverError.message);
+    return { kind: "inProgress", clientId };
+  }
+  if (!takenOver) return { kind: "inProgress", clientId };
+
+  return { kind: "takeover", clientId, client: linkedClient };
+}
+
+async function loadClientForInstructions(
+  clientId: string,
+): Promise<ClientForInstructions | null> {
+  const { data, error } = await supabaseAdmin
+    .from("clients")
+    .select(
+      "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
+    )
+    .eq("id", clientId)
+    .maybeSingle();
+  if (error) {
+    console.error("[ACTIVATION] Client lookup error:", error.message);
+    return null;
+  }
+  return data as ClientForInstructions | null;
+}
+
+async function hasScheduleFor(clientId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("program_schedule")
+    .select("id")
+    .eq("client_id", clientId)
+    .limit(1)
+    .maybeSingle();
+  return !error && data !== null;
 }
 
 async function isClientActivated(
@@ -616,7 +801,9 @@ async function resolveOrCreateClient(
   ) {
     const { data: existing, error: lookupError } = await supabaseAdmin
       .from("clients")
-      .select("id, name, language, telegram_id, connect_code, timezone")
+      .select(
+        "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
+      )
       .eq("telegram_id", request.telegram_id)
       .maybeSingle();
     if (lookupError) {
@@ -630,7 +817,9 @@ async function resolveOrCreateClient(
   if (clientId && !client) {
     const { data: c, error: cErr } = await supabaseAdmin
       .from("clients")
-      .select("id, name, language, telegram_id, connect_code, timezone")
+      .select(
+        "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
+      )
       .eq("id", clientId)
       .maybeSingle();
     if (cErr) {
@@ -703,7 +892,9 @@ async function resolveOrCreateClient(
     if (createError?.code === "23505" && request.telegram_id !== null) {
       const { data: existing, error: lookupError } = await supabaseAdmin
         .from("clients")
-        .select("id, name, language, telegram_id, connect_code, timezone")
+        .select(
+          "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
+        )
         .eq("telegram_id", request.telegram_id)
         .maybeSingle();
       if (lookupError) {
@@ -727,6 +918,8 @@ async function resolveOrCreateClient(
         telegram_id: request.telegram_id,
         connect_code: null,
         timezone: "UTC",
+        program_id: programId,
+        access_end_date: endDate.toISOString(),
       };
     }
   }

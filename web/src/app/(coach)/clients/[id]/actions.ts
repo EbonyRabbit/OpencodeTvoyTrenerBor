@@ -214,7 +214,7 @@ export async function activateProgram(
     const { data: client } = await supabaseAdmin
       .from("clients")
       .select(
-        "id, name, telegram_id, language, connect_code, payment_status, program_id, timezone",
+        "id, name, telegram_id, language, connect_code, payment_status, program_id, access_end_date, timezone",
       )
       .eq("id", clientId)
       .maybeSingle();
@@ -534,7 +534,7 @@ export async function markPurchased(
     const { data: client } = await supabaseAdmin
       .from("clients")
       .select(
-        "id, name, telegram_id, language, connect_code, program_id, timezone",
+        "id, name, telegram_id, language, connect_code, program_id, access_end_date, timezone",
       )
       .eq("id", clientId)
       .maybeSingle();

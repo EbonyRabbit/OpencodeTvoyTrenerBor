@@ -19,6 +19,7 @@ import {
   activatePurchaseByOrder,
   applyProgramActivation,
   buildActivationCoachMessage,
+  toFiniteNumber,
 } from "@/lib/activate-purchase";
 
 const ORDER_ID = "c3f0a2bc-1111-4990-8a58-6a0c8a4f2b01";
@@ -58,6 +59,8 @@ function mockDb(calls: Array<() => Promise<ChainRes>>) {
       select: () => link,
       eq: () => link,
       is: () => link,
+      lt: () => link,
+      limit: () => link,
       update: (payload?: unknown) => {
         if (payload !== undefined) record(payloads.update, table, payload);
         return link;
@@ -288,18 +291,20 @@ describe("activatePurchaseByOrder: payment verification", () => {
 });
 
 describe("activatePurchaseByOrder: idempotency for paid requests", () => {
-  it("returns alreadyActivated when the client is fully activated", async () => {
+  it("returns alreadyActivated when the client is fully activated with a schedule", async () => {
     mockDb([
       () => ok({ ...pendingRequest, status: "paid", client_id: CLIENT_ID }),
       () => ok(baseProgram),
       () => ok(null), // claim loses the race
       () => ok({ ...pendingRequest, status: "paid", client_id: CLIENT_ID }), // re-read
+      () => ok(existingClient), // load linked client
       () =>
         ok({
           payment_status: "paid",
           program_id: PROGRAM_ID,
           access_end_date: "2026-11-12T10:00:00.000Z",
         }), // activation completeness check
+      () => ok({ id: "sched-1" }), // schedule exists
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -320,13 +325,14 @@ describe("activatePurchaseByOrder: idempotency for paid requests", () => {
       () => ok(baseProgram),
       () => ok(null), // claim loses the race
       () => ok({ ...pendingRequest, status: "paid", client_id: CLIENT_ID }), // re-read
+      () => ok(existingClient), // load linked client
       () =>
         ok({
           payment_status: "pending",
           program_id: null,
           access_end_date: null,
         }), // completeness check: NOT activated
-      () => ok(existingClient), // resolve by id
+      () => ok({ id: REQUEST_ID }), // stale-link takeover succeeds
       () => ok({ error: null, data: null }), // clients update
       () => ok({ error: null, data: null }), // program_schedule delete
       () => ok({ error: null, data: null }), // plan_pauses delete
@@ -341,6 +347,11 @@ describe("activatePurchaseByOrder: idempotency for paid requests", () => {
     expect(result.alreadyActivated).toBeUndefined();
     expect(result.clientId).toBe(CLIENT_ID);
     expect(payloads.update.clients).toHaveLength(1);
+    const claimUpdates = (payloads.update.purchase_requests ?? []).map(
+      (p) => p as Record<string, unknown>,
+    );
+    expect(claimUpdates.filter((p) => p.status === "pending")).toHaveLength(0);
+    expect(claimUpdates.filter((p) => p.paid_at)).toHaveLength(2); // claim + stale takeover
   });
 });
 
@@ -553,12 +564,14 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
       () => ok(baseProgram),
       () => ok(null), // claim update -> no row
       () => ok({ ...pendingRequest, status: "paid", client_id: CLIENT_ID }), // re-read
+      () => ok(existingClient), // load linked client
       () =>
         ok({
           payment_status: "paid",
           program_id: PROGRAM_ID,
           access_end_date: "2026-11-12T10:00:00.000Z",
         }),
+      () => ok({ id: "sched-1" }), // schedule exists
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -675,12 +688,15 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
       () => ok({ id: REQUEST_ID }), // claim
       () => ok(existingClient), // resolve
       () => ok(null), // link CAS loses the race
+      () => ok({ client_id: CLIENT_ID }), // re-read linked client_id
+      () => ok(existingClient), // load linked client
       () =>
         ok({
           payment_status: "pending",
           program_id: null,
           access_end_date: null,
         }), // completeness check: NOT activated yet
+      () => ok(null), // stale-link takeover fails (fresh paid_at)
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -699,12 +715,15 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
       () => ok({ id: REQUEST_ID }), // claim
       () => ok(existingClient), // resolve
       () => ok(null), // link CAS loses the race
+      () => ok({ client_id: CLIENT_ID }), // re-read linked client_id
+      () => ok(existingClient), // load linked client
       () =>
         ok({
           payment_status: "paid",
           program_id: PROGRAM_ID,
           access_end_date: "2026-11-12T10:00:00.000Z",
         }), // completeness check: already activated
+      () => ok({ id: "sched-1" }), // schedule exists
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -714,6 +733,50 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
     expect(result.alreadyActivated).toBe(true);
     expect(result.clientId).toBe(CLIENT_ID);
     expect(payloads.update.clients).toBeUndefined();
+  });
+
+  it("renews a stale linked activation by takeover when the client is incomplete", async () => {
+    vi.setSystemTime(new Date(NOW));
+    mockDb([
+      () => ok(pendingRequest),
+      () => ok(baseProgram),
+      () => ok({ id: REQUEST_ID }), // claim
+      () => ok(existingClient), // resolve
+      () => ok(null), // link CAS loses the race
+      () => ok({ client_id: CLIENT_ID }), // re-read linked client_id
+      () =>
+        ok({
+          ...existingClient,
+          program_id: PROGRAM_ID,
+          access_end_date: "2026-11-12T10:00:00.000Z",
+        }), // load linked client (same active program)
+      () =>
+        ok({
+          payment_status: "paid",
+          program_id: PROGRAM_ID,
+          access_end_date: "2026-11-12T10:00:00.000Z",
+        }), // client activated...
+      () => ok(null), // ...but schedule is missing
+      () => ok({ id: REQUEST_ID }), // stale-link takeover succeeds (paid_at older than 10 min)
+      () => ok({ error: null, data: null }), // clients update (dates preserved)
+      () => ok({ error: null, data: null }), // program_schedule delete
+      () => ok({ error: null, data: null }), // plan_pauses delete
+      () => ok({ error: null, data: null }), // messages insert
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.alreadyActivated).toBeUndefined();
+    expect(result.clientId).toBe(CLIENT_ID);
+    expect(payloads.update.clients).toHaveLength(1);
+    const clientUpdate = payloads.update.clients?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(clientUpdate.access_start_date).toBeUndefined(); // same active program: dates preserved
   });
 });
 
@@ -972,6 +1035,101 @@ describe("applyProgramActivation: coach notification", () => {
 
     expect(result.error).toBe("Некорректная длительность программы");
     expect(payloads.update.clients).toBeUndefined();
+  });
+
+  it("keeps access dates when the client already has the same active program", async () => {
+    vi.setSystemTime(new Date(NOW));
+    mockDb([
+      () => ok({ error: null, data: null }), // clients update
+      () => ok({ error: null, data: null }), // program_schedule delete
+      () => ok({ error: null, data: null }), // plan_pauses delete
+      () => ok({ error: null, data: null }), // messages insert
+    ]);
+
+    const result = await applyProgramActivation({
+      clientId: CLIENT_ID,
+      client: {
+        name: "Иван",
+        language: "ru",
+        telegram_id: null,
+        connect_code: null,
+        timezone: null,
+        program_id: PROGRAM_ID,
+        access_end_date: "2027-01-01T10:00:00.000Z",
+      },
+      programId: PROGRAM_ID,
+      programTitle: baseProgram.title,
+      price: 5900,
+      durationWeeks: 12,
+      amount: 5900,
+      contact: null,
+      coachId: COACH_ID,
+    });
+
+    expect(result.error).toBeUndefined();
+    const clientUpdate = payloads.update.clients?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(clientUpdate.access_start_date).toBeUndefined();
+    expect(clientUpdate.access_end_date).toBeUndefined();
+    expect(clientUpdate.program_id).toBe(PROGRAM_ID);
+  });
+
+  it("records the request telegram_id when the resolved client has none", async () => {
+    process.env.COACH_CHAT_ID = "777000";
+    mockDb([
+      () => ok({ error: null, data: null }), // clients update
+      () => ok({ error: null, data: null }), // program_schedule delete
+      () => ok({ error: null, data: null }), // plan_pauses delete
+      () => ok({ error: null, data: null }), // messages insert
+    ]);
+
+    const result = await applyProgramActivation({
+      clientId: CLIENT_ID,
+      client: {
+        name: "Иван",
+        language: "ru",
+        telegram_id: null,
+        connect_code: null,
+        timezone: null,
+        program_id: null,
+        access_end_date: null,
+      },
+      programId: PROGRAM_ID,
+      programTitle: baseProgram.title,
+      price: 5900,
+      durationWeeks: 12,
+      amount: 5900,
+      contact: null,
+      coachId: COACH_ID,
+      telegramIdToRecord: TG_ID,
+    });
+
+    expect(result.error).toBeUndefined();
+    const clientUpdate = payloads.update.clients?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(clientUpdate.telegram_id).toBe(TG_ID);
+    expect(sendTelegramMessage).toHaveBeenCalledWith(TG_ID, expect.any(String));
+  });
+});
+
+describe("toFiniteNumber", () => {
+  it("normalizes numeric strings and plain numbers", () => {
+    expect(toFiniteNumber(5900)).toBe(5900);
+    expect(toFiniteNumber("5900.50")).toBe(5900.5);
+  });
+
+  it("rejects empty, malformed, hex and exponent strings", () => {
+    expect(toFiniteNumber("")).toBeNull();
+    expect(toFiniteNumber("   ")).toBeNull();
+    expect(toFiniteNumber("abc")).toBeNull();
+    expect(toFiniteNumber("0x10")).toBeNull();
+    expect(toFiniteNumber("1e3")).toBeNull();
+    expect(toFiniteNumber(null)).toBeNull();
+    expect(toFiniteNumber(undefined)).toBeNull();
   });
 });
 

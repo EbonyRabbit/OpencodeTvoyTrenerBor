@@ -158,9 +158,12 @@ export async function deliverProgramInstructions(
   input: DeliverInstructionsInput,
 ): Promise<{ warning?: string }> {
   const text = buildProgramInstructions({
-    name: sanitizeText(input.clientName).slice(0, MAX_NAME_LENGTH),
+    name: truncateText(sanitizeText(input.clientName), MAX_NAME_LENGTH),
     language: input.clientLanguage,
-    programTitle: sanitizeText(input.programTitle).slice(0, MAX_NAME_LENGTH),
+    programTitle: truncateText(
+      sanitizeText(input.programTitle),
+      MAX_NAME_LENGTH,
+    ),
     accessEndDate: input.accessEndDate,
     connectCode: input.connectCode,
     botUsername: process.env.TELEGRAM_BOT_USERNAME ?? null,
@@ -209,7 +212,7 @@ export async function deliverProgramInstructions(
   };
 }
 
-function toPositiveNumber(value: unknown): number | null {
+export function toFiniteNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = Number(value);
@@ -218,7 +221,9 @@ function toPositiveNumber(value: unknown): number | null {
   return null;
 }
 
-export { toPositiveNumber };
+function truncateText(text: string, maxLength: number): string {
+  return Array.from(text).slice(0, maxLength).join("");
+}
 
 export function buildActivationCoachMessage({
   clientName,
@@ -240,8 +245,11 @@ export function buildActivationCoachMessage({
   accessEndDate: string;
 }): string {
   const cleanName =
-    sanitizeText(clientName).slice(0, MAX_NAME_LENGTH) || "Клиент";
-  const cleanProgram = sanitizeText(programTitle).slice(0, MAX_NAME_LENGTH);
+    truncateText(sanitizeText(clientName), MAX_NAME_LENGTH) || "Клиент";
+  const cleanProgram = truncateText(
+    sanitizeText(programTitle),
+    MAX_NAME_LENGTH,
+  );
   const priceLine =
     price !== null && price !== undefined
       ? `\nЦена: ${formatPrice(price)} ₽`
@@ -359,9 +367,13 @@ export async function applyProgramActivation({
 export async function activatePurchaseByOrder({
   orderId,
   coachId,
+  paymentStatus,
+  paidSum,
 }: {
   orderId: string;
   coachId: string | null;
+  paymentStatus?: string;
+  paidSum?: number | string | null;
 }): Promise<
   ActivationResult & {
     alreadyActivated?: boolean;
@@ -412,8 +424,38 @@ export async function activatePurchaseByOrder({
       return { error: "Некорректная длительность программы" };
     }
 
-    const price = toPositiveNumber(program.price);
-    const amount = toPositiveNumber(request.amount);
+    const price = toFiniteNumber(program.price);
+    const amount = toFiniteNumber(request.amount);
+
+    if (paymentStatus !== undefined && paymentStatus !== "success") {
+      console.error(
+        "[ACTIVATION] Payment not confirmed for",
+        orderId,
+        "status:",
+        paymentStatus,
+      );
+      return { error: "Платёж не подтверждён." };
+    }
+
+    const expectedAmount = amount ?? price;
+    if (
+      paymentStatus === "success" &&
+      expectedAmount !== null &&
+      expectedAmount > 0
+    ) {
+      const paid = toFiniteNumber(paidSum);
+      if (paid === null || paid < expectedAmount) {
+        console.error(
+          "[ACTIVATION] Payment sum mismatch for",
+          orderId,
+          "expected:",
+          expectedAmount,
+          "paid:",
+          paid,
+        );
+        return { error: "Сумма оплаты не совпадает с ожидаемой." };
+      }
+    }
 
     const { data: claimed, error: claimError } = await supabaseAdmin
       .from("purchase_requests")
@@ -469,6 +511,37 @@ export async function activatePurchaseByOrder({
     const clientId = resolution.clientId;
     const client = resolution.client;
 
+    const { data: linked, error: linkError } = await supabaseAdmin
+      .from("purchase_requests")
+      .update({ client_id: clientId })
+      .eq("id", request.id)
+      .eq("status", "paid")
+      .is("client_id", null)
+      .select("id")
+      .maybeSingle();
+    if (linkError) {
+      console.error(
+        "[ACTIVATION] request->client link failed:",
+        linkError.message,
+      );
+      return { error: "Ошибка обновления заказа.", requestId: request.id };
+    }
+    if (!linked) {
+      const complete = await isClientActivated(clientId, request.program_id);
+      if (complete) {
+        return {
+          alreadyActivated: true,
+          requestId: request.id,
+          clientId,
+        };
+      }
+      return {
+        error: "Активация уже выполняется. Повторите запрос позднее.",
+        requestId: request.id,
+        clientId,
+      };
+    }
+
     const activation = await applyProgramActivation({
       clientId,
       client,
@@ -480,54 +553,11 @@ export async function activatePurchaseByOrder({
       contact: request.contact,
       coachId,
     });
-    if (activation.error) {
-      await rollbackClaim(request.id, clientId, resolution.created);
-      return { ...activation, requestId: request.id, clientId };
-    }
-
-    const { error: linkError } = await supabaseAdmin
-      .from("purchase_requests")
-      .update({ client_id: clientId })
-      .eq("id", request.id)
-      .eq("status", "paid");
-    if (linkError) {
-      console.error(
-        "[ACTIVATION] request->client link failed:",
-        linkError.message,
-      );
-    }
 
     return { ...activation, requestId: request.id, clientId };
   } catch (e) {
     console.error("[ACTIVATION] activatePurchaseByOrder error:", e);
     return { error: "Произошла ошибка при активации." };
-  }
-}
-
-async function rollbackClaim(
-  requestId: string,
-  clientId: string,
-  clientCreated: boolean,
-): Promise<void> {
-  const { error: revertError } = await supabaseAdmin
-    .from("purchase_requests")
-    .update({ status: "pending", paid_at: null, client_id: null })
-    .eq("id", requestId)
-    .eq("status", "paid");
-  if (revertError) {
-    console.error("[ACTIVATION] Claim rollback failed:", revertError.message);
-  }
-  if (clientCreated) {
-    const { error: deleteError } = await supabaseAdmin
-      .from("clients")
-      .delete()
-      .eq("id", clientId);
-    if (deleteError) {
-      console.error(
-        "[ACTIVATION] Created client cleanup failed:",
-        deleteError.message,
-      );
-    }
   }
 }
 
@@ -608,6 +638,26 @@ async function resolveOrCreateClient(
       return { ok: false, error: "Ошибка при поиске клиента." };
     }
     client = c as ClientForInstructions | null;
+    if (
+      client &&
+      request.telegram_id !== null &&
+      request.telegram_id !== undefined &&
+      client.telegram_id !== null &&
+      client.telegram_id !== request.telegram_id
+    ) {
+      console.error(
+        "[ACTIVATION] Telegram mismatch for client",
+        clientId,
+        "expected",
+        request.telegram_id,
+        "actual",
+        client.telegram_id,
+      );
+      return {
+        ok: false,
+        error: "Данные клиента не совпадают. Свяжитесь с тренером.",
+      };
+    }
   }
 
   if (!clientId || !client) {
@@ -616,12 +666,15 @@ async function resolveOrCreateClient(
       now.getTime() + durationWeeks * 7 * 24 * 60 * 60 * 1000,
     );
     const name =
-      sanitizeText(
-        [request.first_name, request.last_name]
-          .filter(Boolean)
-          .join(" ")
-          .trim() || request.name,
-      ).slice(0, MAX_NAME_LENGTH) || "Клиент";
+      truncateText(
+        sanitizeText(
+          [request.first_name, request.last_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || request.name,
+        ),
+        MAX_NAME_LENGTH,
+      ) || "Клиент";
     const consentAt = request.consent_at ?? null;
 
     const { data: createdClient, error: createError } = await supabaseAdmin

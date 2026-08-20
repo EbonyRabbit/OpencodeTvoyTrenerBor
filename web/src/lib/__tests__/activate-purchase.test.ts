@@ -38,6 +38,7 @@ type ChainRes = {
 const payloads = {
   update: {} as Record<string, unknown[]>,
   insert: {} as Record<string, unknown[]>,
+  delete: {} as Record<string, unknown[]>,
 };
 
 function record(
@@ -56,6 +57,7 @@ function mockDb(calls: Array<() => Promise<ChainRes>>) {
     const link = {
       select: () => link,
       eq: () => link,
+      is: () => link,
       update: (payload?: unknown) => {
         if (payload !== undefined) record(payloads.update, table, payload);
         return link;
@@ -122,7 +124,7 @@ function err(message: string, code?: string): Promise<ChainRes> {
   return Promise.resolve({ data: null, error: { message, code } });
 }
 
-/** [request, program, claim, client-resolve?, update, sched, pauses, connect?, messages, link] */
+/** [request, program, claim, client-resolve?, link-CAS, update, sched, pauses, connect?, messages] */
 function fullFlow(
   resolve: Array<() => Promise<ChainRes>>,
   opts: { request?: Record<string, unknown>; withConnectCode?: boolean } = {},
@@ -135,12 +137,12 @@ function fullFlow(
     () => ok(baseProgram),
     () => ok({ id: REQUEST_ID }), // claim
     ...resolve,
+    () => ok({ id: REQUEST_ID }), // link CAS (client_id set)
     () => ok({ error: null, data: null }), // clients update
     () => ok({ error: null, data: null }), // program_schedule delete
     () => ok({ error: null, data: null }), // plan_pauses delete
     ...(opts.withConnectCode ? [() => ok({ error: null, data: null })] : []), // connect-code update
     () => ok({ error: null, data: null }), // messages insert
-    () => ok({ error: null, data: null }), // request->client link update
   ];
 }
 
@@ -228,6 +230,63 @@ describe("activatePurchaseByOrder: argument checks", () => {
   });
 });
 
+describe("activatePurchaseByOrder: payment verification", () => {
+  it("rejects a non-success payment status before any write", async () => {
+    mockDb([() => ok(pendingRequest), () => ok(baseProgram)]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+      paymentStatus: "failed",
+    });
+    expect(result.error).toBe("Платёж не подтверждён.");
+    expect(payloads.update.purchase_requests).toBeUndefined();
+    expect(payloads.insert.clients).toBeUndefined();
+  });
+
+  it("rejects a paid sum below the expected amount", async () => {
+    mockDb([() => ok(pendingRequest), () => ok(baseProgram)]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+      paymentStatus: "success",
+      paidSum: 5000,
+    });
+    expect(result.error).toBe("Сумма оплаты не совпадает с ожидаемой.");
+    expect(payloads.update.purchase_requests).toBeUndefined();
+    expect(payloads.insert.clients).toBeUndefined();
+  });
+
+  it("activates when the paid sum matches the request amount", async () => {
+    mockDb([
+      ...fullFlow([() => ok(existingClient)], { withConnectCode: true }),
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+      paymentStatus: "success",
+      paidSum: 5900,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.clientId).toBe(CLIENT_ID);
+  });
+
+  it("activates without payment verification when the caller is manual (markPurchased)", async () => {
+    mockDb([
+      ...fullFlow([() => ok(existingClient)], { withConnectCode: true }),
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.clientId).toBe(CLIENT_ID);
+  });
+});
+
 describe("activatePurchaseByOrder: idempotency for paid requests", () => {
   it("returns alreadyActivated when the client is fully activated", async () => {
     mockDb([
@@ -272,7 +331,6 @@ describe("activatePurchaseByOrder: idempotency for paid requests", () => {
       () => ok({ error: null, data: null }), // program_schedule delete
       () => ok({ error: null, data: null }), // plan_pauses delete
       () => ok({ error: null, data: null }), // messages insert
-      () => ok({ error: null, data: null }), // link update
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -389,6 +447,24 @@ describe("activatePurchaseByOrder: client resolution", () => {
     const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     const clientsCalls = fake.from.mock.calls.filter((c) => c[0] === "clients");
     expect(clientsCalls).toHaveLength(2); // id lookup + activation update
+  });
+
+  it("rejects when the resolved client's telegram_id does not match the request", async () => {
+    mockDb([
+      () => ok({ ...pendingRequest, client_id: CLIENT_ID, telegram_id: 999 }),
+      () => ok(baseProgram),
+      () => ok({ id: REQUEST_ID }), // claim
+      () => ok(existingClient), // id lookup -> telegram_id is TG_ID (777), not 999
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toContain("не совпадают");
+    expect(result.requestId).toBe(REQUEST_ID);
+    expect(payloads.update.clients).toBeUndefined();
+    expect(payloads.insert.clients).toBeUndefined();
   });
 
   it("retries by telegram_id when client creation hits a 23505 race", async () => {
@@ -512,60 +588,23 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
     expect(payloads.insert.clients).toBeUndefined();
   });
 
-  it("rolls the claim back and cleans up the created client when activation fails", async () => {
+  it("keeps the claim paid and keeps the created client when activation fails", async () => {
     (generateSchedule as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
       {
         error: "план не создался",
       },
     );
-    const queue = [
+    mockDb([
       () => ok(pendingRequest),
       () => ok(baseProgram),
       () => ok({ id: REQUEST_ID }), // claim
       () => ok({ id: CLIENT_ID }), // insert -> created client
+      () => ok({ id: REQUEST_ID }), // link CAS
       () => ok({ error: null, data: null }), // clients update
       () => ok({ error: null, data: null }), // program_schedule delete
       () => ok({ error: null, data: null }), // plan_pauses delete
-      // generateSchedule fails -> no messages, no link
-      () => ok({ error: null, data: null }), // claim rollback (pending, paid_at null, client_id null)
-    ];
-    mockDb(queue);
-    const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
-    const deleteCalls: Array<unknown[]> = [];
-    fake.from.mockImplementation((table: string) => {
-      const link = {
-        select: () => link,
-        eq: () => link,
-        update: (payload?: unknown) => {
-          if (payload !== undefined) record(payloads.update, table, payload);
-          return link;
-        },
-        delete: () => {
-          deleteCalls.push([table]);
-          return link;
-        },
-        insert: (payload?: unknown) => {
-          if (payload !== undefined) record(payloads.insert, table, payload);
-          return link;
-        },
-        maybeSingle: () => {
-          const step = queue[0];
-          queue.shift();
-          if (!step) return Promise.resolve({ data: null, error: null });
-          return step();
-        },
-        then: (onFulfilled: (v: ChainRes) => unknown) => {
-          const step = queue[0];
-          queue.shift();
-          if (!step)
-            return Promise.resolve({ data: null, error: null }).then(
-              onFulfilled,
-            );
-          return Promise.resolve(step()).then(onFulfilled);
-        },
-      };
-      return link;
-    });
+      // generateSchedule fails -> no messages
+    ]);
 
     const result = await activatePurchaseByOrder({
       orderId: ORDER_ID,
@@ -574,14 +613,13 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
     expect(result.error).toContain("расписание");
     expect(result.requestId).toBe(REQUEST_ID);
     expect(result.clientId).toBe(CLIENT_ID);
-
-    const rollback = payloads.update.purchase_requests?.find(
-      (p) => (p as Record<string, unknown>).status === "pending",
-    ) as Record<string, unknown>;
-    expect(rollback.paid_at).toBeNull();
-    expect(rollback.client_id).toBeNull();
-
-    expect(deleteCalls.some((c) => c[0] === "clients")).toBe(true);
+    expect(
+      payloads.update.purchase_requests?.some(
+        (p) => (p as Record<string, unknown>).status === "pending",
+      ),
+    ).toBe(false);
+    expect(payloads.insert.clients).toHaveLength(1);
+    expect(payloads.delete.clients ?? []).toHaveLength(0);
   });
 
   it("returns an error when the claim itself fails", async () => {
@@ -600,7 +638,7 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
     expect(payloads.insert.clients).toBeUndefined();
   });
 
-  it("keeps the claim when activation fails for a pre-existing client (no cleanup delete)", async () => {
+  it("keeps the claim paid when activation fails for a pre-existing client", async () => {
     (generateSchedule as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
       {
         error: "план не создался",
@@ -611,24 +649,71 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
       () => ok(baseProgram),
       () => ok({ id: REQUEST_ID }), // claim
       () => ok(existingClient), // resolve existing client
+      () => ok({ id: REQUEST_ID }), // link CAS
       () => ok({ error: null, data: null }), // clients update
       () => ok({ error: null, data: null }), // program_schedule delete
       () => ok({ error: null, data: null }), // plan_pauses delete
-      () => ok({ error: null, data: null }), // claim rollback
     ]);
-    const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
-    const deleteCalls = fake.from.mock.calls.filter((c) => c[0] === "clients");
 
     const result = await activatePurchaseByOrder({
       orderId: ORDER_ID,
       coachId: COACH_ID,
     });
     expect(result.error).toContain("расписание");
-    expect(deleteCalls).toHaveLength(0);
-    const rollback = payloads.update.purchase_requests?.find(
-      (p) => (p as Record<string, unknown>).status === "pending",
-    ) as Record<string, unknown>;
-    expect(rollback.client_id).toBeNull();
+    expect(payloads.delete.clients ?? []).toHaveLength(0);
+    expect(
+      payloads.update.purchase_requests?.some(
+        (p) => (p as Record<string, unknown>).status === "pending",
+      ),
+    ).toBe(false);
+  });
+
+  it("reports in-progress when the link loses a race and the client is not yet activated", async () => {
+    mockDb([
+      () => ok(pendingRequest),
+      () => ok(baseProgram),
+      () => ok({ id: REQUEST_ID }), // claim
+      () => ok(existingClient), // resolve
+      () => ok(null), // link CAS loses the race
+      () =>
+        ok({
+          payment_status: "pending",
+          program_id: null,
+          access_end_date: null,
+        }), // completeness check: NOT activated yet
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toContain("уже выполняется");
+    expect(result.clientId).toBe(CLIENT_ID);
+    expect(payloads.update.clients).toBeUndefined();
+  });
+
+  it("reports alreadyActivated when the link loses a race and the client is activated", async () => {
+    mockDb([
+      () => ok(pendingRequest),
+      () => ok(baseProgram),
+      () => ok({ id: REQUEST_ID }), // claim
+      () => ok(existingClient), // resolve
+      () => ok(null), // link CAS loses the race
+      () =>
+        ok({
+          payment_status: "paid",
+          program_id: PROGRAM_ID,
+          access_end_date: "2026-11-12T10:00:00.000Z",
+        }), // completeness check: already activated
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.alreadyActivated).toBe(true);
+    expect(result.clientId).toBe(CLIENT_ID);
+    expect(payloads.update.clients).toBeUndefined();
   });
 });
 
@@ -726,7 +811,7 @@ describe("activatePurchaseByOrder: numeric values from PostgREST (numeric as str
       () => ok({ ...baseProgram, price: "5900.00" }),
       () => ok({ id: REQUEST_ID }),
       () => ok(existingClient), // telegram lookup hit
-      () => ok({ error: null, data: null }),
+      () => ok({ id: REQUEST_ID }), // link CAS
       () => ok({ error: null, data: null }),
       () => ok({ error: null, data: null }),
       () => ok({ error: null, data: null }),

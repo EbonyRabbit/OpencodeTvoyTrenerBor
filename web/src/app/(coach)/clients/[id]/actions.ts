@@ -13,7 +13,7 @@ import {
   notifyClientForProgram,
   generateConnectCodeFor,
   applyProgramActivation,
-  toPositiveNumber,
+  toFiniteNumber,
   type ClientForInstructions,
 } from "@/lib/activate-purchase";
 import type { ActivityEvent } from "./activity-types";
@@ -527,6 +527,9 @@ export async function markPurchased(
       return { error: "Нет прав" };
     }
     if (!UUID_RE.test(clientId)) return { error: "Некорректный идентификатор" };
+    if (!UUID_RE.test(programId)) {
+      return { error: "Некорректный идентификатор программы" };
+    }
 
     const { data: client } = await supabaseAdmin
       .from("clients")
@@ -549,7 +552,7 @@ export async function markPurchased(
       client,
       programId,
       programTitle: program.title,
-      price: toPositiveNumber(program.price),
+      price: toFiniteNumber(program.price),
       durationWeeks: program.duration_weeks,
       amount: null,
       contact: null,

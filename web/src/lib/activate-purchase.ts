@@ -7,6 +7,9 @@ import { UUID_REGEX, formatContact, sanitizeText } from "@/lib/validation";
 import { formatPrice } from "@/lib/format-price";
 
 const MAX_NAME_LENGTH = 120;
+const STALE_LINK_MS = 10 * 60 * 1000;
+const CLIENT_SELECT_COLUMNS =
+  "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date";
 
 export async function generateConnectCodeFor(
   clientId: string,
@@ -340,7 +343,17 @@ export async function applyProgramActivation({
     telegramIdToRecord !== undefined &&
     client.telegram_id === null
   ) {
-    update.telegram_id = telegramIdToRecord;
+    const { error: telegramError } = await supabaseAdmin
+      .from("clients")
+      .update({ telegram_id: telegramIdToRecord })
+      .eq("id", clientId)
+      .is("telegram_id", null);
+    if (telegramError) {
+      console.error(
+        "[ACTIVATION] Telegram link failed:",
+        telegramError.message,
+      );
+    }
   }
   if (!sameActiveProgram) {
     update.access_start_date = now.toISOString();
@@ -468,11 +481,15 @@ export async function activatePurchaseByOrder({
     }
 
     const expectedAmount = amount ?? price;
-    if (
-      paymentStatus === "success" &&
-      expectedAmount !== null &&
-      expectedAmount > 0
-    ) {
+    if (paymentStatus === "success") {
+      if (expectedAmount === null || expectedAmount <= 0) {
+        console.error(
+          "[ACTIVATION] Cannot verify payment for",
+          orderId,
+          "- no usable amount",
+        );
+        return { error: "Не удалось проверить сумму оплаты." };
+      }
       const paid = toFiniteNumber(paidSum);
       if (paid === null || paid < expectedAmount) {
         console.error(
@@ -508,7 +525,7 @@ export async function activatePurchaseByOrder({
     if (!claimed) {
       const { data: current } = await supabaseAdmin
         .from("purchase_requests")
-        .select("status, client_id")
+        .select("status, client_id, paid_at")
         .eq("id", request.id)
         .maybeSingle();
       if (current?.status !== "paid") {
@@ -518,14 +535,8 @@ export async function activatePurchaseByOrder({
         const recovered = await recoverLinkedRequest({
           requestId: request.id,
           clientId: current.client_id,
+          paidAt: current.paid_at ?? null,
           programId: request.program_id,
-          programTitle: program.title,
-          price,
-          amount,
-          durationWeeks: program.duration_weeks,
-          contact: request.contact,
-          coachId,
-          telegramIdToRecord: request.telegram_id,
         });
         if (recovered.kind === "alreadyActivated") {
           return {
@@ -583,7 +594,7 @@ export async function activatePurchaseByOrder({
       if (!linked) {
         const { data: current } = await supabaseAdmin
           .from("purchase_requests")
-          .select("client_id")
+          .select("client_id, paid_at")
           .eq("id", request.id)
           .maybeSingle();
         const linkedClientId = current?.client_id ?? null;
@@ -613,14 +624,8 @@ export async function activatePurchaseByOrder({
         const recovered = await recoverLinkedRequest({
           requestId: request.id,
           clientId: linkedClientId,
+          paidAt: current?.paid_at ?? null,
           programId: request.program_id,
-          programTitle: program.title,
-          price,
-          amount,
-          durationWeeks: program.duration_weeks,
-          contact: request.contact,
-          coachId,
-          telegramIdToRecord: request.telegram_id,
         });
         if (recovered.kind === "alreadyActivated") {
           return {
@@ -661,8 +666,6 @@ export async function activatePurchaseByOrder({
   }
 }
 
-const STALE_LINK_MS = 10 * 60 * 1000;
-
 type RecoveryOutcome =
   | { kind: "alreadyActivated"; clientId: string }
   | { kind: "takeover"; clientId: string; client: ClientForInstructions }
@@ -671,33 +674,42 @@ type RecoveryOutcome =
 async function recoverLinkedRequest({
   requestId,
   clientId,
+  paidAt,
   programId,
-  programTitle,
-  price,
-  amount,
-  durationWeeks,
-  contact,
-  coachId,
-  telegramIdToRecord,
 }: {
   requestId: string;
   clientId: string;
+  paidAt: string | null;
   programId: string;
-  programTitle: string;
-  price: number | null;
-  amount: number | null;
-  durationWeeks: number;
-  contact: string | null;
-  coachId: string | null;
-  telegramIdToRecord: number | null;
 }): Promise<RecoveryOutcome> {
-  const linkedClient = await loadClientForInstructions(clientId);
-  if (!linkedClient) return { kind: "inProgress", clientId };
+  const loaded = await loadClientForInstructions(clientId);
+  if (!loaded.ok) {
+    if (loaded.notFound) {
+      const { error: unlinkError } = await supabaseAdmin
+        .from("purchase_requests")
+        .update({ client_id: null })
+        .eq("id", requestId)
+        .eq("status", "paid")
+        .eq("client_id", clientId);
+      if (unlinkError) {
+        console.error(
+          "[ACTIVATION] Stale link cleanup failed:",
+          unlinkError.message,
+        );
+      }
+    }
+    return { kind: "inProgress", clientId };
+  }
+  const linkedClient = loaded.client;
 
   const activated = await isClientActivated(clientId, programId);
   if (activated) {
     const hasSchedule = await hasScheduleFor(clientId);
-    if (hasSchedule) return { kind: "alreadyActivated", clientId };
+    if (hasSchedule) {
+      if (!paidAt || (await hasInstructionsFor(clientId, paidAt))) {
+        return { kind: "alreadyActivated", clientId };
+      }
+    }
   }
 
   const staleCutoff = new Date(Date.now() - STALE_LINK_MS).toISOString();
@@ -721,19 +733,20 @@ async function recoverLinkedRequest({
 
 async function loadClientForInstructions(
   clientId: string,
-): Promise<ClientForInstructions | null> {
+): Promise<
+  { ok: true; client: ClientForInstructions } | { ok: false; notFound: boolean }
+> {
   const { data, error } = await supabaseAdmin
     .from("clients")
-    .select(
-      "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
-    )
+    .select(CLIENT_SELECT_COLUMNS)
     .eq("id", clientId)
     .maybeSingle();
   if (error) {
     console.error("[ACTIVATION] Client lookup error:", error.message);
-    return null;
+    return { ok: false, notFound: false };
   }
-  return data as ClientForInstructions | null;
+  if (!data) return { ok: false, notFound: true };
+  return { ok: true, client: data as ClientForInstructions };
 }
 
 async function hasScheduleFor(clientId: string): Promise<boolean> {
@@ -743,7 +756,30 @@ async function hasScheduleFor(clientId: string): Promise<boolean> {
     .eq("client_id", clientId)
     .limit(1)
     .maybeSingle();
-  return !error && data !== null;
+  if (error) {
+    console.error("[ACTIVATION] Schedule lookup error:", error.message);
+    return false;
+  }
+  return data !== null;
+}
+
+async function hasInstructionsFor(
+  clientId: string,
+  sinceIso: string,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("messages")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("direction", "to_client")
+    .gte("sent_at", sinceIso)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("[ACTIVATION] Instructions lookup error:", error.message);
+    return false;
+  }
+  return data !== null;
 }
 
 async function isClientActivated(
@@ -755,7 +791,10 @@ async function isClientActivated(
     .select("payment_status, program_id, access_end_date")
     .eq("id", clientId)
     .maybeSingle();
-  if (error) return false;
+  if (error) {
+    console.error("[ACTIVATION] Client status lookup error:", error.message);
+    return false;
+  }
   if (client?.program_id !== programId || client.payment_status !== "paid") {
     return false;
   }
@@ -801,9 +840,7 @@ async function resolveOrCreateClient(
   ) {
     const { data: existing, error: lookupError } = await supabaseAdmin
       .from("clients")
-      .select(
-        "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
-      )
+      .select(CLIENT_SELECT_COLUMNS)
       .eq("telegram_id", request.telegram_id)
       .maybeSingle();
     if (lookupError) {
@@ -817,9 +854,7 @@ async function resolveOrCreateClient(
   if (clientId && !client) {
     const { data: c, error: cErr } = await supabaseAdmin
       .from("clients")
-      .select(
-        "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
-      )
+      .select(CLIENT_SELECT_COLUMNS)
       .eq("id", clientId)
       .maybeSingle();
     if (cErr) {
@@ -892,9 +927,7 @@ async function resolveOrCreateClient(
     if (createError?.code === "23505" && request.telegram_id !== null) {
       const { data: existing, error: lookupError } = await supabaseAdmin
         .from("clients")
-        .select(
-          "id, name, language, telegram_id, connect_code, timezone, program_id, access_end_date",
-        )
+        .select(CLIENT_SELECT_COLUMNS)
         .eq("telegram_id", request.telegram_id)
         .maybeSingle();
       if (lookupError) {

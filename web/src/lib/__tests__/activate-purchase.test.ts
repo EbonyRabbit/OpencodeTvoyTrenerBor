@@ -60,6 +60,7 @@ function mockDb(calls: Array<() => Promise<ChainRes>>) {
       eq: () => link,
       is: () => link,
       lt: () => link,
+      gte: () => link,
       limit: () => link,
       update: (payload?: unknown) => {
         if (payload !== undefined) record(payloads.update, table, payload);
@@ -261,6 +262,23 @@ describe("activatePurchaseByOrder: payment verification", () => {
     expect(payloads.insert.clients).toBeUndefined();
   });
 
+  it("refuses to verify when neither request amount nor program price is usable", async () => {
+    mockDb([
+      () => ok({ ...pendingRequest, amount: null }),
+      () => ok({ ...baseProgram, price: null }),
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+      paymentStatus: "success",
+      paidSum: 1,
+    });
+    expect(result.error).toBe("Не удалось проверить сумму оплаты.");
+    expect(payloads.update.purchase_requests).toBeUndefined();
+    expect(payloads.insert.clients).toBeUndefined();
+  });
+
   it("activates when the paid sum matches the request amount", async () => {
     mockDb([
       ...fullFlow([() => ok(existingClient)], { withConnectCode: true }),
@@ -305,6 +323,7 @@ describe("activatePurchaseByOrder: idempotency for paid requests", () => {
           access_end_date: "2026-11-12T10:00:00.000Z",
         }), // activation completeness check
       () => ok({ id: "sched-1" }), // schedule exists
+      () => ok({ id: "msg-1" }), // instructions message exists
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -352,6 +371,69 @@ describe("activatePurchaseByOrder: idempotency for paid requests", () => {
     );
     expect(claimUpdates.filter((p) => p.status === "pending")).toHaveLength(0);
     expect(claimUpdates.filter((p) => p.paid_at)).toHaveLength(2); // claim + stale takeover
+  });
+
+  it("takes over when the client is activated with a schedule but instructions were never delivered", async () => {
+    vi.setSystemTime(new Date(NOW));
+    mockDb([
+      () => ok(pendingRequest),
+      () => ok(baseProgram),
+      () => ok({ id: REQUEST_ID }), // claim
+      () => ok(existingClient), // resolve
+      () => ok(null), // link CAS loses the race
+      () => ok({ client_id: CLIENT_ID, paid_at: "2026-08-20T09:00:00.000Z" }), // re-read linked client_id
+      () =>
+        ok({
+          ...existingClient,
+          program_id: PROGRAM_ID,
+          access_end_date: "2026-11-12T10:00:00.000Z",
+        }), // load linked client
+      () =>
+        ok({
+          payment_status: "paid",
+          program_id: PROGRAM_ID,
+          access_end_date: "2026-11-12T10:00:00.000Z",
+        }), // client activated
+      () => ok({ id: "sched-1" }), // schedule exists...
+      () => ok(null), // ...but no instructions message since paid_at
+      () => ok({ id: REQUEST_ID }), // stale-link takeover succeeds
+      () => ok({ error: null, data: null }), // clients update (dates preserved)
+      () => ok({ error: null, data: null }), // program_schedule delete
+      () => ok({ error: null, data: null }), // plan_pauses delete
+      () => ok({ error: null, data: null }), // messages insert (delivery retried)
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.alreadyActivated).toBeUndefined();
+    expect(payloads.update.clients).toHaveLength(1);
+  });
+
+  it("unlinks the request and reports in-progress when the linked client was deleted", async () => {
+    mockDb([
+      () => ok(pendingRequest),
+      () => ok(baseProgram),
+      () => ok(null), // claim loses the race
+      () => ok({ ...pendingRequest, status: "paid", client_id: CLIENT_ID }), // re-read
+      () => ok(null), // load linked client -> gone (deleted)
+      () => ok({ error: null, data: null }), // unlink update (client_id = null)
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toContain("уже выполняется");
+    const unlinkUpdate = payloads.update.purchase_requests?.find(
+      (p) =>
+        (p as Record<string, unknown>).client_id === null &&
+        (p as Record<string, unknown>).status === undefined,
+    ) as Record<string, unknown> | undefined;
+    expect(unlinkUpdate).toBeDefined();
+    expect(payloads.insert.clients).toBeUndefined();
   });
 });
 
@@ -572,6 +654,7 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
           access_end_date: "2026-11-12T10:00:00.000Z",
         }),
       () => ok({ id: "sched-1" }), // schedule exists
+      () => ok({ id: "msg-1" }), // instructions message exists
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -724,6 +807,7 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
           access_end_date: "2026-11-12T10:00:00.000Z",
         }), // completeness check: already activated
       () => ok({ id: "sched-1" }), // schedule exists
+      () => ok({ id: "msg-1" }), // instructions message exists
     ]);
 
     const result = await activatePurchaseByOrder({
@@ -1079,6 +1163,7 @@ describe("applyProgramActivation: coach notification", () => {
   it("records the request telegram_id when the resolved client has none", async () => {
     process.env.COACH_CHAT_ID = "777000";
     mockDb([
+      () => ok({ error: null, data: null }), // telegram CAS update (telegram_id null -> record)
       () => ok({ error: null, data: null }), // clients update
       () => ok({ error: null, data: null }), // program_schedule delete
       () => ok({ error: null, data: null }), // plan_pauses delete
@@ -1107,11 +1192,12 @@ describe("applyProgramActivation: coach notification", () => {
     });
 
     expect(result.error).toBeUndefined();
-    const clientUpdate = payloads.update.clients?.[0] as Record<
+    expect(payloads.update.clients).toHaveLength(2);
+    const telegramUpdate = payloads.update.clients?.[0] as Record<
       string,
       unknown
     >;
-    expect(clientUpdate.telegram_id).toBe(TG_ID);
+    expect(telegramUpdate.telegram_id).toBe(TG_ID);
     expect(sendTelegramMessage).toHaveBeenCalledWith(TG_ID, expect.any(String));
   });
 });

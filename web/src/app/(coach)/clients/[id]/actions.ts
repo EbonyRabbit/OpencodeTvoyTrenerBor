@@ -684,10 +684,16 @@ export async function createPaymentLink(
 
     const { data: client } = await supabaseAdmin
       .from("clients")
-      .select("id, name, telegram_id")
+      .select("id, name, telegram_id, client_consent_given, client_consent_version")
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
+    if (!client.client_consent_given) {
+      return {
+        error:
+          "Клиент не принял политику конфиденциальности — отправьте согласие через портал или бота",
+      };
+    }
 
     const { data: program } = await supabaseAdmin
       .from("programs")
@@ -734,14 +740,13 @@ export async function createPaymentLink(
           contact: "panel",
           telegram_id: client.telegram_id,
           sub_type: "program",
-          // Согласие: панельная ссылка создаётся тренером для СУЩЕСТВУЮЩЕГО
-          // клиента, который уже дал согласие при подключении/покупке
-          // (client_consent_*). Без consent_given=true вебхук отклонит
-          // активацию уже оплаченной заявки (fail-closed). Сам факт оплаты
-          // клиент совершает лично на странице Продамуса.
+          // Согласие: панельная ссылка создаётся тренером для клиента,
+          // который УЖЕ принял политику (проверено выше — client_consent_given).
+          // Без consent_given=true вебхук отклонил бы активацию уже
+          // оплаченной заявки (fail-closed). Фиксируем версию политики клиента.
           consent_given: true,
           consent_at: new Date().toISOString(),
-          consent_version: PRIVACY_POLICY_VERSION,
+          consent_version: client.client_consent_version ?? PRIVACY_POLICY_VERSION,
         });
       const { error: insertError } = await insert();
       if (insertError?.code === "23505") {
@@ -800,12 +805,15 @@ export async function sendPaymentLinkToClient(
 
     const { data: client } = await supabaseAdmin
       .from("clients")
-      .select("id, telegram_id")
+      .select("id, telegram_id, client_consent_given")
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
     if (client.telegram_id == null) {
       return { error: "Клиент не подключён к боту" };
+    }
+    if (!client.client_consent_given) {
+      return { error: "Клиент отозвал согласие на обработку данных" };
     }
 
     const { data: request } = await supabaseAdmin
@@ -864,6 +872,8 @@ export async function sendPaymentLinkToClient(
       `Оплата программы «${programTitle}»${amountText}:\n\n${url}`,
     );
     if (!sent) {
+      // Снимаем троттлинг, чтобы тренер мог повторить отправку сразу
+      await supabaseAdmin.from("bot_dedup").delete().eq("key", sendDedupKey);
       return { error: "Не удалось отправить сообщение в Telegram" };
     }
     return {};

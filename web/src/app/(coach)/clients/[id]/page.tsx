@@ -82,6 +82,7 @@ export default async function ClientProfilePage({
     checkinHistoryResult,
     measurementHistoryResult,
     workoutLogsResult,
+    purchaseRequestsResult,
     // latestPhotosResult, // DISABLED: photo storage removed
   ] = await Promise.all([
     safeFetch(
@@ -109,6 +110,19 @@ export default async function ClientProfilePage({
     ),
     safeFetch(
       supabase.from("workout_logs").select("date, exercise, week, day_order").eq("client_id", id),
+      [],
+    ),
+    safeFetch(
+      (() => {
+        const query = supabase
+          .from("purchase_requests")
+          .select("id, sub_type, status, amount, created_at, paid_at, program:programs!purchase_requests_program_id_fkey(id, title)")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        return typedClient.telegram_id != null
+          ? query.or(`client_id.eq.${id},and(client_id.is.null,telegram_id.eq.${typedClient.telegram_id})`)
+          : query.eq("client_id", id);
+      })(),
       [],
     ),
     // safeFetch( // DISABLED: photo storage removed
@@ -162,6 +176,7 @@ export default async function ClientProfilePage({
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
         purchasedProgramName={purchasedProgramName}
+        purchaseRequests={purchaseRequestsResult.data ?? []}
       />
     </div>
   );

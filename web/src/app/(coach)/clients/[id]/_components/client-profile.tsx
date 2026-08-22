@@ -39,6 +39,10 @@ type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], 
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
 type CheckinHistoryRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress">;
 type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
+type PurchaseRequestRow = Pick<
+  Database["public"]["Tables"]["purchase_requests"]["Row"],
+  "id" | "sub_type" | "status" | "amount" | "created_at" | "paid_at"
+> & { program: { id: string; title: string } | null };
 // type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url"> & { resolvedUrl: string | null }; // DISABLED: photo storage removed
 
 const MEASUREMENT_DAY_LABELS: Record<number, string> = Object.fromEntries(
@@ -48,6 +52,26 @@ const MEASUREMENT_DAY_LABELS: Record<number, string> = Object.fromEntries(
 const WEEKDAY_LABELS: Record<number, string> = Object.fromEntries(
   CHECKIN_DAY_OPTIONS.map((o) => [o.value, o.label])
 ) as Record<number, string>;
+
+const PURCHASE_REQUEST_STATUS_LABELS: Record<string, string> = {
+  pending: "Ожидает оплаты",
+  paid: "Оплачено",
+  cancelled: "Отменена",
+};
+
+const PURCHASE_REQUEST_STATUS_VARIANTS: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  pending: "secondary",
+  paid: "default",
+  cancelled: "destructive",
+};
+
+const PURCHASE_SUB_TYPE_LABELS: Record<string, string> = {
+  program: "Программа",
+  individ: "Индивидуальное ведение",
+};
 
 function formatDate(date: string | null): string {
   if (!date) return "—";
@@ -93,6 +117,11 @@ function daysSince(date: string | null): number | null {
   } catch {
     return null;
   }
+}
+
+function formatAmount(amount: number | null): string {
+  if (amount == null) return "—";
+  return `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`;
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -192,6 +221,7 @@ export function ClientProfile({
   loadMoreActivity,
   // latestPhotos, // DISABLED: photo storage removed
   purchasedProgramName,
+  purchaseRequests,
 }: {
   client: ClientRow;
   latestCheckin: CheckinRow | null;
@@ -208,6 +238,7 @@ export function ClientProfile({
   loadMoreActivity: (offset: number) => Promise<ActivityEvent[]>;
   // latestPhotos: PhotoRow[]; // DISABLED: photo storage removed
   purchasedProgramName: string | null;
+  purchaseRequests: PurchaseRequestRow[];
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
@@ -388,6 +419,58 @@ export function ClientProfile({
             label="Отметка тренера"
             value="Подтверждено"
           />
+        )}
+      </SectionCard>
+
+      <SectionCard title="Оплаты">
+        {purchaseRequests.length > 0 ? (
+          <div className="space-y-2">
+            {purchaseRequests.map((req) => (
+              <div
+                key={req.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
+              >
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="text-[10px]">
+                      {PURCHASE_SUB_TYPE_LABELS[req.sub_type] ?? req.sub_type}
+                    </Badge>
+                    <Badge
+                      variant={
+                        PURCHASE_REQUEST_STATUS_VARIANTS[req.status] ?? "secondary"
+                      }
+                      className="text-[10px]"
+                    >
+                      {PURCHASE_REQUEST_STATUS_LABELS[req.status] ?? req.status}
+                    </Badge>
+                  </div>
+                  <p className="truncate font-medium">
+                    {req.program ? (
+                      <Link
+                        href={`/programs/${req.program.id}`}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {req.program.title}
+                      </Link>
+                    ) : req.sub_type === "individ" ? (
+                      PURCHASE_SUB_TYPE_LABELS.individ
+                    ) : (
+                      "Программа удалена"
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Заявка от {formatDate(req.created_at)}
+                    {req.status === "paid" && req.paid_at
+                      ? ` · оплачено ${formatDate(req.paid_at)}`
+                      : ""}
+                  </p>
+                </div>
+                <span className="shrink-0 font-medium">{formatAmount(req.amount)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Нет заявок на покупку</p>
         )}
       </SectionCard>
 

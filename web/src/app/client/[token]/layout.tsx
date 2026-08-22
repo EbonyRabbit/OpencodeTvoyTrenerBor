@@ -1,10 +1,47 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CLIENT_STATUS_LABELS, type ClientRow } from "@/lib/clients";
 import { ConsentScreen } from "./_components/consent-screen";
 import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
+
+/**
+ * Ленивое автоистечение доступа (21.10): активный клиент с прошедшим
+ * access_end_date помечается status='access_expired' и отправляется на
+ * /client/expired. Условный UPDATE (status=active + lt access_end_date)
+ * делает операцию идемпотентной: продлённый доступ не перезаписывается.
+ * Возвращает true только если истечение реально применено.
+ */
+async function lazyExpireAccess(client: ClientRow): Promise<boolean> {
+  if (client.status !== "active" || !client.access_end_date) return false;
+  if (new Date(client.access_end_date).getTime() >= Date.now()) return false;
+
+  // Активная пауза — доступ не истекает во время паузы.
+  const { data: pause } = await supabaseAdmin
+    .from("plan_pauses")
+    .select("id")
+    .eq("client_id", client.id)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  if (pause) return false;
+
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("clients")
+    .update({ status: "access_expired" })
+    .eq("id", client.id)
+    .eq("status", "active")
+    .lt("access_end_date", nowIso)
+    .select("id");
+  if (error) {
+    console.error("[client-layout] Failed to expire access:", error.message);
+    return false;
+  }
+  // 0 строк = дату успели продлить в гонке — доступ остаётся активным.
+  return Array.isArray(data) && data.length > 0;
+}
 
 async function getClientData(clientId: string): Promise<(ClientRow & { program_title: string | null }) | null> {
   const { data: client, error } = await supabaseAdmin
@@ -60,6 +97,16 @@ export default async function ClientPortalLayout({
   const client = await getClientData(clientId);
   if (!client) {
     notFound();
+  }
+
+  if (await lazyExpireAccess(client)) {
+    redirect("/client/expired");
+  }
+
+  // Fallback для клиентов, истёкших до внедрения ленивого автоистечения
+  // или помеченных вручную (proxy их не пускает только при смене статуса).
+  if (client.status === "access_expired") {
+    redirect("/client/expired");
   }
 
   if (!client.client_consent_given) {

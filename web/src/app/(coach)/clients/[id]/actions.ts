@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifySession } from "@/lib/dal";
 import type { Database, PaymentStatus } from "@/types/supabase";
 import { TIMEZONE_LIST, LANGUAGE_LABELS, isQuarterTime } from "@/lib/clients";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { buildPaymentUrl } from "@/lib/prodamus";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import {
   resetPlanAssignments,
   assignProgramAndNotify,
@@ -192,6 +195,26 @@ export async function getActivePrograms() {
     .select("id, title, active, type")
     .eq("active", true)
     .order("title");
+  return data ?? [];
+}
+
+export async function getPayablePrograms(): Promise<
+  { id: string; title: string; price: number | null }[]
+> {
+  const { profile } = await verifySession();
+  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+    return [];
+  }
+  const { data, error } = await supabaseAdmin
+    .from("programs")
+    .select("id, title, price")
+    .eq("active", true)
+    .gt("price", 0)
+    .order("title");
+  if (error) {
+    console.error("getPayablePrograms failed:", error.message);
+    return [];
+  }
   return data ?? [];
 }
 
@@ -562,6 +585,288 @@ export async function markPurchased(
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/clients");
     return activation;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+// ─── Ссылка на оплату (Продамус) ─────────────────────────────────────────────
+
+function getPayformBaseUrl(): string | null {
+  const raw = process.env.PRODAMUS_PAYFORM_BASE_URL;
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:") return null;
+    // trailing slash не влияет на URL()/searchParams, но нормализуем для чистоты
+    return raw.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
+type PendingRequest = {
+  id: string;
+  client_id: string | null;
+  amount: number | null;
+};
+
+async function findPendingProgramRequest(
+  clientId: string,
+  telegramId: number | null,
+  programId: string,
+): Promise<PendingRequest | null> {
+  const byClient = await supabaseAdmin
+    .from("purchase_requests")
+    .select("id, client_id, amount")
+    .eq("status", "pending")
+    .eq("program_id", programId)
+    .eq("client_id", clientId)
+    .limit(1)
+    .maybeSingle();
+  if (byClient.data) return byClient.data as PendingRequest;
+
+  if (telegramId == null) return null;
+  const byTelegram = await supabaseAdmin
+    .from("purchase_requests")
+    .select("id, client_id, amount")
+    .eq("status", "pending")
+    .eq("program_id", programId)
+    .eq("telegram_id", telegramId)
+    .limit(1)
+    .maybeSingle();
+  return (byTelegram.data as PendingRequest) ?? null;
+}
+
+async function bindRequestToClient(
+  requestId: string,
+  clientId: string,
+  clientName: string,
+): Promise<{ error?: string }> {
+  // Guard'ы обязательны: гонка с вебхуком (заявка уже paid) или другим
+  // процессом не должна перезаписывать чужие данные. 0 строк = fail-closed.
+  const { data, error } = await supabaseAdmin
+    .from("purchase_requests")
+    .update({ client_id: clientId, name: clientName })
+    .eq("id", requestId)
+    .is("client_id", null)
+    .eq("status", "pending")
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) {
+    return { error: "Заявка уже обработана — обновите страницу" };
+  }
+  return {};
+}
+
+export async function createPaymentLink(
+  clientId: string,
+  programId: string,
+): Promise<{
+  error?: string;
+  url?: string;
+  requestId?: string;
+}> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+    if (!UUID_RE.test(clientId)) return { error: "Некорректный идентификатор" };
+    if (!UUID_RE.test(programId)) {
+      return { error: "Некорректный идентификатор программы" };
+    }
+
+    const payformUrl = getPayformBaseUrl();
+    if (!payformUrl) {
+      return { error: "Платежи не настроены: отсутствует PRODAMUS_PAYFORM_BASE_URL" };
+    }
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id, name, telegram_id")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+
+    const { data: program } = await supabaseAdmin
+      .from("programs")
+      .select("id, title, price, active")
+      .eq("id", programId)
+      .maybeSingle();
+    if (!program || !program.active) return { error: "Программа не найдена" };
+
+    const price = toFiniteNumber(program.price);
+    if (price == null || price <= 0) {
+      return { error: "У программы не указана цена" };
+    }
+
+    // Переиспользуем pending-заявку (в т.ч. созданную ботом до привязки
+    // клиента), иначе упрёмся в unique-индекс по pending.
+    let request = await findPendingProgramRequest(clientId, client.telegram_id, programId);
+    const ensureBound = async (): Promise<{ error?: string }> => {
+      if (!request || request.client_id === clientId) return {};
+      if (request.client_id !== null) {
+        // Заявка принадлежит другому клиенту панели — не перехватываем её.
+        return {
+          error:
+            "Найдена незавершённая заявка на эту программу от другого профиля клиента. Отмените её в блоке «Оплаты» и попробуйте снова",
+        };
+      }
+      // Заявка бота без привязки — привязываем к текущему клиенту панели,
+      // чтобы вебхук/отправка работали по client_id.
+      const bind = await bindRequestToClient(request.id, clientId, client.name);
+      if (bind.error) return bind;
+      request = { ...request, client_id: clientId };
+      return {};
+    };
+
+    if (!request) {
+      const requestId = randomUUID();
+      const insert = async () =>
+        supabaseAdmin.from("purchase_requests").insert({
+          id: requestId,
+          order_id: requestId, // order_id = id заявки (конвенция миграции)
+          amount: price, // снимок цены на момент создания ссылки
+          client_id: clientId,
+          program_id: programId,
+          name: client.name,
+          contact: "panel",
+          telegram_id: client.telegram_id,
+          sub_type: "program",
+          // Согласие: панельная ссылка создаётся тренером для СУЩЕСТВУЮЩЕГО
+          // клиента, который уже дал согласие при подключении/покупке
+          // (client_consent_*). Без consent_given=true вебхук отклонит
+          // активацию уже оплаченной заявки (fail-closed). Сам факт оплаты
+          // клиент совершает лично на странице Продамуса.
+          consent_given: true,
+          consent_at: new Date().toISOString(),
+          consent_version: PRIVACY_POLICY_VERSION,
+        });
+      const { error: insertError } = await insert();
+      if (insertError?.code === "23505") {
+        // Гонка с параллельным созданием/ботом: побеждает существующая
+        // pending-заявка — переиспользуем её (bind ниже).
+        request = await findPendingProgramRequest(clientId, client.telegram_id, programId);
+        if (!request) {
+          return { error: "Не удалось создать заявку — обновите страницу" };
+        }
+      } else if (insertError) {
+        return { error: insertError.message };
+      } else {
+        // insert без .select() данных не возвращает — конструируем из известных полей.
+        request = { id: requestId, client_id: clientId, amount: price };
+      }
+    }
+    if (!request) return { error: "Не удалось создать заявку на оплату" };
+    const bound = await ensureBound();
+    if (bound.error) return bound;
+
+    const amount = toFiniteNumber(request.amount) ?? price;
+    if (amount == null || amount <= 0) {
+      return { error: "У заявки некорректная сумма — обновите страницу" };
+    }
+    const url = buildPaymentUrl({
+      payformUrl,
+      orderId: request.id,
+      amount,
+      productName: program.title,
+    });
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/clients");
+    return { url, requestId: request.id };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function sendPaymentLinkToClient(
+  clientId: string,
+  requestId: string,
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+    if (!UUID_RE.test(clientId) || !UUID_RE.test(requestId)) {
+      return { error: "Некорректный идентификатор" };
+    }
+
+    const payformUrl = getPayformBaseUrl();
+    if (!payformUrl) {
+      return { error: "Платежи не настроены: отсутствует PRODAMUS_PAYFORM_BASE_URL" };
+    }
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id, telegram_id")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+    if (client.telegram_id == null) {
+      return { error: "Клиент не подключён к боту" };
+    }
+
+    const { data: request } = await supabaseAdmin
+      .from("purchase_requests")
+      .select("id, amount, status, program:programs!purchase_requests_program_id_fkey(title)")
+      .eq("id", requestId)
+      .eq("client_id", clientId)
+      .maybeSingle();
+    if (!request || request.status !== "pending") {
+      return { error: "Активная заявка не найдена — создайте ссылку заново" };
+    }
+
+    const programTitle =
+      request.program && !Array.isArray(request.program) && typeof request.program === "object"
+        ? (request.program as { title?: string }).title ?? "Программа"
+        : "Программа";
+    const amount = toFiniteNumber(request.amount);
+    if (amount == null || amount <= 0) {
+      return { error: "У заявки некорректная сумма — создайте ссылку заново" };
+    }
+
+    // Троттлинг повторных отправок (защита от спама клиенту): одна отправка
+    // на заявку в минуту.
+    const sendDedupKey = `send_link:${requestId}`;
+    const { error: sendPurgeError } = await supabaseAdmin
+      .from("bot_dedup")
+      .delete()
+      .eq("key", sendDedupKey)
+      .lt("expires_at", new Date().toISOString());
+    if (sendPurgeError) {
+      console.error("sendPaymentLinkToClient: purge dedup failed:", sendPurgeError.message);
+    }
+    const { error: sendDedupError } = await supabaseAdmin
+      .from("bot_dedup")
+      .insert({
+        key: sendDedupKey,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+    if (sendDedupError?.code === "23505") {
+      return { error: "Ссылка только что была отправлена — подождите минуту" };
+    }
+    if (sendDedupError) {
+      console.error("sendPaymentLinkToClient: dedup write failed:", sendDedupError.message);
+    }
+
+    const url = buildPaymentUrl({
+      payformUrl,
+      orderId: request.id,
+      amount,
+      productName: programTitle,
+    });
+
+    const amountText = ` (${amount.toLocaleString("ru-RU")} ₽)`;
+    const sent = await sendTelegramMessage(
+      client.telegram_id,
+      `Оплата программы «${programTitle}»${amountText}:\n\n${url}`,
+    );
+    if (!sent) {
+      return { error: "Не удалось отправить сообщение в Telegram" };
+    }
+    return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }

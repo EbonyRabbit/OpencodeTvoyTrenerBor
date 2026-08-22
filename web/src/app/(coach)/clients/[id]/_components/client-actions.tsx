@@ -13,6 +13,9 @@ import {
   sendProgramInstructions,
   togglePayment,
   updateClient,
+  createPaymentLink,
+  sendPaymentLinkToClient,
+  getPayablePrograms,
 } from "../actions";
 import { TIMEZONE_LIST, MEASUREMENT_DAY_OPTIONS, CHECKIN_DAY_OPTIONS, LANGUAGE_LABELS, WEEKDAY_OPTIONS } from "@/lib/clients";
 import { Button } from "@/components/ui/button";
@@ -34,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 type Program = { id: string; title: string; type: string };
+type PayableProgram = { id: string; title: string; price: number | null };
 
 export function ClientActions({
   clientId,
@@ -51,6 +55,7 @@ export function ClientActions({
   clientCheckinTime,
   clientTrainingDays,
   programDayOrders,
+  clientTelegramId,
 }: {
   clientId: string;
   currentCode: string | null;
@@ -67,6 +72,7 @@ export function ClientActions({
   clientCheckinTime: string | null;
   clientTrainingDays?: number[] | null;
   programDayOrders?: number[];
+  clientTelegramId?: number | null;
 }) {
   const router = useRouter();
   const [activating, setActivating] = useState(false);
@@ -101,6 +107,17 @@ export function ClientActions({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [payLinkOpen, setPayLinkOpen] = useState(false);
+  const [payPrograms, setPayPrograms] = useState<PayableProgram[]>([]);
+  const [payLoadingPrograms, setPayLoadingPrograms] = useState(false);
+  const [paySelected, setPaySelected] = useState("");
+  const [payCreating, setPayCreating] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [payResult, setPayResult] = useState<{ url: string; requestId: string } | null>(null);
+  const [paySending, setPaySending] = useState(false);
+  const [paySent, setPaySent] = useState(false);
+  const [payCopied, setPayCopied] = useState(false);
   const [editForm, setEditForm] = useState<{
     name: string;
     language: string;
@@ -340,6 +357,63 @@ export function ClientActions({
     }
   }, [clientId, selectedProgram, router]);
 
+  const openPayLinkDialog = useCallback(async () => {
+    setPayError(null);
+    setPayResult(null);
+    setPaySent(false);
+    setPayCopied(false);
+    setPaySelected("");
+    setPayLinkOpen(true);
+
+    setPayPrograms([]);
+    setPayLoadingPrograms(true);
+    try {
+      const payList = await getPayablePrograms();
+      setPayPrograms(payList);
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Ошибка загрузки программ");
+    } finally {
+      setPayLoadingPrograms(false);
+    }
+  }, []);
+
+  const handleCreatePaymentLink = useCallback(async () => {
+    if (!paySelected) return;
+    setPayCreating(true);
+    setPayError(null);
+    try {
+      const result = await createPaymentLink(clientId, paySelected);
+      if (result.error || !result.url || !result.requestId) {
+        setPayError(result.error ?? "Не удалось создать ссылку");
+        return;
+      }
+      setPayResult({ url: result.url, requestId: result.requestId });
+      router.refresh();
+    } catch {
+      setPayError("Произошла ошибка");
+    } finally {
+      setPayCreating(false);
+    }
+  }, [clientId, paySelected, router]);
+
+  const handleSendPaymentLink = useCallback(async () => {
+    if (!payResult) return;
+    setPaySending(true);
+    setPayError(null);
+    try {
+      const result = await sendPaymentLinkToClient(clientId, payResult.requestId);
+      if (result.error) {
+        setPayError(result.error);
+        return;
+      }
+      setPaySent(true);
+    } catch {
+      setPayError("Произошла ошибка");
+    } finally {
+      setPaySending(false);
+    }
+  }, [clientId, payResult]);
+
   const openEditDialog = useCallback(() => {
     setEditError(null);
     setEditForm({
@@ -519,6 +593,14 @@ export function ClientActions({
           disabled={generatingToken}
         >
           {generatingToken ? "Генерация..." : "Ссылка для клиента"}
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={openPayLinkDialog}
+        >
+          Ссылка на оплату
         </Button>
 
         {currentStatus !== "inactive" && currentStatus !== "access_expired" && (
@@ -738,6 +820,118 @@ export function ClientActions({
               Закрыть
             </DialogClose>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={payLinkOpen}
+        onOpenChange={(open) => {
+          setPayLinkOpen(open);
+        }}
+      >
+        <DialogContent>
+          {payResult ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Ссылка на оплату готова</DialogTitle>
+                <DialogDescription>
+                  Отправьте ссылку клиенту или отправьте её в Telegram одной кнопкой.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-xs text-muted-foreground">Платёжная ссылка:</p>
+                <p className="font-mono text-sm break-all">{payResult.url}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 h-7 px-2"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(payResult.url);
+                      setPayCopied(true);
+                      setTimeout(() => setPayCopied(false), 2000);
+                    } catch {
+                      window.prompt("Скопируйте ссылку вручную:", payResult.url);
+                    }
+                  }}
+                >
+                  {payCopied ? "✓ Скопировано" : "Копировать"}
+                </Button>
+              </div>
+              {payError && (
+                <p className="text-sm text-destructive" role="alert">{payError}</p>
+              )}
+              <DialogFooter>
+                <DialogClose render={<Button variant="outline" />}>
+                  Закрыть
+                </DialogClose>
+                {clientTelegramId != null ? (
+                  <Button
+                    onClick={handleSendPaymentLink}
+                    disabled={paySending || paySent}
+                  >
+                    {paySent
+                      ? "✓ Отправлено"
+                      : paySending
+                        ? "Отправка..."
+                        : "Отправить в Telegram"}
+                  </Button>
+                ) : (
+                  <span title="Клиент не подключён к боту">
+                    <Button disabled>Нет Telegram</Button>
+                  </span>
+                )}
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Ссылка на оплату</DialogTitle>
+                <DialogDescription>
+                  Выберите программу — клиент получит ссылку на оплату через Продамус.
+                  После оплаты доступ откроется автоматически.
+                </DialogDescription>
+              </DialogHeader>
+              {payError && (
+                <p className="text-sm text-destructive" role="alert">{payError}</p>
+              )}
+              {payLoadingPrograms ? (
+                <p className="text-sm text-muted-foreground">Загрузка...</p>
+              ) : payPrograms.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Нет активных программ с ценой
+                </p>
+              ) : (
+                <Select value={paySelected} onValueChange={(v) => v && setPaySelected(v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Выберите программу" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {payPrograms.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.title}
+                        {p.price != null ? ` — ${p.price.toLocaleString("ru-RU")} ₽` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <DialogFooter>
+                <DialogClose render={<Button variant="outline" />}>
+                  Отмена
+                </DialogClose>
+                {payPrograms.length > 0 && (
+                  <Button
+                    onClick={handleCreatePaymentLink}
+                    disabled={!paySelected || payCreating}
+                  >
+                    {payCreating ? "Создание..." : "Создать ссылку"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

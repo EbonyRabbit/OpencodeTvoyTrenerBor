@@ -741,6 +741,7 @@ export function ClientProfile({
         clientCheckinTime={client.checkin_time}
         clientTrainingDays={client.training_days}
         programDayOrders={programDayOrders}
+        clientTelegramId={client.telegram_id}
       />
 
       <div className="flex justify-end gap-2">

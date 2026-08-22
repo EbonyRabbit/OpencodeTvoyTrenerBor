@@ -440,6 +440,62 @@ export async function activatePurchaseByOrder({
     }
     if (!request) return { error: "Заявка не найдена." };
     if (request.status === "cancelled") {
+      if (paymentStatus === "success") {
+        // Деньги списаны по отменённой заявке: доступ не выдаём автоматически,
+        // но молча терять оплату нельзя — требуем возврата или ручной выдачи.
+        console.error(
+          "[ACTIVATION] Payment received for CANCELLED request:",
+          orderId,
+        );
+        // Идемпотентность: вебхук Продамуса может ретраиться — алерт шлём один
+        // раз на заявку (bot_dedup с TTL 30 дней).
+        const dedupKey = `cancelled_payment:${orderId}`;
+        const expiresAt = new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000,
+        ).toISOString();
+        const { error: purgeError } = await supabaseAdmin
+          .from("bot_dedup")
+          .delete()
+          .eq("key", dedupKey)
+          .lt("expires_at", new Date().toISOString());
+        if (purgeError) {
+          console.error(
+            "[ACTIVATION] Failed to purge expired dedup key:",
+            purgeError.message,
+          );
+        }
+        const { error: dedupError } = await supabaseAdmin
+          .from("bot_dedup")
+          .insert({ key: dedupKey, expires_at: expiresAt });
+        if (dedupError && dedupError.code !== "23505") {
+          console.error(
+            "[ACTIVATION] Failed to write dedup key:",
+            dedupError.message,
+          );
+        }
+        if (!dedupError || dedupError.code !== "23505") {
+          const coachChatId = process.env.COACH_CHAT_ID;
+          if (coachChatId) {
+            const amountText =
+              request.amount != null
+                ? ` на сумму ${request.amount.toLocaleString("ru-RU")} ₽`
+                : "";
+            const sent = await sendTelegramMessage(
+              coachChatId,
+              `⚠️ Получена оплата${amountText} по ОТМЕНЁННОЙ заявке ${orderId} (клиент: ${sanitizeText(request.name)}, контакт: ${formatContact(request.contact)}). Доступ не выдан — сделайте возврат или выдайте доступ вручную.`,
+            );
+            if (!sent) {
+              console.error(
+                "[ACTIVATION] Failed to notify coach about cancelled-request payment",
+              );
+            }
+          } else {
+            console.error(
+              "[ACTIVATION] COACH_CHAT_ID is not set; cancelled-payment alert skipped",
+            );
+          }
+        }
+      }
       return { error: "Заявка отменена." };
     }
     if (request.sub_type !== "program") {

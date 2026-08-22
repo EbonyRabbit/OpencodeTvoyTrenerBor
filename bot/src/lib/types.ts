@@ -10,7 +10,8 @@ export type NotificationType =
   | "measurement"
   | "checkin"
   | "alert"
-  | "payment";
+  | "payment"
+  | "access_expiring";
 export type PauseReason = "sick" | "vacation" | "injury" | "personal" | "other";
 export type ResumeStrategy = "skip" | "shift" | "deload" | "rollback";
 export type PauseStatus = "active" | "resuming" | "completed";

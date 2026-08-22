@@ -1188,6 +1188,7 @@ export const Constants = {
         "checkin",
         "alert",
         "payment",
+        "access_expiring",
       ],
       payment_status: ["pending", "paid"],
       photo_type: ["front", "side", "back"],

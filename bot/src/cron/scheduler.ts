@@ -6,6 +6,7 @@ import { runEveningPoll } from "./evening-scheduler.js";
 import { runMorningNotification } from "./morning.js";
 import { runMeasurementReminder } from "./measurement-reminder.js";
 import { runCheckinReminder } from "./checkin-reminder.js";
+import { runAccessExpiryReminder } from "./access-expiry.js";
 import { runAutoResume, runResumeReminder } from "./resume.js";
 import { logBotEvent } from "./logger.js";
 
@@ -65,6 +66,10 @@ export function startScheduler(bot: Bot<MyContext>): void {
 
   tasks.push(
     cron.schedule(POLL_CRON, wrapWithGuard("checkin_reminder", () => runCheckinReminder(bot))),
+  );
+
+  tasks.push(
+    cron.schedule(POLL_CRON, wrapWithGuard("access_expiry", () => runAccessExpiryReminder(bot))),
   );
 
   tasks.push(

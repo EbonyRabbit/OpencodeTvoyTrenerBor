@@ -335,7 +335,6 @@ export async function applyProgramActivation({
     program_id: programId,
     purchased_program_id: programId,
     payment_status: "paid",
-    purchase_date: now.toISOString(),
     status: "active",
   };
   if (
@@ -358,6 +357,7 @@ export async function applyProgramActivation({
   if (!sameActiveProgram) {
     update.access_start_date = now.toISOString();
     update.access_end_date = accessEndDate;
+    update.purchase_date = now.toISOString();
   }
 
   const { error: updateError } = await supabaseAdmin
@@ -719,7 +719,7 @@ async function recoverLinkedRequest({
     .eq("id", requestId)
     .eq("status", "paid")
     .eq("client_id", clientId)
-    .lt("paid_at", staleCutoff)
+    .or(`paid_at.is.null,paid_at.lt.${staleCutoff}`)
     .select("id")
     .maybeSingle();
   if (takeoverError) {
@@ -767,6 +767,10 @@ async function hasInstructionsFor(
   clientId: string,
   sinceIso: string,
 ): Promise<boolean> {
+  // Accepted limitation: any to_client message sent after paid_at counts as
+  // delivered instructions, and the message row is inserted before the Telegram
+  // send. A false positive can only mask auto-redelivery — the coach keeps the
+  // synchronous warning and the manual "Отправить инструкции" action.
   const { data, error } = await supabaseAdmin
     .from("messages")
     .select("id")

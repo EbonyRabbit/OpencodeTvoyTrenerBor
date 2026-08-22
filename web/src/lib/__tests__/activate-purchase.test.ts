@@ -60,6 +60,7 @@ function mockDb(calls: Array<() => Promise<ChainRes>>) {
       eq: () => link,
       is: () => link,
       lt: () => link,
+      or: () => link,
       gte: () => link,
       limit: () => link,
       update: (payload?: unknown) => {
@@ -861,6 +862,50 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
       unknown
     >;
     expect(clientUpdate.access_start_date).toBeUndefined(); // same active program: dates preserved
+    expect(clientUpdate.purchase_date).toBeUndefined(); // original purchase date kept
+  });
+
+  it("takes over a legacy paid request with null paid_at when activation is incomplete", async () => {
+    vi.setSystemTime(new Date(NOW));
+    mockDb([
+      () => ok({ ...pendingRequest, status: "paid", client_id: CLIENT_ID }), // initial read
+      () => ok(baseProgram),
+      () => ok(null), // claim CAS misses (already paid)
+      () =>
+        ok({ status: "paid", client_id: CLIENT_ID, paid_at: null }), // re-read: legacy row without paid_at
+      () =>
+        ok({
+          ...existingClient,
+          program_id: null,
+          access_end_date: null,
+        }), // load linked client (not activated)
+      () =>
+        ok({
+          payment_status: "paid",
+          program_id: PROGRAM_ID,
+          access_end_date: "2026-11-12T10:00:00.000Z",
+        }), // client activated...
+      () => ok(null), // ...but schedule is missing -> falls to takeover
+      () => ok({ id: REQUEST_ID }), // takeover matches paid_at IS NULL
+      () => ok({ error: null, data: null }), // clients update
+      () => ok({ error: null, data: null }), // program_schedule delete
+      () => ok({ error: null, data: null }), // plan_pauses delete
+      () => ok({ error: null, data: null }), // messages insert
+    ]);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.alreadyActivated).toBeUndefined();
+    expect(result.clientId).toBe(CLIENT_ID);
+    const clientUpdate = payloads.update.clients?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(clientUpdate.access_start_date).toBeDefined(); // not same active program: fresh dates
+    expect(clientUpdate.purchase_date).toBeDefined();
   });
 });
 

@@ -106,6 +106,33 @@ describe("prodamus webhook", () => {
     });
   });
 
+  it("регрессия e2e: наш UUID приходит в order_num, order_id — внутренний ID Продамуса", async () => {
+    activationMock.mockResolvedValueOnce({});
+    const res = await POST(
+      signedRequest({
+        date: "2026-08-24T15:33:17+03:00",
+        order_id: "47987743",
+        order_num: ORDER_ID,
+        domain: "TvoyTrener.payform.ru",
+        sum: "7770.00",
+        currency: "rub",
+        customer_phone: "+79978797709",
+        payment_type: "СБП",
+        payment_status: "success",
+        products: JSON.stringify([
+          { name: "Домашний Full Body 10 недель", price: "7770.00", quantity: "1", sum: "7770.00" },
+        ]),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(activationMock).toHaveBeenCalledWith({
+      orderId: ORDER_ID,
+      coachId: null,
+      paymentStatus: "success",
+      paidSum: 7770,
+    });
+  });
+
   it("answers 200 idempotently when already activated", async () => {
     activationMock.mockResolvedValueOnce({ alreadyActivated: true });
     const res = await POST(
@@ -158,6 +185,37 @@ describe("prodamus webhook", () => {
     expect(sent.mock.calls[0][0]).toBe("42");
     expect(sent.mock.calls[0][1]).toContain("Иван Петров");
     expect(sent.mock.calls[0][1]).toContain("отменена");
+    expect(activationMock).not.toHaveBeenCalled();
+  });
+
+  it("регрессия: cancel с нашим UUID в order_num находит заявку (order_id — числовой)", async () => {
+    vi.stubEnv("COACH_CHAT_ID", "42");
+    const sent = vi.mocked(sendTelegramMessage).mockResolvedValueOnce(true);
+    const fromSpy = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    mockDb([
+      () =>
+        Promise.resolve({
+          data: {
+            name: "Шошин Андрей",
+            contact: "+79978797709",
+            telegram_id: 856271201,
+            amount: 7770,
+            sub_type: "program",
+          },
+          error: null,
+        }),
+    ]);
+    const res = await POST(
+      signedRequest({
+        order_id: "47987743",
+        order_num: ORDER_ID,
+        payment_status: "order_canceled",
+      }),
+    );
+    expect(res.status).toBe(200);
+    // Заявка искалась именно по нашей таблице (cancel CAS), а не мимо
+    expect(fromSpy.from).toHaveBeenCalledWith("purchase_requests");
+    expect(sent).toHaveBeenCalledTimes(1);
     expect(activationMock).not.toHaveBeenCalled();
   });
 

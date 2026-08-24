@@ -213,7 +213,9 @@ describe("buildProdamusSignature / verifyProdamusSignature", () => {
 describe("parseProdamusOrder", () => {
   it("официальный пример: order_id, sum, status, products", () => {
     const order = parseProdamusOrder(docsBody());
-    expect(order.orderId).toBe("1");
+    // В доках order_id=1 (внутренний ID Продамуса), order_num="test" (наш номер
+    // заказа) — приоритет у order_num.
+    expect(order.orderId).toBe("test");
     expect(order.sum).toBe(1000);
     expect(order.paymentStatus).toBe("success");
     expect(order.products).toEqual([
@@ -254,6 +256,38 @@ describe("parseProdamusOrder", () => {
     expect(order.orderId).toBe("9");
     expect(order.sum).toBe(1000);
     expect(order.paymentStatus).toBe("success");
+  });
+
+  it("реальный продовый payload: наш UUID в order_num, внутренний ID Продамуса в order_id", () => {
+    // Регрессия e2e 24.08.2026: вебхук приходил с order_id="47987743"
+    // (внутренний ID Продамуса) и order_num=<наш UUID> — активация падала.
+    const body = new URLSearchParams();
+    body.set("date", "2026-08-24T15:33:17+03:00");
+    body.set("order_id", "47987743");
+    body.set("order_num", "36ba6284-4e7c-4ba8-bcbc-de502107a0bf");
+    body.set("domain", "TvoyTrener.payform.ru");
+    body.set("sum", "7770.00");
+    body.set("currency", "rub");
+    body.set("customer_phone", "+79978797709");
+    body.set("payment_type", "СБП");
+    body.set("payment_status", "success");
+    body.set(
+      "products",
+      JSON.stringify([
+        { name: "Домашний Full Body 10 недель", price: "7770.00", quantity: "1", sum: "7770.00" },
+      ]),
+    );
+
+    const order = parseProdamusOrder(body.toString());
+    expect(order.orderId).toBe("36ba6284-4e7c-4ba8-bcbc-de502107a0bf");
+    expect(order.sum).toBe(7770);
+    expect(order.paymentStatus).toBe("success");
+  });
+
+  it("нет order_num → fallback на order_id (обратная совместимость с доками)", () => {
+    const body = new URLSearchParams();
+    body.set("order_id", "1");
+    expect(parseProdamusOrder(body.toString()).orderId).toBe("1");
   });
 });
 

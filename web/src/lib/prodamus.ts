@@ -224,8 +224,15 @@ export function parseProdamusOrder(entries: ProdamusFormEntries): ProdamusOrder 
   const sumRaw = toStr(payload.sum);
   const sum = sumRaw === null ? null : Number(sumRaw);
 
+  // Пустая/пробельная строка order_num не должна перекрывать fallback.
+  const orderNum = toStr(payload.order_num)?.trim();
+
   return {
-    orderId: toStr(payload.order_id),
+    // Продамус возвращает наш идентификатор заказа (то, что мы отправляли
+    // в order_id платёжной ссылки) в поле order_num, а в order_id кладёт
+    // свой внутренний числовой ID. Активация ищет заявку по нашему UUID,
+    // поэтому приоритет — order_num.
+    orderId: orderNum || toStr(payload.order_id),
     sum: sum === null || !Number.isFinite(sum) ? null : sum,
     paymentStatus: toStr(payload.payment_status),
     products,
@@ -249,6 +256,8 @@ export function buildPaymentUrl({
   }
   const url = new URL(payformUrl);
   url.searchParams.set("do", "pay");
+  // NB: отправляемый здесь orderId вебхук вернёт в поле order_num
+  // (см. parseProdamusOrder).
   url.searchParams.set("order_id", orderId);
   url.searchParams.set("products[0][name]", productName);
   url.searchParams.set("products[0][price]", amount.toFixed(2));

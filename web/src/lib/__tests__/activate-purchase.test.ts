@@ -792,6 +792,43 @@ describe("activatePurchaseByOrder: claim, rollback, idempotency", () => {
     expect(payloads.update.clients).toBeUndefined();
   });
 
+  it("регрессия e2e 24.08: панельная заявка (client_id предзаполнен) активируется с первого вебхука", async () => {
+    // Продовый инцидент: createPaymentLink ставит client_id при создании
+    // ссылки → линковка «промахивается» → recovery с свежим paid_at отдавал
+    // 503 in_progress, пока paid_at не состарится. Ожидание: клейм у этой
+    // инвокации + заявка указывает на резолвленного клиента = первичная
+    // активация без recovery.
+    const flow = [
+      ...fullFlow([() => ok(existingClient)], {
+        request: { client_id: CLIENT_ID },
+      }),
+    ];
+    // Структура fullFlow: [0] request, [1] program, [2] claim, [3] resolve,
+    // [4] link CAS, [5] clients update, [6] schedule delete, [7] pauses
+    // delete, [8] messages insert.
+    const LINK_CAS = 4;
+    flow[LINK_CAS] = () => ok(null); // miss: client_id уже был проставлен
+    // Re-read purchase_requests сразу после промаха линковки
+    flow.splice(LINK_CAS + 1, 0, () =>
+      ok({
+        status: "paid",
+        client_id: CLIENT_ID,
+        paid_at: "2026-08-24T12:53:17.000Z",
+      }),
+    );
+
+    mockDb(flow);
+
+    const result = await activatePurchaseByOrder({
+      orderId: ORDER_ID,
+      coachId: COACH_ID,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.clientId).toBe(CLIENT_ID);
+    // Инструкции клиенту записаны с первого захода (без ожидания ретрая)
+    expect(payloads.insert.messages).toBeDefined();
+  });
+
   it("reports alreadyActivated when the link loses a race and the client is activated", async () => {
     mockDb([
       () => ok(pendingRequest),

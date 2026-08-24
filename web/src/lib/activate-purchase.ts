@@ -677,28 +677,45 @@ export async function activatePurchaseByOrder({
             clientId,
           };
         }
-        const recovered = await recoverLinkedRequest({
-          requestId: request.id,
-          clientId: linkedClientId,
-          paidAt: current?.paid_at ?? null,
-          programId: request.program_id,
-        });
-        if (recovered.kind === "alreadyActivated") {
-          return {
-            alreadyActivated: true,
+        // Регрессия e2e 24.08.2026: панельные заявки (21.9) приходят с
+        // предзаполненным client_id — линковка «промахивается», и раньше
+        // поток проваливался в recovery, где свежий paid_at означал
+        // «чужая незавершённая активация» → 503 in_progress на каждой
+        // доставке, пока paid_at не состарится (10 мин). Если клейм у этой
+        // инвокации и заявка изначально указывала на резолвленного клиента —
+        // это первичная активация: идемпотентность обеспечил CAS-клейм,
+        // продолжаем сразу. Recovery — для повторных доставок (клейм
+        // проигран) и для гонок линковки у заявок без исходного client_id.
+        // (клейм проигран). NB: !linkedClientId здесь недостижим — строка
+        // выше уже вернула in-progress при пустом client_id.
+        if (
+          !claimed ||
+          linkedClientId !== clientId ||
+          request.client_id === null
+        ) {
+          const recovered = await recoverLinkedRequest({
             requestId: request.id,
-            clientId: recovered.clientId,
-          };
+            clientId: linkedClientId,
+            paidAt: current?.paid_at ?? null,
+            programId: request.program_id,
+          });
+          if (recovered.kind === "alreadyActivated") {
+            return {
+              alreadyActivated: true,
+              requestId: request.id,
+              clientId: recovered.clientId,
+            };
+          }
+          if (recovered.kind === "inProgress") {
+            return {
+              error: "Активация уже выполняется. Повторите запрос позднее.",
+              requestId: request.id,
+              clientId: recovered.clientId,
+            };
+          }
+          clientId = recovered.clientId;
+          client = recovered.client;
         }
-        if (recovered.kind === "inProgress") {
-          return {
-            error: "Активация уже выполняется. Повторите запрос позднее.",
-            requestId: request.id,
-            clientId: recovered.clientId,
-          };
-        }
-        clientId = recovered.clientId;
-        client = recovered.client;
       }
     }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createHmac } from "node:crypto";
 import {
   buildPaymentUrl,
@@ -368,5 +368,63 @@ describe("buildPaymentUrl", () => {
     expect(() => buildPaymentUrl({ ...base, amount: 0 })).toThrow();
     expect(() => buildPaymentUrl({ ...base, amount: -5 })).toThrow();
     expect(new URL(buildPaymentUrl({ ...base, amount: 1000 })).searchParams.get("products[0][price]")).toBe("1000.00");
+  });
+});
+
+describe("createShortPaymentUrl", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("запрашивает do=link и возвращает короткий URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("https://payform.ru/m9cmErR/", { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { createShortPaymentUrl } = await import("@/lib/prodamus");
+    const short = await createShortPaymentUrl({
+      payformUrl: "https://tvoytrener.payform.ru",
+      orderId: "550e8400-e29b-41d4-a716-446655440000",
+      amount: 7770,
+      productName: "HYROX 5x12 - подготовка к гонке",
+    });
+
+    expect(short).toBe("https://payform.ru/m9cmErR/");
+    const requested = String(fetchMock.mock.calls[0][0]);
+    expect(requested).toContain("do=link");
+    expect(requested).toContain("products%5B0%5D%5Bprice%5D=7770.00");
+  });
+
+  it("бросает при не-URL ответе Продамуса", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("error: bad request", { status: 200 })),
+    );
+    const { createShortPaymentUrl } = await import("@/lib/prodamus");
+    await expect(
+      createShortPaymentUrl({
+        payformUrl: "https://demo.payform.ru",
+        orderId: "1",
+        amount: 100,
+        productName: "X",
+      }),
+    ).rejects.toThrow("unexpected response");
+  });
+
+  it("бросает при HTTP-ошибке API", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("", { status: 500 })),
+    );
+    const { createShortPaymentUrl } = await import("@/lib/prodamus");
+    await expect(
+      createShortPaymentUrl({
+        payformUrl: "https://demo.payform.ru",
+        orderId: "1",
+        amount: 100,
+        productName: "X",
+      }),
+    ).rejects.toThrow("responded 500");
   });
 });

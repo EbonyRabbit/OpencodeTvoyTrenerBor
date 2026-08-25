@@ -105,10 +105,17 @@ function firstReplyText(ctx: MyContext): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Короткая ссылка ходит в сеть — в юнит-тестах заставляем её падать:
+  // sendPaymentLink уходит в fallback на длинную ссылку (buildPaymentUrl).
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockRejectedValue(new Error("offline (test)")),
+  );
   for (const key of Object.keys(captured)) delete captured[key];
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   (config as { coachChatId: bigint }).coachChatId = 0n;
   (config as { prodamusPayformBaseUrl: string }).prodamusPayformBaseUrl =
     "https://pay.demo.prodamus.ru/payment";
@@ -284,6 +291,23 @@ describe("startPurchase", () => {
     expect(buttons).toContain(`"url":"https://pay.demo.prodamus.ru/payment?do=pay&order_id=req-1`);
     // ссылка строится по снапшоту суммы из заявки, а не по текущей цене
     expect(buttons).toContain("%5B0%5D%5Bprice%5D=8900.00");
+  });
+
+  it("отправляет КОРОТКУЮ ссылку, когда API Продамуса доступен", async () => {
+    defaultDb({ id: "req-1", status: "pending", consent_given: true, amount: 8900 });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("https://payform.ru/m9cmErR/", { status: 200 }),
+      ),
+    );
+    const ctx = makeCtx();
+
+    await startPurchase(ctx, VALID_PROGRAM_ID);
+
+    const buttons = keyboardJson(replyOptions(ctx));
+    expect(buttons).toContain('"url":"https://payform.ru/m9cmErR/"');
+    expect(buttons).not.toContain("do=pay");
   });
 
   it("does not offer a second payment for an already paid request", async () => {

@@ -8,7 +8,7 @@ import { verifySession } from "@/lib/dal";
 import type { Database, PaymentStatus } from "@/types/supabase";
 import { TIMEZONE_LIST, LANGUAGE_LABELS, isQuarterTime } from "@/lib/clients";
 import { sendTelegramMessage } from "@/lib/telegram";
-import { buildPaymentUrl } from "@/lib/prodamus";
+import { resolvePaymentUrl } from "@/lib/prodamus";
 import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import {
   resetPlanAssignments,
@@ -771,12 +771,15 @@ export async function createPaymentLink(
     if (amount == null || amount <= 0) {
       return { error: "У заявки некорректная сумма — обновите страницу" };
     }
-    const url = buildPaymentUrl({
+    const linkOpts = {
       payformUrl,
       orderId: request.id,
       amount,
       productName: program.title,
-    });
+    };
+    // Короткая ссылка устойчива к копированию текстом (длинная теряет
+    // скобки → у клиента пустая сумма).
+    const url = await resolvePaymentUrl(linkOpts);
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/clients");
     return { url, requestId: request.id };
@@ -859,12 +862,13 @@ export async function sendPaymentLinkToClient(
       console.error("sendPaymentLinkToClient: dedup write failed:", sendDedupError.message);
     }
 
-    const url = buildPaymentUrl({
+    const linkOpts = {
       payformUrl,
       orderId: request.id,
       amount,
       productName: programTitle,
-    });
+    };
+    const url = await resolvePaymentUrl(linkOpts);
 
     const amountText = ` (${amount.toLocaleString("ru-RU")} ₽)`;
     const sent = await sendTelegramMessage(

@@ -3,7 +3,7 @@ import type { MyContext } from "../bot.js";
 import { t, applyClientLanguage } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
-import { buildPaymentUrl } from "../lib/prodamus.js";
+import { resolvePaymentUrl } from "../lib/prodamus.js";
 import { buildPrivacyUrl, PRIVACY_POLICY_VERSION } from "./consent.js";
 import { findClientByTelegramId, type Client } from "../lib/clients.js";
 import { truncateButtonLabel } from "./programs.js";
@@ -530,12 +530,15 @@ async function sendPaymentLink(
     return;
   }
   try {
-    const paymentUrl = buildPaymentUrl({
+    const linkOpts = {
       payformUrl: config.prodamusPayformBaseUrl,
       orderId: requestId,
       amount,
       productName: program.title,
-    });
+    };
+    // Короткая ссылка устойчива к копированию текстом (длинная с
+    // products[0][...] теряет скобки → пустая сумма у клиента).
+    const paymentUrl = await resolvePaymentUrl(linkOpts);
     const payLabel = truncateButtonLabel(
       t("purchase.pay_button", lang, {
         title: program.title,

@@ -166,11 +166,45 @@ describe("programsHandler catalog query", () => {
       reply_markup?: unknown;
     };
     const keyboard = JSON.stringify(options.reply_markup ?? []);
-    // короткие подписи без дублирования названия и без обрезки «…»
+    // короткие подписи без дублирования названия и без обрезки «…»;
+    // программа одна → кнопки без номеров
     expect(keyboard).toContain("ℹ️ Подробнее");
     expect(keyboard).toContain("💳 Купить");
     expect(keyboard).toContain("📩 Запросить");
     expect(keyboard).not.toContain("— HYROX");
+    expect(keyboard).not.toContain("ℹ️ Подробнее 1");
+  });
+
+  it("при нескольких программах кнопки пронумерованы по блокам текста", async () => {
+    mockProgramsQuery([
+      {
+        id: "tpl-1",
+        title: "Первая",
+        type: "template",
+        description: null,
+        duration_weeks: 12,
+        price: 1000,
+      },
+      {
+        id: "tpl-2",
+        title: "Вторая",
+        type: "template",
+        description: null,
+        duration_weeks: 12,
+        price: 2000,
+      },
+    ]);
+    const ctx = makeCtx();
+
+    await programsHandler(ctx);
+
+    const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
+      reply_markup?: unknown;
+    };
+    const keyboard = JSON.stringify(options.reply_markup ?? []);
+    expect(keyboard).toContain("ℹ️ Подробнее 1");
+    expect(keyboard).toContain("💳 Купить 2");
+    expect(keyboard).toContain("📩 Запросить 2");
   });
 
   it("hides the buy button for a program the client already owns", async () => {

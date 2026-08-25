@@ -106,19 +106,28 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
     const lines: string[] = [t("programs.title", lang), ""];
     const keyboard = new InlineKeyboard();
 
+    // Короткие подписи: полное название программы уже в тексте блока выше,
+    // а лимит Telegram — 64 байта на надпись кнопки. При нескольких
+    // программах добавляем номер кнопкам — он соответствует нумерации
+    // блоков в тексте и однозначно связывает кнопки с программой.
+    const numbered = programs.length > 1;
     programs.forEach((program, i) => {
       lines.push(formatProgram(i + 1, program, lang));
       lines.push("");
       // Короткие подписи: полное название программы уже в тексте блока выше,
       // а лимит Telegram — 64 байта на надпись кнопки.
+      const num = numbered ? ` ${i + 1}` : "";
       const buyable =
         program.price != null && program.price > 0 && !ownedProgramIds.has(program.id);
       const row = keyboard
-        .text(t("programs.details_button", lang), `program_details:${program.id}`);
+        .text(
+          t("programs.details_button", lang) + num,
+          `program_details:${program.id}`,
+        );
       if (buyable) {
-        row.text(t("programs.buy_button", lang), `purchase_start:${program.id}`);
+        row.text(t("programs.buy_button", lang) + num, `purchase_start:${program.id}`);
       }
-      row.text(t("programs.request_button", lang), `program_request:${program.id}`);
+      row.text(t("programs.request_button", lang) + num, `program_request:${program.id}`);
       keyboard.row();
     });
 

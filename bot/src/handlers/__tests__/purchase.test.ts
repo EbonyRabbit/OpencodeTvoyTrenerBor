@@ -9,7 +9,7 @@ import {
   handleConsentCoachRequest,
   buildCoachRequestCoachMessage,
 } from "../purchase.js";
-import { buildPaymentUrl } from "../../lib/prodamus.js";
+import { buildPaymentUrl, sanitizeProductName } from "../../lib/prodamus.js";
 import type { MyContext } from "../../bot.js";
 
 vi.mock("../../bot.js", () => ({
@@ -1359,5 +1359,28 @@ describe("buildPaymentUrl (bot copy)", () => {
         productName: "Программа",
       }),
     ).toThrow("Invalid amount");
+  });
+});
+describe("sanitizeProductName / buildPaymentUrl: кодировка названия", () => {
+  it("зеркало web-фикса e2e: × → x, — → - (страница Продамуса в windows-1251)", () => {
+    expect(sanitizeProductName("HYROX 5\u00D712 \u2014 подготовка к гонке")).toBe(
+      "HYROX 5x12 - подготовка к гонке",
+    );
+    const url = buildPaymentUrl({
+      payformUrl: "https://demo.payform.ru",
+      orderId: "550e8400-e29b-41d4-a716-446655440000",
+      amount: 7770,
+      productName: "HYROX 5\u00D712 \u2014 подготовка к гонке",
+    });
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("products[0][name]")).toBe(
+      "HYROX 5x12 - подготовка к гонке",
+    );
+  });
+
+  it("кавычки заменяются, символы вне windows-1251 вырезаются", () => {
+    expect(sanitizeProductName("\u00ABСила\u00BB \u201CPro\u201D \u2192 \u{1F3CB}\uFE0F")).toBe(
+      '"Сила" "Pro"',
+    );
   });
 });

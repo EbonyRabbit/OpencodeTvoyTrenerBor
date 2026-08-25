@@ -12,6 +12,30 @@ export type PaymentUrlOptions = {
   urlReturn?: string | null;
 };
 
+// Замена типографских символов и вырезание всего, что отсутствует в
+// кодировке windows-1251 страницы оплаты Продамуса (эмодзи, стрелки,
+// dingbats и т.п.): × ✕ ✖, тире, типографские кавычки, emoji.
+export function sanitizeProductName(name: string): string {
+  // Fallback: если после санитизации пусто (название целиком из emoji),
+  // оставляем нейтральное наименование — пустой товар Продамус не примет.
+  const sanitized = sanitizeInner(name);
+  return sanitized || "Программа";
+}
+
+function sanitizeInner(name: string): string {
+  return name
+    .replace(/[×✕✖]/g, "x")
+    .replace(/[\u2014\u2013\u2212]/g, "-")
+    .replace(/[\u00AB\u00BB\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(
+      /[\u2190-\u21FF\u2300-\u27BF\u2B00-\u2BFF\uFE0F\uFE0E\u200D\u20E3\u{1F000}-\u{1FAFF}]/gu,
+      "",
+    )
+    .replace(/ {2,}/g, " ")
+    .trim();
+}
+
 // Ссылка на платёжную страницу Продамуса (развёрнутая, без SYS-кода).
 // Скобки `[`/`]` в ключах продуктов кодируются (как у официальных примеров
 // Продамуса: URLSearchParams/http_build_query).
@@ -30,7 +54,10 @@ export function buildPaymentUrl({
   const url = new URL(payformUrl);
   url.searchParams.set("do", "pay");
   url.searchParams.set("order_id", orderId);
-  url.searchParams.set("products[0][name]", productName);
+  url.searchParams.set(
+    "products[0][name]",
+    sanitizeProductName(productName),
+  );
   url.searchParams.set("products[0][price]", amount.toFixed(2));
   url.searchParams.set("products[0][quantity]", "1");
   if (customerPhone) url.searchParams.set("customer_phone", customerPhone);

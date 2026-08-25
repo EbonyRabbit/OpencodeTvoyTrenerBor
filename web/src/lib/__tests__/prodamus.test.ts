@@ -294,6 +294,34 @@ describe("parseProdamusOrder", () => {
 describe("buildPaymentUrl", () => {
   const payformUrl = "https://demo.payform.ru";
 
+  it("санитизирует типографские символы в названии (регрессия e2e: HYROX 5×12)", () => {
+    const url = buildPaymentUrl({
+      payformUrl,
+      orderId: "550e8400-e29b-41d4-a716-446655440000",
+      amount: 7770,
+      productName: "HYROX 5\u00D712 \u2014 подготовка к гонке",
+    });
+    const parsed = new URL(url);
+    // × → x, — → - : страница Продамуса (windows-1251) не распознаёт их
+    expect(parsed.searchParams.get("products[0][name]")).toBe(
+      "HYROX 5x12 - подготовка к гонке",
+    );
+    expect(url).not.toContain("%C3%97"); // UTF-8 ×
+    expect(url).not.toContain("%E2%80%94"); // UTF-8 —
+  });
+
+  it("санитизирует кавычки и вырезает символы вне windows-1251 (emoji, стрелки)", () => {
+    const parsed = new URL(
+      buildPaymentUrl({
+        payformUrl,
+        orderId: "550e8400-e29b-41d4-a716-446655440000",
+        amount: 1000,
+        productName: "\u00ABСила\u00BB \u201CPro\u201D \u2192 \u{1F3CB}\uFE0F",
+      }),
+    );
+    expect(parsed.searchParams.get("products[0][name]")).toBe('"Сила" "Pro"');
+  });
+
   it("строит полный URL с кодированными скобками", () => {
     const url = buildPaymentUrl({
       payformUrl,

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
 import { buildProgramRequestCoachMessage } from "../lib/program-links.js";
 import { InlineKeyboard } from "grammy";
+import { truncateMessage } from "../lib/workout-utils.js";
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 const TELEGRAM_BUTTON_MAX_BYTES = 64;
@@ -108,21 +109,17 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
     programs.forEach((program, i) => {
       lines.push(formatProgram(i + 1, program, lang));
       lines.push("");
-      const requestLabel = truncateButtonLabel(
-        `${t("programs.request_button", lang)} — ${program.title}`,
-      );
+      // Короткие подписи: полное название программы уже в тексте блока выше,
+      // а лимит Telegram — 64 байта на надпись кнопки.
       const buyable =
         program.price != null && program.price > 0 && !ownedProgramIds.has(program.id);
+      const row = keyboard
+        .text(t("programs.details_button", lang), `program_details:${program.id}`);
       if (buyable) {
-        const buyLabel = truncateButtonLabel(
-          `${t("programs.buy_button", lang)} — ${program.title}`,
-        );
-        keyboard.row()
-          .text(buyLabel, `purchase_start:${program.id}`)
-          .text(requestLabel, `program_request:${program.id}`);
-      } else {
-        keyboard.row().text(requestLabel, `program_request:${program.id}`);
+        row.text(t("programs.buy_button", lang), `purchase_start:${program.id}`);
       }
+      row.text(t("programs.request_button", lang), `program_request:${program.id}`);
+      keyboard.row();
     });
 
     // отдельная строка внизу каталога: заявка на индивидуальное ведение
@@ -208,5 +205,85 @@ export async function handleProgramRequestCallback(ctx: MyContext, programId: st
   } catch (err) {
     console.warn(`[PROGRAMS] Failed to send request:`, err);
     await ctx.reply(t("programs.request_error", lang));
+  }
+}
+
+// ℹ️ Подробнее: полное описание программы отдельным сообщением.
+// Доступно всем (в т.ч. не-клиентам) — покупка начинается отсюда.
+export async function handleProgramDetailsCallback(ctx: MyContext, programId: string): Promise<void> {
+  if (!ctx.from?.id) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  const lang = ctx.language;
+
+  if (!UUID_REGEX.test(programId)) {
+    await ctx.answerCallbackQuery({ text: t("error.unknown_callback", lang), show_alert: true });
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
+
+  try {
+    const { data: program, error } = await supabaseAdmin
+      .from("programs")
+      .select("id, title, type, description, duration_weeks, price")
+      .eq("id", programId)
+      .eq("active", true)
+      .eq("type", "template")
+      .is("client_id", null)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`[PROGRAMS] Details query error:`, error.message);
+      await ctx.reply(t("error.service_unavailable", lang));
+      return;
+    }
+    if (!program) {
+      await ctx.reply(t("programs.not_found", lang));
+      return;
+    }
+
+    // владелец программы не видит кнопку «Купить»
+    let owned = false;
+    try {
+      const { findClientByTelegramId } = await import("../lib/clients.js");
+      const client = await findClientByTelegramId(ctx.from.id);
+      owned = client?.program_id === program.id;
+    } catch (err) {
+      console.warn(`[PROGRAMS] Client lookup failed for ${ctx.from.id}:`, err);
+    }
+
+    const priceLine = program.price != null
+      ? t("programs.price_line", lang, { price: formatPrice(program.price) })
+      : "";
+    const lines: string[] = [
+      program.title,
+      `${t("programs.item_type_label", lang)} ${program.type || "—"}`,
+      `${t("programs.item_weeks_label", lang)} ${program.duration_weeks ?? 12}`,
+      priceLine,
+    ].filter((line) => line.trim() !== "");
+    if (program.description) {
+      lines.push("");
+      lines.push(program.description);
+    }
+    const message = truncateMessage(
+      lines.join("\n"),
+      t("program.truncation_suffix", lang),
+    );
+
+    const keyboard = new InlineKeyboard();
+    const buyable =
+      program.price != null && program.price > 0 && !owned;
+    if (buyable) {
+      keyboard.text(t("programs.buy_button", lang), `purchase_start:${program.id}`);
+    }
+    keyboard.text(t("programs.request_button", lang), `program_request:${program.id}`);
+
+    await ctx.reply(message, { reply_markup: keyboard });
+  } catch (err) {
+    console.warn(`[PROGRAMS] Details error for ${ctx.from.id}:`, err);
+    await ctx.reply(t("error.service_unavailable", lang));
   }
 }

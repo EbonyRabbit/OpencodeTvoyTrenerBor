@@ -19,6 +19,124 @@ const CONFIG = {
   },
 };
 
+function getSupabaseUrl() {
+  return PropertiesService.getScriptProperties().getProperty('SUPABASE_URL') || 'https://jafxybtbbkmwngqhsoaa.supabase.co';
+}
+
+function getSupabaseServiceKey() {
+  return PropertiesService.getScriptProperties().getProperty('SUPABASE_SERVICE_KEY');
+}
+
+function generateIdempotencyKey(clientId, date, exercise, dayOrder) {
+  const input = `${clientId}|${date}|${exercise}|${dayOrder}`;
+  const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input);
+  return hash.map((b) => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+}
+
+function parseIntSafe(value, defaultValue = null) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  const parsed = parseInt(String(value).trim(), 10);
+  return isNaN(parsed) ? defaultValue : parsed;
+}
+
+function parseFloatSafe(value, defaultValue = null) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  const cleaned = String(value).replace(',', '.').replace(/[^\d.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? defaultValue : parsed;
+}
+
+function supabaseInsertWorkoutLog(payload) {
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceKey();
+  if (!key) {
+    return { success: false, error: 'SUPABASE_SERVICE_KEY not configured in Script Properties' };
+  }
+
+  const endpoint = `${url}/rest/v1/workout_logs`;
+  const options = {
+    method: 'post',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  };
+
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = UrlFetchApp.fetch(endpoint, options);
+      const code = response.getResponseCode();
+
+      if (code === 201 || code === 200) {
+        return { success: true };
+      }
+      if (code === 409) {
+        return { success: true, duplicate: true };
+      }
+      if (code === 429 || code >= 500) {
+        Utilities.sleep(Math.pow(2, attempt) * 1000);
+        continue;
+      }
+      return { success: false, code, body: response.getContentText() };
+    } catch (e) {
+      if (attempt === maxRetries - 1) {
+        return { success: false, error: e.message };
+      }
+      Utilities.sleep(Math.pow(2, attempt) * 1000);
+    }
+  }
+  return { success: false, error: 'max retries exceeded' };
+}
+
+function logWorkoutToSupabase(client, state) {
+  try {
+    if (!client || !client.client_id) {
+      logBot('unknown', client?.telegram_id || 0, 'supabase_log_failed', 'failed', 'Missing client_id');
+      return;
+    }
+
+    const tz = client.timezone || CONFIG.DEFAULT_TIMEZONE;
+    const date = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    const dayOrder = Number(state.exercise_index) + 1;
+    const idempotencyKey = generateIdempotencyKey(client.client_id, date, state.exercise_name, dayOrder);
+
+    const payload = {
+      client_id: client.client_id,
+      date: date,
+      exercise: state.exercise_name,
+      sets: parseIntSafe(state.temp_sets),
+      reps: state.temp_reps || null,
+      weight: parseFloatSafe(state.temp_weight),
+      rpe: parseIntSafe(state.temp_rpe),
+      comment: state.temp_comment || null,
+      week: parseIntSafe(client.active_week),
+      day_order: dayOrder,
+      idempotency_key: idempotencyKey,
+    };
+
+    const result = supabaseInsertWorkoutLog(payload);
+
+    if (!result.success) {
+      logBot(
+        client.client_id,
+        client.telegram_id,
+        'supabase_workout_log_failed',
+        'failed',
+        JSON.stringify({ payload, error: result })
+      );
+    } else if (result.duplicate) {
+      logBot(client.client_id, client.telegram_id, 'supabase_workout_log_duplicate', 'info', 'Duplicate skipped');
+    }
+  } catch (e) {
+    logBot(client.client_id, client.telegram_id, 'supabase_workout_log_error', 'failed', e.message);
+  }
+}
+
 function getCommonSpreadsheet() {
   return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
 }
@@ -1046,6 +1164,8 @@ function logExerciseResult(client, state) {
     }
   }
   appendRow(CONFIG.SHEETS.RAW_RESULTS, [new Date(), client.client_id, client.active_cycle, client.active_week, state.day_title, Number(state.exercise_index) + 1, state.exercise_name, '', '', '', state.temp_sets, state.temp_reps, state.temp_weight, state.temp_rpe, state.temp_comment, sheetName, ex2 ? ex2.row : ''], ss);
+
+  logWorkoutToSupabase(client, state);
 }
 
 function startMeasurements(client) {

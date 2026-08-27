@@ -85,7 +85,7 @@
 
 | # | Задача | Статус |
 |---|--------|--------|
-| 1.6.1 | Добавить в Code.gs вызов Supabase API при записи тренировки | pending |
+| 1.6.1 | Добавить в Code.gs вызов Supabase API при записи тренировки | done |
 | 1.6.2 | Добавить в Code.gs вызов Supabase API при записи замеров | pending |
 | 1.6.3 | Добавить в Code.gs вызов Supabase API при чек-ине | pending |
 | 1.6.4 | Добавить в Code.gs вызов Supabase API при загрузке фото | pending |

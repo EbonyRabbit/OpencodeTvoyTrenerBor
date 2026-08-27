@@ -93,7 +93,7 @@ export function ActivityFeed({
   loadMore,
 }: {
   initialEvents: ActivityEvent[];
-  loadMore: (offset: number) => Promise<ActivityEvent[]>;
+  loadMore: (offset: number) => Promise<ActivityEvent[] | { error: string }>;
 }) {
   const [events, setEvents] = useState(initialEvents);
   const [loading, setLoading] = useState(false);
@@ -119,7 +119,12 @@ export function ActivityFeed({
   async function handleLoadMore() {
     setLoading(true);
     try {
-      const newEvents = await loadMore(events.length);
+      const res = await loadMore(events.length);
+      if ("error" in res) {
+        setHasMore(false);
+        return;
+      }
+      const newEvents = res;
       if (newEvents.length < ACTIVITY_PAGE_SIZE) setHasMore(false);
       setEvents((prev) => [...prev, ...newEvents]);
     } catch {

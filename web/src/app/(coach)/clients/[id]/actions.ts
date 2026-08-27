@@ -168,9 +168,17 @@ async function fetchPage(
   return all.slice(0, ACTIVITY_PAGE_SIZE);
 }
 
-export async function getClientActivity(clientId: string): Promise<{
-  events: ActivityEvent[];
-}> {
+export async function getClientActivity(clientId: string): Promise<
+  { events: ActivityEvent[] } | { error: string }
+> {
+  const { profile } = await verifySession();
+  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+    return { error: "Нет прав" };
+  }
+  if (!UUID_RE.test(clientId)) {
+    return { error: "Некорректный идентификатор" };
+  }
+
   const supabase = await createClient();
   const events = await fetchPage(supabase, clientId, 0);
 
@@ -180,7 +188,15 @@ export async function getClientActivity(clientId: string): Promise<{
 export async function loadMoreActivity(
   clientId: string,
   offset: number,
-): Promise<ActivityEvent[]> {
+): Promise<ActivityEvent[] | { error: string }> {
+  const { profile } = await verifySession();
+  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+    return { error: "Нет прав" };
+  }
+  if (!UUID_RE.test(clientId)) {
+    return { error: "Некорректный идентификатор" };
+  }
+
   const supabase = await createClient();
   return fetchPage(supabase, clientId, offset);
 }

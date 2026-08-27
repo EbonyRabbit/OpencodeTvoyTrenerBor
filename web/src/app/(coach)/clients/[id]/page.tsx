@@ -152,7 +152,9 @@ export default async function ClientProfilePage({
     ? measurementHistory[measurementHistory.length - 1]
     : null;
 
-  const { events: initialActivityEvents } = await getClientActivity(id);
+  const activityResult = await getClientActivity(id);
+  const initialActivityEvents =
+    "events" in activityResult ? activityResult.events : [];
 
   // DISABLED: photo storage removed
   // const rawPhotos = latestPhotosResult.data ?? [];

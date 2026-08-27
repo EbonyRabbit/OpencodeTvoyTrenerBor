@@ -235,7 +235,7 @@ export function ClientProfile({
   checkinHistory: CheckinHistoryRow[];
   measurementHistory: MeasurementHistoryRow[];
   initialActivityEvents: ActivityEvent[];
-  loadMoreActivity: (offset: number) => Promise<ActivityEvent[]>;
+  loadMoreActivity: (offset: number) => Promise<ActivityEvent[] | { error: string }>;
   // latestPhotos: PhotoRow[]; // DISABLED: photo storage removed
   purchasedProgramName: string | null;
   purchaseRequests: PurchaseRequestRow[];

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildProgramRequestCoachMessage } from "../../lib/program-links.js";
 import { programsHandler, handleProgramDetailsCallback } from "../programs.js";
 import { supabaseAdmin } from "../../lib/supabase-admin.js";
 import type { MyContext } from "../../bot.js";
@@ -138,11 +137,10 @@ describe("programsHandler catalog query", () => {
     const keyboard = JSON.stringify(options.reply_markup ?? []);
     expect(keyboard).toContain("purchase_start:tpl-buy");
     expect(keyboard).not.toContain("purchase_start:tpl-free");
-    expect(keyboard).toContain("program_request:tpl-buy");
-    expect(keyboard).toContain("program_request:tpl-free");
-    // у каждой программы есть кнопка «Подробнее»
+    // у каждой программы есть кнопка «Подробнее», но НЕТ пер-программной кнопки запроса
     expect(keyboard).toContain("program_details:tpl-buy");
     expect(keyboard).toContain("program_details:tpl-free");
+    expect(keyboard).not.toContain("program_request:");
   });
 
   it("uses short button labels so full titles live in the text", async () => {
@@ -170,7 +168,8 @@ describe("programsHandler catalog query", () => {
     // программа одна → кнопки без номеров
     expect(keyboard).toContain("ℹ️ Подробнее");
     expect(keyboard).toContain("💳 Купить");
-    expect(keyboard).toContain("📩 Запросить");
+    expect(keyboard).not.toContain("📩 Запросить");
+    expect(keyboard).not.toContain("program_request:");
     expect(keyboard).not.toContain("— HYROX");
     expect(keyboard).not.toContain("ℹ️ Подробнее 1");
   });
@@ -204,7 +203,7 @@ describe("programsHandler catalog query", () => {
     const keyboard = JSON.stringify(options.reply_markup ?? []);
     expect(keyboard).toContain("ℹ️ Подробнее 1");
     expect(keyboard).toContain("💳 Купить 2");
-    expect(keyboard).toContain("📩 Запросить 2");
+    expect(keyboard).not.toContain("📩 Запросить");
   });
 
   it("hides the buy button for a program the client already owns", async () => {
@@ -230,7 +229,7 @@ describe("programsHandler catalog query", () => {
     };
     const keyboard = JSON.stringify(options.reply_markup ?? []);
     expect(keyboard).not.toContain("purchase_start:tpl-buy");
-    expect(keyboard).toContain("program_request:tpl-buy");
+    expect(keyboard).not.toContain("program_request:");
   });
 
   it("adds a coach_request button at the bottom of the catalog", async () => {
@@ -252,7 +251,7 @@ describe("programsHandler catalog query", () => {
       reply_markup?: unknown;
     };
     const keyboard = JSON.stringify(options.reply_markup ?? []);
-    expect(keyboard).toContain(`"text":"📞 Связаться с тренером","callback_data":"coach_request"`);
+    expect(keyboard).toContain(`"text":"✉️ Связаться с тренером","callback_data":"coach_request"`);
   });
 
   it("adds a coach_request button when the catalog is empty", async () => {
@@ -269,71 +268,6 @@ describe("programsHandler catalog query", () => {
   });
 });
 
-
-describe("buildProgramRequestCoachMessage", () => {
-  it("includes name, username link and tg id", () => {
-    const msg = buildProgramRequestCoachMessage({
-      clientName: "Иван",
-      telegramId: 123456789,
-      username: "iurii",
-      programTitle: "Сушка",
-    });
-    expect(msg).toContain("👤 Иван");
-    expect(msg).toContain("🔗 @iurii (https://t.me/iurii)");
-    expect(msg).toContain("🆔 TG ID: 123456789");
-    expect(msg).toContain("Хочет: Сушка");
-  });
-
-  it("still shows tg id when username is missing", () => {
-    const msg = buildProgramRequestCoachMessage({
-      clientName: "Иван",
-      telegramId: 123456789,
-      username: null,
-      programTitle: "Сушка",
-    });
-    expect(msg).toContain("🆔 TG ID: 123456789");
-    expect(msg).not.toContain("@");
-  });
-
-  it("keeps blank separator lines (no collapsed message)", () => {
-    const msg = buildProgramRequestCoachMessage({
-      clientName: "Иван",
-      telegramId: 123456789,
-      username: null,
-      programTitle: "Сушка",
-    });
-    expect(msg).toBe(
-      "📩 Запрос от клиента\n" +
-        "\n" +
-        "👤 Иван\n" +
-        "🆔 TG ID: 123456789\n" +
-        "\n" +
-        "Хочет: Сушка\n" +
-        "\n" +
-        "Свяжитесь с клиентом в Telegram.",
-    );
-  });
-
-  it("builds exact message with username link", () => {
-    const msg = buildProgramRequestCoachMessage({
-      clientName: "Иван",
-      telegramId: 123456789,
-      username: "iurii",
-      programTitle: "Сушка",
-    });
-    expect(msg).toBe(
-      "📩 Запрос от клиента\n" +
-        "\n" +
-        "👤 Иван\n" +
-        "🔗 @iurii (https://t.me/iurii)\n" +
-        "🆔 TG ID: 123456789\n" +
-        "\n" +
-        "Хочет: Сушка\n" +
-        "\n" +
-        "Свяжитесь с клиентом в Telegram.",
-    );
-  });
-});
 
 const DETAILS_ID = "d1e2f3a4-b2c3-4d5e-8f90-1a2b3c4d5e6f";
 
@@ -414,7 +348,7 @@ describe("handleProgramDetailsCallback", () => {
     };
     const keyboard = JSON.stringify(options.reply_markup ?? []);
     expect(keyboard).not.toContain(`purchase_start:${DETAILS_ID}`);
-    expect(keyboard).toContain(`program_request:${DETAILS_ID}`);
+    expect(keyboard).not.toContain(`program_request:${DETAILS_ID}`);
   });
 
   it("сообщает not_found для скрытой/удалённой программы", async () => {

@@ -12,7 +12,7 @@ import { startMeasurements, handleMeasurementsInput, showMeasurementHistory } fr
 import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
-import { programsHandler, handleProgramRequestCallback, handleProgramDetailsCallback } from "./handlers/programs.js";
+import { programsHandler, handleProgramDetailsCallback } from "./handlers/programs.js";
 import {
   startPurchase,
   handleConsentPurchase,
@@ -236,11 +236,6 @@ bot.on("callback_query:data", async (ctx, next) => {
     }
     ctx.client = guard.client;
     await handleSettingsCallback(ctx, data);
-    return;
-  }
-  if (data?.startsWith("program_request:")) {
-    const programId = data.slice("program_request:".length);
-    await handleProgramRequestCallback(ctx, programId);
     return;
   }
   if (data?.startsWith("program_details:")) {

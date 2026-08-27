@@ -2,7 +2,6 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
-import { buildProgramRequestCoachMessage } from "../lib/program-links.js";
 import { InlineKeyboard } from "grammy";
 import { truncateMessage } from "../lib/workout-utils.js";
 
@@ -127,7 +126,6 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
       if (buyable) {
         row.text(t("programs.buy_button", lang) + num, `purchase_start:${program.id}`);
       }
-      row.text(t("programs.request_button", lang) + num, `program_request:${program.id}`);
       keyboard.row();
     });
 
@@ -146,76 +144,7 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
   }
 }
 
-export async function handleProgramRequestCallback(ctx: MyContext, programId: string): Promise<void> {
-  if (!ctx.from?.id) {
-    await ctx.answerCallbackQuery();
-    return;
-  }
 
-  const lang = ctx.language;
-
-  if (!UUID_REGEX.test(programId)) {
-    await ctx.answerCallbackQuery({ text: t("error.unknown_callback", lang), show_alert: true });
-    return;
-  }
-
-  await ctx.answerCallbackQuery();
-
-  try {
-    const { data: program } = await supabaseAdmin
-      .from("programs")
-      .select("title")
-      .eq("id", programId)
-      .eq("type", "template")
-      .maybeSingle();
-
-    const programTitle = program?.title ?? programId;
-
-    const bot = (await import("../bot.js")).bot;
-    const coachChatId = config.coachChatId;
-    let notificationFailed = false;
-
-    if (coachChatId !== 0n) {
-      const { findClientByTelegramId } = await import("../lib/clients.js");
-      const client = await findClientByTelegramId(ctx.from.id);
-      const clientName = client?.name ?? "Неизвестный клиент";
-      const coachMsg = buildProgramRequestCoachMessage({
-        clientName,
-        telegramId: ctx.from.id,
-        username: ctx.from.username ?? null,
-        programTitle,
-      });
-      try {
-        await bot.api.sendMessage(String(coachChatId), coachMsg);
-      } catch (sendErr) {
-        console.warn(`[PROGRAMS] Coach notification failed for ${ctx.from.id}:`, sendErr);
-        notificationFailed = true;
-      }
-    } else {
-      notificationFailed = true;
-    }
-
-    const { error: logError } = await supabaseAdmin.from("bot_logs").insert({
-      action: notificationFailed ? "program_request:coach_notification_failed" : "program_request",
-      status: notificationFailed ? "error" : "info",
-      telegram_id: ctx.from.id,
-      details: JSON.stringify({ program_id: programId, program_title: programTitle }),
-    });
-    if (logError) {
-      console.warn("[PROGRAMS] Failed to log request:", logError.message);
-    }
-
-    if (notificationFailed) {
-      await ctx.reply(t("programs.request_error", lang));
-      return;
-    }
-
-    await ctx.reply(t("programs.request_sent", lang));
-  } catch (err) {
-    console.warn(`[PROGRAMS] Failed to send request:`, err);
-    await ctx.reply(t("programs.request_error", lang));
-  }
-}
 
 // ℹ️ Подробнее: полное описание программы отдельным сообщением.
 // Доступно всем (в т.ч. не-клиентам) — покупка начинается отсюда.
@@ -288,7 +217,6 @@ export async function handleProgramDetailsCallback(ctx: MyContext, programId: st
     if (buyable) {
       keyboard.text(t("programs.buy_button", lang), `purchase_start:${program.id}`);
     }
-    keyboard.text(t("programs.request_button", lang), `program_request:${program.id}`);
 
     await ctx.reply(message, { reply_markup: keyboard });
   } catch (err) {

@@ -156,7 +156,7 @@ bot.command("resume", async (ctx) => {
   await startResume(ctx);
 });
 
-bot.command("programs", programsHandler);
+bot.command("programs", (ctx) => programsHandler(ctx));
 
 bot.command("myweb", async (ctx) => {
   const guard = await guardAuthenticatedClient(ctx);

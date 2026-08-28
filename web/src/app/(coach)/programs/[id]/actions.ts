@@ -240,7 +240,7 @@ export async function updateProgramSport(
   }
 }
 
-export async function getClientsForAssignment(): Promise<{
+export async function getAssignableClients(): Promise<{
   clients: Array<{ id: string; name: string; program_id: string | null }>;
   error?: string;
 }> {

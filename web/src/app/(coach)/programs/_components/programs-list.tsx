@@ -25,6 +25,7 @@ import {
   FILTER_LABELS,
   type ProgramRow,
   type ProgramFilter,
+  type SportFilter,
 } from "@/lib/programs";
 import { CreateProgramDialog } from "./create-program-dialog";
 

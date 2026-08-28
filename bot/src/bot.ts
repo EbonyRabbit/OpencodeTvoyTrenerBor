@@ -243,6 +243,12 @@ bot.on("callback_query:data", async (ctx, next) => {
     await handleProgramDetailsCallback(ctx, programId);
     return;
   }
+  if (data?.startsWith("programs_sport:")) {
+    const sport = data.slice("programs_sport:".length);
+    ctx.answerCallbackQuery().catch(() => {});
+    await programsHandler(ctx, sport === "all" ? null : sport);
+    return;
+  }
   // purchase flow must bypass guardActiveClient: buyers may not be linked to a
   // client yet (pending payment / no program assigned).
   if (data?.startsWith("purchase_start:")) {

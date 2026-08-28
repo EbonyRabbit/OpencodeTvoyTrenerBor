@@ -18,6 +18,7 @@ export async function createProgram(input: {
   price?: number;
   duration_weeks: number;
   type?: string;
+  sport?: string;
   language?: string;
 }): Promise<{ id?: string; error?: string }> {
   try {
@@ -37,6 +38,8 @@ export async function createProgram(input: {
 
     const validTypes = ["template", "personal"];
     const type = input.type && validTypes.includes(input.type) ? input.type : "template";
+    const validSports = ["tennis", "running", "triathlon", "swimming", "hyrox", "general"];
+    const sport = input.sport && validSports.includes(input.sport) ? input.sport : null;
     const language = input.language === "en" ? "en" : "ru";
 
     const insertData: ProgramInsert = {
@@ -46,6 +49,7 @@ export async function createProgram(input: {
       price: typeof input.price === "number" && Number.isFinite(input.price) && input.price >= 0 ? input.price : null,
       duration_weeks: durationWeeks,
       type: type as "template" | "personal",
+      sport,
       language,
       active: false,
       parsed_content: null,
@@ -198,7 +202,45 @@ export async function updateProgramType(
   }
 }
 
-export async function getAssignableClients(): Promise<{
+export async function updateProgramSport(
+  programId: string,
+  sport: "tennis" | "running" | "triathlon" | "swimming" | "hyrox" | "general" | null,
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+
+    if (!UUID_RE.test(programId)) return { error: "Некорректный идентификатор" };
+
+    const validSports = ["tennis", "running", "triathlon", "swimming", "hyrox", "general"];
+    const nextSport = sport && validSports.includes(sport) ? sport : null;
+
+    const { data: program, error: fetchError } = await supabaseAdmin
+      .from("programs")
+      .select("id")
+      .eq("id", programId)
+      .maybeSingle();
+    if (fetchError) return { error: fetchError.message };
+    if (!program) return { error: "Программа не найдена" };
+
+    const { error } = await supabaseAdmin
+      .from("programs")
+      .update({ sport: nextSport, updated_at: new Date().toISOString() })
+      .eq("id", programId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/programs/${programId}`);
+    revalidatePath(`/programs/${programId}/edit`);
+    revalidatePath("/programs");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function getClientsForAssignment(): Promise<{
   clients: Array<{ id: string; name: string; program_id: string | null }>;
   error?: string;
 }> {

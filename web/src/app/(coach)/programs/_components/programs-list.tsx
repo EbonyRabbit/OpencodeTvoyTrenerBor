@@ -21,6 +21,7 @@ import {
   getProgramStatus,
   STATUS_LABELS,
   STATUS_VARIANTS,
+  SPORT_LABELS,
   FILTER_LABELS,
   type ProgramRow,
   type ProgramFilter,
@@ -78,10 +79,12 @@ function Paginator({
   page,
   totalPages,
   currentStatus,
+  currentSport,
 }: {
   page: number;
   totalPages: number;
   currentStatus: ProgramFilter;
+  currentSport: SportFilter;
 }) {
   const pages: (number | "ellipsis")[] = [];
   const delta = 1;
@@ -108,7 +111,8 @@ function Paginator({
   }
 
   function href(p: number) {
-    return `/programs?page=${p}&status=${currentStatus}`;
+    const sportParam = currentSport !== "all" ? `&sport=${currentSport}` : "";
+    return `/programs?page=${p}&status=${currentStatus}${sportParam}`;
   }
 
   return (
@@ -153,12 +157,14 @@ export function ProgramsList({
   page,
   totalPages,
   currentStatus,
+  currentSport,
 }: {
   programs: ProgramRow[];
   totalCount: number;
   page: number;
   totalPages: number;
   currentStatus: ProgramFilter;
+  currentSport: SportFilter;
 }) {
   if (totalCount === 0) {
     return (
@@ -191,6 +197,11 @@ export function ProgramsList({
                       {program.title}
                     </h3>
                     <div className="flex shrink-0 flex-col items-end gap-1">
+                      {program.sport && (
+                        <Badge variant="outline">
+                          {SPORT_LABELS[program.sport as SportFilter]}
+                        </Badge>
+                      )}
                       {program.type === "personal" && (
                         <Badge variant="secondary">Персональная</Badge>
                       )}
@@ -223,6 +234,7 @@ export function ProgramsList({
           page={page}
           totalPages={totalPages}
           currentStatus={currentStatus}
+          currentSport={currentSport}
         />
       )}
     </div>

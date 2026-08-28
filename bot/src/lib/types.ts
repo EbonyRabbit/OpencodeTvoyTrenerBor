@@ -67,6 +67,7 @@ export interface Database {
           template_id: string | null;
           active: boolean;
           type: string | null;
+          sport: string | null;
           language: string;
           duration_weeks: number;
           template_file_url: string | null;

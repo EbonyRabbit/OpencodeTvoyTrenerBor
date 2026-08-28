@@ -36,6 +36,9 @@ export function CreateProgramDialog() {
   const [language, setLanguage] = useState("ru");
   const [price, setPrice] = useState("");
   const [type, setType] = useState<"template" | "personal">("template");
+  const [sport, setSport] = useState<
+    "tennis" | "running" | "triathlon" | "swimming" | "hyrox" | "general"
+  >("general");
 
   const canSubmit = useMemo(() => {
     if (loading) return false;
@@ -53,6 +56,7 @@ export function CreateProgramDialog() {
     setLanguage("ru");
     setPrice("");
     setType("template");
+    setSport("general");
     setError(null);
   }, []);
 
@@ -90,6 +94,7 @@ export function CreateProgramDialog() {
         language,
         price: parsedPrice,
         type,
+        sport,
       });
 
       if (result.error) {
@@ -107,7 +112,7 @@ export function CreateProgramDialog() {
     } finally {
       setLoading(false);
     }
-  }, [title, description, durationWeeks, equipment, language, price, type, reset, router]);
+  }, [title, description, durationWeeks, equipment, language, price, type, sport, reset, router]);
 
   return (
     <Dialog
@@ -268,6 +273,46 @@ export function CreateProgramDialog() {
               <p className="text-xs text-muted-foreground">
                 Персональные программы не отображаются в меню покупки в
                 Telegram-боте.
+              </p>
+            </div>
+
+            <div className="grid gap-1.5">
+              <label id="label-sport" className="text-sm font-medium">
+                Вид спорта
+              </label>
+              <Select
+                value={sport}
+                onValueChange={(v) => {
+                  if (
+                    v === "tennis" ||
+                    v === "running" ||
+                    v === "triathlon" ||
+                    v === "swimming" ||
+                    v === "hyrox" ||
+                    v === "general"
+                  ) {
+                    setSport(v);
+                  }
+                }}
+              >
+                <SelectTrigger
+                  className="w-full"
+                  aria-labelledby="label-sport"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">Общее</SelectItem>
+                  <SelectItem value="tennis">🎾 Теннис</SelectItem>
+                  <SelectItem value="running">🏃 Бег</SelectItem>
+                  <SelectItem value="triathlon">🚴 Триатлон</SelectItem>
+                  <SelectItem value="swimming">🏊 Плавание</SelectItem>
+                  <SelectItem value="hyrox">🏋️ HYROX</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Спорт-специфичные шаблоны сгруппированы по виду спорта в
+                каталоге бота и веб-панели.
               </p>
             </div>
           </div>

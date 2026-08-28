@@ -32,7 +32,7 @@ import {
   getCompositeLetters,
   type ExerciseType,
 } from "@/lib/program-utils";
-import { updateProgramContent, updateProgramType } from "../../actions";
+import { updateProgramContent, updateProgramType, updateProgramSport } from "../../actions";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { ExerciseAutocomplete } from "./exercise-autocomplete";
 
@@ -664,6 +664,20 @@ export function ProgramEditor({
   const [programType, setProgramType] = useState<"template" | "personal">(
     program.type === "personal" ? "personal" : "template",
   );
+  const [programSport, setProgramSport] = useState<
+    "tennis" | "running" | "triathlon" | "swimming" | "hyrox" | "general" | null
+  >(
+    program.sport === "tennis" ||
+      program.sport === "running" ||
+      program.sport === "triathlon" ||
+      program.sport === "swimming" ||
+      program.sport === "hyrox" ||
+      program.sport === "general"
+      ? program.sport
+      : null,
+  );
+  const [sportSaving, setSportSaving] = useState(false);
+  const [sportError, setSportError] = useState<string | null>(null);
 
   const handleTypeChange = useCallback(async (next: string | null) => {
     if (next !== "template" && next !== "personal") return;
@@ -680,6 +694,32 @@ export function ProgramEditor({
       setTypeError("Не удалось изменить тип программы");
     } finally {
       setTypeSaving(false);
+    }
+  }, [program.id]);
+
+  const handleSportChange = useCallback(async (next: string | null) => {
+    const value =
+      next === "tennis" ||
+      next === "running" ||
+      next === "triathlon" ||
+      next === "swimming" ||
+      next === "hyrox" ||
+      next === "general"
+        ? next
+        : null;
+    setSportError(null);
+    setSportSaving(true);
+    try {
+      const result = await updateProgramSport(program.id, value);
+      if (result.error) {
+        setSportError(result.error);
+      } else {
+        setProgramSport(value);
+      }
+    } catch {
+      setSportError("Не удалось изменить вид спорта");
+    } finally {
+      setSportSaving(false);
     }
   }, [program.id]);
 
@@ -784,6 +824,41 @@ export function ProgramEditor({
             {typeError && (
               <span className="text-xs text-destructive" role="alert">
                 {typeError}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <label
+              id="label-editor-sport"
+              className="text-sm text-muted-foreground"
+            >
+              Вид спорта:
+            </label>
+            <Select
+              value={programSport ?? "none"}
+              onValueChange={handleSportChange}
+            >
+              <SelectTrigger
+                className="h-8 w-72"
+                aria-labelledby="label-editor-sport"
+                disabled={sportSaving}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Не задан —</SelectItem>
+                <SelectItem value="general">Общее</SelectItem>
+                <SelectItem value="tennis">🎾 Теннис</SelectItem>
+                <SelectItem value="running">🏃 Бег</SelectItem>
+                <SelectItem value="triathlon">🚴 Триатлон</SelectItem>
+                <SelectItem value="swimming">🏊 Плавание</SelectItem>
+                <SelectItem value="hyrox">🏋️ HYROX</SelectItem>
+              </SelectContent>
+            </Select>
+            {sportSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {sportError && (
+              <span className="text-xs text-destructive" role="alert">
+                {sportError}
               </span>
             )}
           </div>

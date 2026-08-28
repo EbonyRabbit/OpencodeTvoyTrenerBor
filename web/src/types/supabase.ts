@@ -828,6 +828,7 @@ export type Database = {
           language: string
           parsed_content: Json | null
           price: number | null
+          sport: string | null
           template_file_url: string | null
           template_id: string | null
           title: string
@@ -845,6 +846,7 @@ export type Database = {
           language?: string
           parsed_content?: Json | null
           price?: number | null
+          sport?: string | null
           template_file_url?: string | null
           template_id?: string | null
           title: string
@@ -862,6 +864,7 @@ export type Database = {
           language?: string
           parsed_content?: Json | null
           price?: number | null
+          sport?: string | null
           template_file_url?: string | null
           template_id?: string | null
           title?: string

@@ -6,6 +6,27 @@ export type ProgramStatus = "draft" | "active" | "archived";
 export const VALID_STATUSES = ["all", "draft", "active", "archived"] as const;
 export type ProgramFilter = (typeof VALID_STATUSES)[number];
 
+export const VALID_SPORTS = [
+  "all",
+  "tennis",
+  "running",
+  "triathlon",
+  "swimming",
+  "hyrox",
+  "general",
+] as const;
+export type SportFilter = (typeof VALID_SPORTS)[number];
+
+export const SPORT_LABELS: Record<SportFilter, string> = {
+  all: "Все виды",
+  tennis: "🎾 Теннис",
+  running: "🏃 Бег",
+  triathlon: "🚴 Триатлон",
+  swimming: "🏊 Плавание",
+  hyrox: "🏋️ HYROX",
+  general: "Общее",
+};
+
 export function getProgramStatus(
   program: Pick<ProgramRow, "active" | "parsed_content">,
 ): ProgramStatus {

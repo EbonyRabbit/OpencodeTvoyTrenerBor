@@ -1,7 +1,7 @@
 import { verifySession } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
-import { VALID_STATUSES, type ProgramFilter, type ProgramRow } from "@/lib/programs";
+import { VALID_STATUSES, VALID_SPORTS, type ProgramFilter, type SportFilter, type ProgramRow } from "@/lib/programs";
 import { ProgramsList } from "./_components/programs-list";
 import { ProgramFilters } from "./_components/program-filters";
 import { CreateProgramDialog } from "./_components/create-program-dialog";
@@ -11,10 +11,11 @@ const PAGE_SIZE = 10;
 function buildQuery(
   supabase: Awaited<ReturnType<typeof createClient>>,
   status: ProgramFilter,
+  sport: SportFilter,
 ) {
   let query = supabase
     .from("programs")
-    .select("id, title, description, equipment, price, template_id, active, type, language, duration_weeks, parsed_content, created_at", { count: "exact" });
+    .select("id, title, description, equipment, price, template_id, active, type, sport, language, duration_weeks, parsed_content, created_at", { count: "exact" });
 
   if (status === "draft") {
     query = query.eq("active", false).is("parsed_content", null);
@@ -24,13 +25,17 @@ function buildQuery(
     query = query.eq("active", false).not("parsed_content", "is", null);
   }
 
+  if (sport !== "all") {
+    query = query.eq("sport", sport);
+  }
+
   return query;
 }
 
 export default async function ProgramsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; status?: string }>;
+  searchParams: Promise<{ page?: string; status?: string; sport?: string }>;
 }) {
   const { profile } = await verifySession();
 
@@ -43,12 +48,15 @@ export default async function ProgramsPage({
   const status = VALID_STATUSES.includes(params.status as ProgramFilter)
     ? (params.status as ProgramFilter)
     : "all";
+  const sport = VALID_SPORTS.includes(params.sport as SportFilter)
+    ? (params.sport as SportFilter)
+    : "all";
 
   const supabase = await createClient();
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const query = buildQuery(supabase, status)
+  const query = buildQuery(supabase, status, sport)
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -80,7 +88,7 @@ export default async function ProgramsPage({
         <CreateProgramDialog />
       </div>
 
-      <ProgramFilters currentStatus={status} />
+      <ProgramFilters currentStatus={status} currentSport={sport} />
 
       <ProgramsList
         programs={programs ?? []}
@@ -88,6 +96,7 @@ export default async function ProgramsPage({
         page={safePage}
         totalPages={totalPages}
         currentStatus={status}
+        currentSport={sport}
       />
     </div>
   );

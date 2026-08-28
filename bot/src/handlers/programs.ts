@@ -13,10 +13,28 @@ interface Program {
   id: string;
   title: string;
   type: string | null;
+  sport: string | null;
   description: string | null;
   duration_weeks: number | null;
   price: number | null;
 }
+
+const BOT_SPORT_FILTERS: { label: string; value: string | null }[] = [
+  { label: "Все", value: null },
+  { label: "🎾 Теннис", value: "tennis" },
+  { label: "🏃 Бег", value: "running" },
+  { label: "🚴 Триатлон", value: "triathlon" },
+  { label: "🏊 Плавание", value: "swimming" },
+];
+
+const BOT_SPORT_LABELS: Record<string, string> = {
+  tennis: "🎾 Теннис",
+  running: "🏃 Бег",
+  triathlon: "🚴 Триатлон",
+  swimming: "🏊 Плавание",
+  hyrox: "🏋️ HYROX",
+  general: "Общее",
+};
 
 export function truncateButtonLabel(label: string, maxBytes = TELEGRAM_BUTTON_MAX_BYTES): string {
   const encoder = new TextEncoder();
@@ -42,6 +60,7 @@ function formatPrice(price: number | null): string {
 
 function formatProgram(index: number, program: Program, lang: Language): string {
   const type = program.type || "—";
+  const sport = program.sport ? (BOT_SPORT_LABELS[program.sport] ?? program.sport) : "";
   const weeks = program.duration_weeks ?? 12;
   const priceLine = program.price != null
     ? t("programs.price_line", lang, { price: formatPrice(program.price) })
@@ -50,17 +69,24 @@ function formatProgram(index: number, program: Program, lang: Language): string 
     ? t("programs.description_line", lang, { description: program.description.slice(0, 100) })
     : "";
 
-  return t("programs.item", lang, {
-    index,
-    title: program.title,
-    type,
-    weeks,
-    price_line: priceLine,
-    description_line: descriptionLine,
-  });
+  const sportLine = sport ? `🏆 ${sport}\n` : "";
+  return (
+    sportLine +
+    t("programs.item", lang, {
+      index,
+      title: program.title,
+      type,
+      weeks,
+      price_line: priceLine,
+      description_line: descriptionLine,
+    })
+  );
 }
 
-export async function programsHandler(ctx: MyContext): Promise<void> {
+export async function programsHandler(
+  ctx: MyContext,
+  sportFilter: string | null = null,
+): Promise<void> {
   if (!ctx.from?.id) {
     await ctx.reply(t("error.user_not_identified", ctx.language));
     return;
@@ -69,13 +95,19 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
   const lang = ctx.language;
 
   try {
-    const { data: programs, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("programs")
-      .select("id, title, type, description, duration_weeks, price")
+      .select("id, title, type, sport, description, duration_weeks, price")
       .eq("active", true)
       .eq("type", "template")
-      .is("client_id", null)
-      .order("title");
+      .is("client_id", null);
+
+    const VALID_SPORTS = ["tennis", "running", "triathlon", "swimming", "hyrox", "general"];
+    if (sportFilter && VALID_SPORTS.includes(sportFilter)) {
+      query = query.eq("sport", sportFilter);
+    }
+
+    const { data: programs, error } = await query.order("title");
 
     if (error) {
       console.error(`[PROGRAMS] Query error:`, error.message);
@@ -104,6 +136,13 @@ export async function programsHandler(ctx: MyContext): Promise<void> {
 
     const lines: string[] = [t("programs.title", lang), ""];
     const keyboard = new InlineKeyboard();
+
+    // Строка фильтра по виду спорта (первой строкой каталога).
+    for (const f of BOT_SPORT_FILTERS) {
+      const active = (sportFilter ?? null) === f.value;
+      keyboard.text(active ? `✓ ${f.label}` : f.label, `programs_sport:${f.value ?? "all"}`);
+    }
+    keyboard.row();
 
     // Короткие подписи: полное название программы уже в тексте блока выше,
     // а лимит Telegram — 64 байта на надпись кнопки. При нескольких

@@ -234,7 +234,7 @@
 | 9.7 | Бег: анализ (md) + builder + seed | done |
 | 9.8 | Триатлон: анализ (md) + builder + seed | done |
 | 9.9 | Плавание: анализ (md) + builder + seed | done |
-| 9.10 | Прогнать миграцию и seed на Supabase (`supabase db push` + 4 seed-скрипта) | pending |
+| 9.10 | Прогнать миграцию и seed на Supabase (`supabase db push` + 4 seed-скрипта) | done |
 
 ---
 

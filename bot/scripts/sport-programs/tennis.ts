@@ -5,6 +5,11 @@
  * регионы/задачи и блоки — стабильная основа (см. tennis.md), конкретный
  * состав упражнений может меняться тренером без затрагивания основы.
  *
+ * Структура (финал): Дни 1 и 2 — Full Body (низ+верх, баланс ВП/ГП/ВЖ/ГЖ),
+ * День 3 — Кондиция+Кор (ОФП) с финишем бегом (клиент бегает с другим тренером
+ * на трассе, здесь — зальная ОФП + лёгкий финиш-бег). Взрывная работа —
+ * строго в начале дня (после разминки), только фаза power (нед 9–11).
+ *
  * Run from bot/ together with seed-tennis-program.ts:
  *   DOTENV_CONFIG_PATH=.env.local npx tsx scripts/seed-tennis-program.ts
  */
@@ -63,6 +68,27 @@ function strength(
   };
 }
 
+function core(phase: Phase, name: string, reps: string, note: string): ParsedExercise {
+  const p = PHASE_PRESCRIPTION[phase];
+  return { block: "Кор", name, sets: p.sets, reps, rpe: "7", rest: "60с", notes: note };
+}
+
+function cond(phase: Phase, name: string, reps: string, note: string): ParsedExercise {
+  const p = PHASE_PRESCRIPTION[phase];
+  return { block: "Кондиция", name, sets: p.sets, reps, rpe: "7", rest: "90с", notes: note };
+}
+
+function explosive(
+  phase: Phase,
+  block: string,
+  name: string,
+  reps: string,
+  note: string,
+): ParsedExercise | null {
+  if (phase !== "power") return null;
+  return { block, name, sets: "3", reps, rpe: "7", rest: "90с", notes: note };
+}
+
 function warmup(): ParsedExercise {
   return {
     block: "Разминка",
@@ -70,13 +96,64 @@ function warmup(): ParsedExercise {
   };
 }
 
+function cardioRun(phase: Phase): ParsedExercise {
+  if (phase === "foundation" || phase === "deload") {
+    return {
+      block: "Кондиция",
+      name: "Лёгкий бег",
+      type: "cardio",
+      distance: phase === "deload" ? "4-5 км" : "6-8 км",
+      duration: phase === "deload" ? "25-30 мин" : "35-45 мин",
+      pace: "комфортный",
+      heart_rate: "Z2-Z3",
+      notes: "аэробная база; без спринтов (финиш ОФП-дня)",
+    };
+  }
+  if (phase === "power") {
+    return {
+      block: "Кондиция",
+      name: "Лёгкий бег",
+      type: "cardio",
+      duration: "8-10×(400 м)",
+      pace: "темп 5К",
+      heart_rate: "Z4-Z5",
+      notes: "интервалы после силовой; восстановление между повторами — лёгкий бег/ходьба",
+    };
+  }
+  return {
+    block: "Кондиция",
+    name: "Лёгкий бег",
+    type: "cardio",
+    distance: "8-10 км",
+    duration: "45-55 мин",
+    pace: "комфортный",
+    heart_rate: "Z2-Z3",
+    notes: "объёмный лёгкий бег",
+  };
+}
+
 function buildDayA(w: number, phase: Phase): ParsedExercise[] {
   const ex: ParsedExercise[] = [warmup()];
-  ex.push(strength(phase, "Сила", "Румынская тяга с гантелями", "ЗС; нейтраль позвоночника, без округления"));
-  ex.push(strength(phase, "Сила", "Ягодичный мост со штангой", "УС; пик в укороченном состоянии"));
-  ex.push(
-    strength(phase, "Сила", "Отведение бедра (кабель/резинка)", "дропсет; glute med/min для латеральной стабильности"),
-  );
+  const e1 = explosive(phase, "Ротация", "Кабель-ротация туловища", "8/сторону", "взрывная X-factor; контроль поясницы, без рывков");
+  if (e1) ex.push(e1);
+  const e2 = explosive(phase, "Плиометрика", "Запрыгивания на тумбу", "5", "мягкое приземление; только после разминки");
+  if (e2) ex.push(e2);
+  ex.push(strength(phase, "Сила", "Румянская тяга с гантелями", "ЗС; нейтраль позвоночника, без округления"));
+  ex.push(strength(phase, "Сила", "Болгарские выпады", "ЖГ, свободный ЛГС; одноопорная сила"));
+  ex.push(strength(phase, "Сила", "Подъём на носки (икры)", "полная амплитуда; можно с весом"));
+  ex.push(strength(phase, "Тяга", "Тяга верхнего блока", "широчайшие; против сутулости от игры"));
+  ex.push(strength(phase, "Манжета", "Тяга к лицу", "задняя дельта/трапеция — здоровье плеча"));
+  ex.push(strength(phase, "Жим", "Жим гантелей на наклонной", "грудь/дельты; горизонтальный жим"));
+  ex.push(strength(phase, "Жим", "Жим гантелей стоя", "вертикальный жим; осанка/руки (ВЖ)"));
+  ex.push(core(phase, "Паллоф-пресс", "10-12/сторону", "антиротация кор — защита поясницы"));
+  return ex;
+}
+
+function buildDayB(w: number, phase: Phase): ParsedExercise[] {
+  const ex: ParsedExercise[] = [warmup()];
+  const e1 = explosive(phase, "Ротация", "Ротационный бросок медбола", "8/сторону", "взрывная ротационная мощь удара; только после разминки");
+  if (e1) ex.push(e1);
+  ex.push(strength(phase, "Сила", "Ягодичный мостик с гантелью", "УС; пик в укороченном состоянии"));
   ex.push(strength(phase, "Сила", "Боковые выпады", "фронтальная плоскость — COD"));
   ex.push({
     block: "Мобильность",
@@ -87,164 +164,33 @@ function buildDayA(w: number, phase: Phase): ParsedExercise[] {
     rest: "60с",
     notes: "растяжение приводящих + ротация ТБС + мобильность голеностопа",
   });
-  ex.push(strength(phase, "Сила", "Болгарские выпады", "ЖГ, свободный ЛГС; одноопорная сила"));
   ex.push(strength(phase, "Сила", "Приведение бедра", "декомпрессор при латеральном торможении"));
-  ex.push({
-    block: "Сила",
-    name: "Подъём на носки (икры)",
-    sets: PHASE_PRESCRIPTION[phase].sets,
-    reps: "12-15",
-    rpe: "6-7",
-    rest: "60с",
-    notes: "икры — отталкивание; эксцентрика инверсии осторожно, без боли",
-  });
-  if (phase === "power") {
-    ex.push({
-      block: "Ротация",
-      name: "Кабель-ротация туловища",
-      sets: "3",
-      reps: "8/сторону",
-      rpe: "7",
-      rest: "90с",
-      notes: "взрывная X-factor; контроль, без рывков поясницей",
-    });
-    ex.push({
-      block: "Плиометрика",
-      name: "Запрыгивания на тумбу",
-      sets: "3",
-      reps: "5",
-      rpe: "7",
-      rest: "90с",
-      notes: "мягкое приземление; только после стабильности",
-    });
-  }
-  return ex;
-}
-
-function buildDayB(w: number, phase: Phase): ParsedExercise[] {
-  const ex: ParsedExercise[] = [warmup()];
-  ex.push(strength(phase, "Сила", "Тяга верхнего блока", "тяговая фаза удара, противовес сутулости"));
-  ex.push({
-    block: "Ротация",
-    name: "Ротации с резинкой",
-    sets: "3",
-    reps: "12-15",
-    rpe: "7",
-    rest: "60с",
-    notes: "наружные ротаторы (ER) — торможение руки после удара; ER ДО жима",
-  });
-  ex.push({
-    block: "Ротация",
-    name: "Отведение плеча наружу (кабель лёжа)",
-    sets: "3",
-    reps: "12-15",
-    rpe: "7",
-    rest: "60с",
-    notes: "изолированная сила ER под нагрузкой; контроль объёма",
-  });
-  ex.push(strength(phase, "Сила", "Жим гантелей на наклонной", "объём жима ≤ тяги+ER"));
-  ex.push(strength(phase, "Сила", "Молотки с гантелями", "предплечье/хват — буферизация локтя"));
-  ex.push(strength(phase, "Сила", "Тяга к лицу", "задняя дельта/трапеция — здоровье плеча"));
-  if (phase === "power") {
-    ex.push({
-      block: "Ротация",
-      name: "Ротационный бросок медбола",
-      sets: "3",
-      reps: "8/сторону",
-      rpe: "7",
-      rest: "90с",
-      notes: "взрывная ротационная мощь удара; только после разминки",
-    });
-  }
+  ex.push(strength(phase, "Сила", "Отведение бедра (кабель/резинка)", "glute med/min для латеральной стабильности"));
+  ex.push(strength(phase, "Тяга", "Подтягивания", "при необходимости — гравитрон (ВП)"));
+  ex.push(strength(phase, "Тяга", "Тяга гантели в наклоне", "горизонтальная тяга; широчайшие (ГП)"));
+  ex.push(strength(phase, "Жим", "Отжимания", "горизонтальный жим; кор+грудь (ГЖ)"));
+  ex.push(strength(phase, "Предплечье", "Молотки с гантелями", "предплечье/хват — буферизация локтя"));
+  ex.push(strength(phase, "Манжета", "Отведение плеча наружу (кабель лёжа)", "ротаторы; умеренно (на фоне игры)"));
+  ex.push(core(phase, "Планка", "40-60с", "анти-экстензия; жёсткость туловища"));
+  ex.push(core(phase, "Боковая планка", "40-60с/сторону", "анти-латеральная флексия"));
   return ex;
 }
 
 function buildDayC(w: number, phase: Phase): ParsedExercise[] {
   const ex: ParsedExercise[] = [warmup()];
-  ex.push({
-    block: "Кондиция",
-    name: "Тяга саней",
-    sets: phase === "deload" ? "2" : "3",
-    reps: "30 м",
-    rpe: "7",
-    rest: "90с",
-    notes: "кор + сгибатели бедра; брейсинг",
-  });
-  ex.push({
-    block: "Кор",
-    name: "Планка",
-    sets: "3",
-    reps: "40-60с",
-    rpe: "7",
-    rest: "60с",
-    notes: "анти-экстензия; жёсткость туловища",
-  });
-  ex.push({
-    block: "Кор",
-    name: "Боковая планка",
-    sets: "3",
-    reps: "40-60с/сторону",
-    rpe: "7",
-    rest: "60с",
-    notes: "анти-латеральная флексия",
-  });
-  ex.push({
-    block: "Кор",
-    name: "Паллоф-пресс",
-    sets: "3",
-    reps: "12-15/сторону",
-    rpe: "7",
-    rest: "60с",
-    notes: "антиротация кор — защита поясницы при ударе",
-  });
+  const e1 = explosive(phase, "Плиометрика", "Боковые запрыгивания/приземления", "5/сторону", "латеральная плио; мягкое приземление без вальгуса");
+  if (e1) ex.push(e1);
+  ex.push(cond(phase, "Трастеры", "12-15", "с гантелями 2×8-16кг; глубокий присед + жим без паузы"));
+  ex.push(cond(phase, "Махи гирей", "15-20", "гиря 16-24кг; мощный хип-хиндж, спина нейтральна"));
+  ex.push(cond(phase, "Фермерская прогулка", "30-40 м", "осанка/хват/контрлатеральность"));
+  ex.push(cond(phase, "Медбол-слэм", "8-10", "взрывная ротация/вертикаль; только после разминки"));
+  ex.push(cond(phase, "Бёрпи", "8-10", "кондиция всего тела"));
+  ex.push(core(phase, "Планка", "40-60с", "анти-экстензия"));
+  ex.push(core(phase, "Боковая планка", "40-60с/сторону", "анти-латеральная"));
+  ex.push(core(phase, "Паллоф-пресс", "10-12/сторону", "антиротация"));
+  ex.push(core(phase, "Русский твист", "12-15/сторону", "контролируемая ротация"));
   ex.push(cardioRun(phase));
-  ex.push(strength(phase, "Сила", "Приведение бедра", "повторная силовая выносливость"));
-  if (phase === "power") {
-    ex.push({
-      block: "Плиометрика",
-      name: "Боковые запрыгивания/приземления",
-      sets: "3",
-      reps: "5/сторону",
-      rpe: "7",
-      rest: "90с",
-      notes: "латеральная плиометрика; мягкое приземление без вальгуса",
-    });
-  }
   return ex;
-}
-
-function cardioRun(phase: Phase): ParsedExercise {
-  if (phase === "foundation" || phase === "deload") {
-    return {
-      block: "Кондиция",
-      name: "Бег",
-      type: "cardio",
-      duration: "20-30 мин",
-      pace: "Z2 (легко)",
-      heart_rate: "60-70% ЧССmax",
-      notes: "восстановительная З2; база аэробной выносливости перед ВИИТ",
-    };
-  }
-  if (phase === "power") {
-    return {
-      block: "Кондиция",
-      name: "Бег",
-      type: "cardio",
-      duration: "10×(20с спринт / 40с ходьба)",
-      pace: "Z4",
-      heart_rate: "85-90% ЧССmax",
-      notes: "ВИИТ: работа:отдых 1:2; потолок 90% ЧССmax; базу Z2 набрать заранее",
-    };
-  }
-  return {
-    block: "Кондиция",
-    name: "Бег",
-    type: "cardio",
-    duration: "8×(20с спринт / 40с ходьба)",
-    pace: "Z4",
-    heart_rate: "80-85% ЧССmax",
-    notes: "ВИИТ интервалы под плотность очков 1:3-1:5",
-  };
 }
 
 export function buildTennisProgram(): ParsedContent {
@@ -252,44 +198,24 @@ export function buildTennisProgram(): ParsedContent {
   for (let w = 1; w <= 12; w++) {
     const phase = phaseForWeek(w);
     const days: ParsedDay[] = [
-      {
-        day_name: "День A — Низ",
-        day_order: 1,
-        focus: "Ягодицы / задняя цепь / ротация бедра",
-        exercises: buildDayA(w, phase),
-      },
-      {
-        day_name: "День B — Верх + ротаторы",
-        day_order: 2,
-        focus: "Плечо / ротаторы / предплечье",
-        exercises: buildDayB(w, phase),
-      },
-      {
-        day_name: "День C — Кондиция + Кор",
-        day_order: 3,
-        focus: "ВИИТ / кор / приведение",
-        exercises: buildDayC(w, phase),
-      },
+      { day_name: "День 1 — Full Body (низ+верх)", day_order: 1, focus: "ЗС/квад + тяга/жим (ВП/ГП/ГЖ/ВЖ)", exercises: buildDayA(w, phase) },
+      { day_name: "День 2 — Full Body (низ+верх)", day_order: 2, focus: "Ягод/привод + тяга/жим/ротаторы (ВП/ГП/ГЖ)", exercises: buildDayB(w, phase) },
+      { day_name: "День 3 — Кондиция + Кор (ОФП)", day_order: 3, focus: "Трастеры/махи/фермерская/слэм/бёрпи + кор + финиш-бег", exercises: buildDayC(w, phase) },
     ];
-    weeks.push({
-      week_number: w,
-      week_label: WEEK_LABEL[phase],
-      is_deload: phase === "deload",
-      days,
-    });
+    weeks.push({ week_number: w, week_label: WEEK_LABEL[phase], is_deload: phase === "deload", days });
   }
 
   return {
-    program_name: "Теннис — силовая база (12 нед, 3 дня)",
+    program_name: "Tennis — силовая база (12 нед, 3 дня)",
     generated_at: new Date().toISOString(),
     version: 1,
     weeks,
     notes: [
-      "Спорт-специфичный шаблон: теннис — прерывистый, многонаправленный, ротационный вид.",
-      "Регионы: ягодицы (РС+УС), задняя цепь, квадрицепс, приводящие, отводящие/ротаторы бедра, плечо+манжета+задняя дельта, предплечье/хват, кор (вкл. антиротацию), икры/голеностоп.",
-      "Блоки: 1) мобильность/стабильность, 2) низ гипертрофия+сила/кор, 3) ГСС/ротаторы/ПЛК, 4) ротация плеч+бёдер, 5) ВИИТ/кондиция, 6) навыки (гашение/плио после стабильности).",
-      "Игра на корте — вне шаблона. %ПМ и темп упакованы в notes каждого упражнения.",
-      "Прекауции: нейтраль позвоночника в РС; ER до жима и контроль объёма; инверсия голеностопа без боли; плиометрика только после стабильности.",
+      "Спорт-специфичный шаблон: теннис — ротационная мощь, латеральная стабильность, игра вне шаблона.",
+      "Дни 1/2 — Full Body (низ+верх) с балансом вертикальных/горизонтальных тяг и жимов.",
+      "День 3 — зальная ОФП (кондиция+кор); финиш-бег — лёгкий, клиент бегает с другим тренером на трассе.",
+      "Взрывная/плиометрика — строго в начале дня, только фаза power (нед 9–11); делoad без неё.",
+      "Прекауции: плиометрика только после разминки; при боли в плече — снизить объём наружной ротации.",
     ],
   };
 }

@@ -137,7 +137,7 @@ export async function createPurchaseRequest(
     const tgRaw = input.telegramId?.trim() ?? "";
     const telegramId = parseTelegramId(tgRaw);
     if (tgRaw !== "" && telegramId === null) {
-      return { error: "Telegram ID — только цифры (от 5 до 15)." };
+      return { error: "Telegram ID - только цифры (от 5 до 15)." };
     }
     const usernameRaw = input.telegramUsername?.trim() ?? "";
     const telegramUsername = TELEGRAM_USERNAME_REGEX.test(usernameRaw)

@@ -24,17 +24,17 @@ const POLL_LIMIT = 50;
 function formatTime(dateStr: string): string {
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "—";
+    if (isNaN(d.getTime())) return "-";
     return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function formatDateLabel(dateStr: string): string {
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "—";
+    if (isNaN(d.getTime())) return "-";
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -48,7 +48,7 @@ function formatDateLabel(dateStr: string): string {
       year: d.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
     });
   } catch {
-    return "—";
+    return "-";
   }
 }
 

@@ -34,7 +34,7 @@ function Field({
     <div>
       <label className="block text-xs font-medium text-muted-foreground">
         {label}
-        {hint && <span className="font-normal"> — {hint}</span>}
+        {hint && <span className="font-normal"> - {hint}</span>}
       </label>
       {children}
     </div>
@@ -181,7 +181,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-2">
-          <Field label="RU — техника выполнения">
+          <Field label="RU - техника выполнения">
             <textarea
               value={form.techniqueRu}
               onChange={(e) => setForm({ ...form, techniqueRu: e.target.value })}
@@ -190,7 +190,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
               maxLength={4000}
             />
           </Field>
-          <Field label="RU — особенности" hint="по одному в строке">
+          <Field label="RU - особенности" hint="по одному в строке">
             <textarea
               value={ruFeatures.value}
               onChange={(e) => ruFeatures.set(e.target.value)}
@@ -201,7 +201,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
           </Field>
         </div>
         <div className="space-y-2">
-          <Field label="EN — technique">
+          <Field label="EN - technique">
             <textarea
               value={form.techniqueEn}
               onChange={(e) => setForm({ ...form, techniqueEn: e.target.value })}
@@ -210,7 +210,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
               maxLength={4000}
             />
           </Field>
-          <Field label="EN — features" hint="one per line">
+          <Field label="EN - features" hint="one per line">
             <textarea
               value={enFeatures.value}
               onChange={(e) => enFeatures.set(e.target.value)}
@@ -223,7 +223,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="RU — описание">
+        <Field label="RU - описание">
           <Input
             value={form.descriptionRu}
             onChange={(e) => setForm({ ...form, descriptionRu: e.target.value })}
@@ -232,7 +232,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
             maxLength={4000}
           />
         </Field>
-        <Field label="EN — description">
+        <Field label="EN - description">
           <Input
             value={form.descriptionEn}
             onChange={(e) => setForm({ ...form, descriptionEn: e.target.value })}

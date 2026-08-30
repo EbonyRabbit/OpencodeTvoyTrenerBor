@@ -35,7 +35,7 @@ function formatPrice(price: number): string {
   return `${price.toLocaleString("ru-RU")} ₽`;
 }
 
-// contact — обязательное поле purchase_requests: @username, иначе id
+// contact - обязательное поле purchase_requests: @username, иначе id
 function buyerContact(username: string | undefined, telegramId: number): string {
   return username ? `@${username}` : String(telegramId);
 }
@@ -63,7 +63,7 @@ export function buildPurchaseCoachMessage({
   programTitle: string;
   price: number | null;
 }): string {
-  const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "—";
+  const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "-";
   const usernameLine = username ? `🔗 @${username} (https://t.me/${username})` : null;
   const priceLine = price != null && price > 0 ? formatPrice(price) : null;
   const lines = [
@@ -231,7 +231,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
   if (client) applyClientLanguage(ctx, client.language);
   const lang = ctx.language;
 
-  // уже владеет программой (активирована после оплаты) — повторная оплата не нужна
+  // уже владеет программой (активирована после оплаты) - повторная оплата не нужна
   if (client && client.program_id === program.id) {
     await ctx.reply(t("purchase.already_owned", lang));
     return;
@@ -246,7 +246,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
       }
       if (latest.status === "pending") {
         if (latest.consent_given) {
-          // ссылка выдаётся напрямую — та же защита от повторной оплаты,
+          // ссылка выдаётся напрямую - та же защита от повторной оплаты,
           // что и в consent-пути
           if (!(await ensureNoPriorPayment(ctx, telegramId, program.id, lang))) {
             return;
@@ -257,7 +257,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
         }
         return;
       }
-      // cancelled (отменена коучем) — можно покупать заново
+      // cancelled (отменена коучем) - можно покупать заново
     }
 
     if ((await countPendingRequests(telegramId)) >= MAX_PENDING_REQUESTS) {
@@ -265,7 +265,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
       return;
     }
 
-    // order_id = id заявки (как задумано в миграции); amount — снимок цены
+    // order_id = id заявки (как задумано в миграции); amount - снимок цены
     // на момент покупки, по нему вебхук Продамуса сверит фактическое списание.
     const requestId = randomUUID();
     const requestPayload = {
@@ -287,7 +287,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
     let { error } = await insertRequest();
 
     if (error?.code === "23505") {
-      // гонка двойного тапа: параллельная вставка победила — переиспользуем её
+      // гонка двойного тапа: параллельная вставка победила - переиспользуем её
       const winner = await findRequestForProgram(telegramId, program.id).catch(() => null);
       if (winner?.status === "paid") {
         await ctx.reply(t("purchase.already_paid", lang));
@@ -304,7 +304,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
         }
         return;
       }
-      // winner пропал или отменён (гонка отмен тренером) — повторяем вставку
+      // winner пропал или отменён (гонка отмен тренером) - повторяем вставку
       error = (await insertRequest()).error;
     }
 
@@ -323,7 +323,7 @@ export async function startPurchase(ctx: MyContext, programId: string): Promise<
 }
 
 // Лучше-чем-ничего уведомление тренеру: заявка уже в БД, поэтому при сбое
-// уведомления покупка не блокируется — фиксируем в bot_logs.
+// уведомления покупка не блокируется - фиксируем в bot_logs.
 async function notifyCoachAboutRequest(
   telegramId: number,
   from: { first_name?: string; last_name?: string; username?: string },
@@ -479,7 +479,7 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
         return;
       }
       // 0 затронутых строк не блокируем: двойной тап уже проставил согласие,
-      // а если статус изменился — это поймает финальная проверка ниже
+      // а если статус изменился - это поймает финальная проверка ниже
     }
 
     // финальная проверка ПЕРЕД выдачей ссылки: статус и согласие могли
@@ -559,7 +559,7 @@ async function sendPaymentLink(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Заявка «Связаться с тренером» (sub_type='individ'): согласие получаем ДО
-// вставки (для не-клиентов единственное хранилище согласия — строка заявки),
+// вставки (для не-клиентов единственное хранилище согласия - строка заявки),
 // поэтому кнопка подтверждения и создаёт заявку сразу с consent_given=true.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -574,7 +574,7 @@ export function buildCoachRequestCoachMessage({
   username: string | null;
   telegramId: number;
 }): string {
-  const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "—";
+  const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "-";
   const usernameLine = username ? `🔗 @${username} (https://t.me/${username})` : null;
   const lines = [
     "🤝 Хочу индивидуальное ведение/кураторство",
@@ -600,7 +600,7 @@ async function findPendingIndividRequest(telegramId: number): Promise<{ id: stri
     .limit(1)
     .maybeSingle<{ id: string }>();
   if (error) {
-    // fail-closed: если нельзя проверить отсутствие заявки — заявку не создаём
+    // fail-closed: если нельзя проверить отсутствие заявки - заявку не создаём
     throw new Error(`Pending individ check failed: ${error.message}`);
   }
   return data ?? null;
@@ -672,7 +672,7 @@ async function submitIndividRequest(
         await ctx.reply(t("coach_request.already_sent", lang));
         return;
       }
-      // winner пропал (гонка отмен тренером) — повторяем вставку один раз
+      // winner пропал (гонка отмен тренером) - повторяем вставку один раз
       error = (await insert()).error;
     }
     if (error) {
@@ -690,7 +690,7 @@ async function submitIndividRequest(
 }
 
 // Уведомление тренеру, как notifyCoachAboutRequest: не блокирует клиента
-// при сбое — заявка уже в БД и видна в панели (фиксируем в bot_logs).
+// при сбое - заявка уже в БД и видна в панели (фиксируем в bot_logs).
 async function notifyCoachAboutIndividRequest(
   telegramId: number,
   from: { first_name?: string; last_name?: string; username?: string },
@@ -767,7 +767,7 @@ export async function startCoachRequest(ctx: MyContext): Promise<void> {
   if (!lookup.ok) return;
   const client = lookup.client;
 
-  // быстрый путь — только если постоянное согласие действует под текущей
+  // быстрый путь - только если постоянное согласие действует под текущей
   // версией политики; иначе показываем свежий шаг согласия
   if (
     client &&

@@ -16,7 +16,7 @@ export function weekdayShortLabel(iso: number, lang: Language): string {
 }
 
 export function formatSchedule(days: number[] | null, lang: Language): string {
-  if (!days || days.length === 0) return "—";
+  if (!days || days.length === 0) return "-";
   return days
     .map((iso, i) => `${i + 1}. ${weekdayLabel(iso, lang)}`)
     .join("\n");

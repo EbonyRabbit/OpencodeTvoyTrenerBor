@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Политика конфиденциальности — ТвойТренерБот",
+  title: "Политика конфиденциальности - ТвойТренерБот",
   description: "Политика обработки персональных данных сервиса ТвойТренерБот",
 };
 

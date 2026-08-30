@@ -1,7 +1,7 @@
-# TASKS_WEB.md — План миграции Telegram-бота на Node.js
+# TASKS_WEB.md - План миграции Telegram-бота на Node.js
 
 > **🔴 P0 (следующие задачи):**
-> — нет активных P0 задач
+> - нет активных P0 задач
 
 ---
 
@@ -67,14 +67,14 @@ OpenCode/
 │   │   │   ├── types.ts          # Типы БД (копия из web/src/types/)
 │   │   │   └── telegram.ts       # Обёртка Telegram API (file download и т.д.)
 │   │   ├── handlers/
-│   │   │   ├── start.ts          # /start — приветствие, подключение по коду
+│   │   │   ├── start.ts          # /start - приветствие, подключение по коду
 │   │   │   ├── menu.ts           # /menu, /myprogram
 │   │   │   ├── workout.ts        # /today, просмотр/логирование упражнений
-│   │   │   ├── checkin.ts        # /checkin — 7-шаговый опрос
-│   │   │   ├── measurements.ts   # Замеры тела — 14 шагов
+│   │   │   ├── checkin.ts        # /checkin - 7-шаговый опрос
+│   │   │   ├── measurements.ts   # Замеры тела - 14 шагов
 │   │   │   ├── photos.ts         # Загрузка фото (front/side/back/composition)
-│   │   │   ├── settings.ts       # /settings — настройки уведомлений
-│   │   │   ├── programs.ts       # /programs — каталог программ
+│   │   │   ├── settings.ts       # /settings - настройки уведомлений
+│   │   │   ├── programs.ts       # /programs - каталог программ
 │   │   │   ├── pause.ts          # /pause, /resume
 │   │   │   └── chat.ts           # Свободный чат (coach ↔ client)
 │   │   ├── cron/
@@ -107,32 +107,32 @@ OpenCode/
 |---|--------|----------|--------|
 | 1.1 | Инициализация проекта `bot/` | Создать `bot/package.json` с зависимостями: `grammy`, `node-cron`, `@supabase/supabase-js`, `date-fns-tz`, `i18next` | ✅ |
 | 1.2 | TypeScript конфиг | Создать `bot/tsconfig.json` (target: ES2022, module: NodeNext, strict) | ✅ |
-| 1.3 | Конфигурация | Создать `bot/src/config.ts` — чтение env vars, экспорт объекта конфигурации | ✅ |
+| 1.3 | Конфигурация | Создать `bot/src/config.ts` - чтение env vars, экспорт объекта конфигурации | ✅ |
 | 1.4 | Supabase клиент | Скопировать `supabase-admin.ts` из `web/src/lib/` в `bot/src/lib/` | ✅ |
 | 1.5 | Типы БД | Скопировать `types/supabase.ts` из `web/src/types/` в `bot/src/lib/types.ts` | ✅ |
 | 1.6 | Миграция БД: `bot_state` | Создать таблицу для состояний разговоров (заменяет Bot State sheet) | ✅ |
 | 1.7 | Миграция БД: `bot_logs` | Создать таблицу логов бота (заменяет Bot Logs sheet) | ✅ |
 | 1.8 | Миграция БД: `bot_schedule` | Создать таблицу отложенных напоминаний (заменяет Bot Schedule sheet) | ✅ |
 | 1.9 | .env.local | Настроить переменные окружения (TELEGRAM_BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, COACH_CHAT_ID) | ✅ |
-| 1.10 | Базовый entry point | Создать `bot/src/index.ts` — запуск grammY в режиме webhook | ✅ |
+| 1.10 | Базовый entry point | Создать `bot/src/index.ts` - запуск grammY в режиме webhook | ✅ |
 | 1.11 | Dockerfile | Создать Dockerfile для деплоя бота | ✅ |
 | 1.12 | Тест запуска | Убедиться, что бот стартует и отвечает на `ping` | ✅ |
 
 ---
 
-### Фаза 2: Ядро бота — команды и навигация
+### Фаза 2: Ядро бота - команды и навигация
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | 2.1 | Базовый `bot.ts` | Экземпляр `Bot`, middleware для логирования, обработка ошибок | ✅ |
-| 2.2 | Поиск клиента | Функция `findClientByTelegramId(telegramId)` — запрос в Supabase `clients` | ✅ |
+| 2.2 | Поиск клиента | Функция `findClientByTelegramId(telegramId)` - запрос в Supabase `clients` | ✅ |
 | 2.3 | Команда `/start` | Приветствие: активные клиенты → меню; неактивные → "подключиться по коду"; новые → "купить программу" | ✅ |
 | 2.4 | Подключение по коду | Ввод 8-символьного кода → связка `telegram_id` с клиентом в Supabase | ✅ |
 | 2.5 | Команда `/menu` | Адаптивный список команд на основе `status` и `payment_status` клиента | ✅ |
 | 2.6 | Команда `/myprogram` | Показ текущей программы, ссылки на spreadsheet (если есть), кода подключения | ✅ |
 | 2.7 | Машин состояний | Модуль `state/machine.ts`: `getState`, `setState`, `clearState` (Supabase `bot_state`) | ✅ |
 | 2.8 | Роутинг callback | Обработка inline-кнопок: `today_open`, `exercise_log:*`, `exercise_skip:*`, `skip_workout`, и т.д. | ✅ |
-| 2.9 | Локализация | Утилита `i18n.ts` — выбор языка на основе `client.language` | ✅ |
+| 2.9 | Локализация | Утилита `i18n.ts` - выбор языка на основе `client.language` | ✅ |
 
 ---
 
@@ -140,8 +140,8 @@ OpenCode/
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| 3.1 | Определение тренировки | Функция `getTodayWorkout(client)` — определение дня недели → поиск в `program_schedule` → чтение плана | ✅ |
-| 3.2 | Чтение плана тренировки | Функция `getWorkoutPlan(client, scheduleWeek)` — чтение из Supabase или legacy spreadsheet | ✅ |
+| 3.1 | Определение тренировки | Функция `getTodayWorkout(client)` - определение дня недели → поиск в `program_schedule` → чтение плана | ✅ |
+| 3.2 | Чтение плана тренировки | Функция `getWorkoutPlan(client, scheduleWeek)` - чтение из Supabase или legacy spreadsheet | ✅ |
 | 3.3 | Показ упражнения | Кнопки: "Выполнил" (логирование), "Пропустить", навигация по упражнениям | ✅ |
 | 3.4 | Wizard логирования | 5 шагов: подходы → повторы → вес → RPE → комментарий | ✅ |
 | 3.5 | Запись результата | INSERT в `workout_logs` (Supabase): client_id, date, week, exercise, sets, reps, weight, rpe, comment | ✅ |
@@ -180,7 +180,7 @@ OpenCode/
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| 6.1 | Планировщик | `cron/scheduler.ts` — node-cron с 15-минутным циклом | ✅ |
+| 6.1 | Планировщик | `cron/scheduler.ts` - node-cron с 15-минутным циклом | ✅ |
 | 6.2 | Утреннее уведомление | Проверка `morning_time` каждого клиента → отправка плана тренировки | ✅ |
 | 6.3 | Вечерний опрос | Проверка: тренировка существовала + не выполнена + не пропущена → отправка poll в 20:00 | ✅ |
 | 6.4 | Напоминание замеров | В `measurement_day` + `measurement_time` → отправка чеклиста замеров | ✅ |
@@ -195,13 +195,13 @@ OpenCode/
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| 7.1 | Паузы | `/pause` — запуск wizard: количество → причина → дата возобновления | ✅ |
-| 7.2 | Возобновление | `/resume` — ручное возобновление + выбор стратегии (skip/shift/deload/rollback) | ✅ |
+| 7.1 | Паузы | `/pause` - запуск wizard: количество → причина → дата возобновления | ✅ |
+| 7.2 | Возобновление | `/resume` - ручное возобновление + выбор стратегии (skip/shift/deload/rollback) | ✅ |
 | 7.3 | Переиспользование plan-adjustment | Импорт `plan-adjustment.ts` из `web/src/lib/` для логики пауз | ✅ |
-| 7.4 | Каталог программ | `/programs` — список активных программ из Supabase `programs` | ✅ |
+| 7.4 | Каталог программ | `/programs` - список активных программ из Supabase `programs` | ✅ |
 | 7.5 | Покупка программы | Выбор программы → переход на страницу оплаты (будущее) | ✅ |
 | 7.6 | Свободный чат | Пересылка сообщений coach ↔ client через Supabase `messages` | ✅ |
-| 7.7 | Админ-команды | `/debug_today`, `recalcSchedule`, `generateCodes` — для тренера | ✅ |
+| 7.7 | Админ-команды | `/debug_today`, `recalcSchedule`, `generateCodes` - для тренера | ✅ |
 
 ---
 
@@ -229,10 +229,10 @@ OpenCode/
 | **9.5** | Обновить профиль клиента | В `client-profile.tsx`: показать `purchase_date`, `purchased_program_id` (название программы) в секции "Доступ и программа" | done |
 | **9.6** | Обновить бота (минимально) | В `bot/src/handlers/menu.ts`: показать "Оплачено: {название программы}" если `purchased_program_id` | done |
 | **9.7** | Fix фото из Supabase Storage | В `web/src/app/clients/[id]/_components/client-profile.tsx` и `photo-gallery.tsx`: добавить отображение фото через `storage_path` (Supabase Storage URL) если `drive_url = null` | ✅ |
-| **9.8** | История замеров в боте | Новая команда `/my Measurements` или кнопка "История замеров" — показ последних 10 замеров с дельтами | ✅ |
+| **9.8** | История замеров в боте | Новая команда `/my Measurements` или кнопка "История замеров" - показ последних 10 замеров с дельтами | ✅ |
 | **9.9** | История фото в боте | Отправка последних фото (front/side/back) клиенту в чат по запросу | ✅ |
-| **9.10** | История тренировок в боте | Новая команда `/mystats` — количество выполненных тренировок, пропусков, средний RPE за месяц | ✅ |
-| **9.11** | UI создания клиента | Добавить форму "Добавить клиента" на `/clients` — имя, telegram_id (опционально), язык, timezone, статус оплаты | ✅ |
+| **9.10** | История тренировок в боте | Новая команда `/mystats` - количество выполненных тренировок, пропусков, средний RPE за месяц | ✅ |
+| **9.11** | UI создания клиента | Добавить форму "Добавить клиента" на `/clients` - имя, telegram_id (опционально), язык, timezone, статус оплаты | ✅ |
 | **9.12** | UI редактирования клиента | Заменить заглушку "Редактировать" в `client-actions.tsx` на диалог редактирования: name, language, timezone, morning_time, measurement_time, measurement_day. Серверный экшен `updateClient` в `clients/[id]/actions.ts` с валидацией | ✅ |
 | **9.13** | Исправление отключения клиента | `disableClient` должен очищать `program_id` при отключении, чтобы `markPurchased` не блокировал повторное подключение | ✅ |
 | **9.14** | Кнопка смены статуса оплаты | Добавить кнопку "Снять оплату" / "Отметить оплаченным" в `client-actions.tsx` через `togglePayment`. Добавить `revalidatePath("/clients")` во все экшены для обновления списка | ✅ |
@@ -390,12 +390,12 @@ Dev:        ngrok http 3001  (для тестирования локально)
 
 ## Приоритеты
 
-1. **P0**: Фазы 1-3 (инфраструктура + ядро + логирование) — бот работает ✅
-2. **P1**: Фазы 4-5 (замеры + фото + чек-ины) — полный функционал ✅
-3. **P2**: Фаза 6 (cron) — автоматизация ✅
-4. **P3**: Фаза 7 (продвинутое) — паузы, чат, программы ✅
-5. **P4**: Фаза 8 (переход) — выключение GAS
-6. **P5**: Фаза 9 (улучшение UX) — покупка, фото, история, создание клиентов
+1. **P0**: Фазы 1-3 (инфраструктура + ядро + логирование) - бот работает ✅
+2. **P1**: Фазы 4-5 (замеры + фото + чек-ины) - полный функционал ✅
+3. **P2**: Фаза 6 (cron) - автоматизация ✅
+4. **P3**: Фаза 7 (продвинутое) - паузы, чат, программы ✅
+5. **P4**: Фаза 8 (переход) - выключение GAS
+6. **P5**: Фаза 9 (улучшение UX) - покупка, фото, история, создание клиентов
    - **9.1-9.6**: Покупка программы (P0 внутри фазы)
    - **9.7**: Fix фото из Supabase Storage
    - **9.8-9.10**: История в боте
@@ -414,7 +414,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 Текущее состояние:
 - Программы хранятся в Supabase (`programs.parsed_content` JSON)
 - Веб-панель: read-only просмотр программ (accordion по неделям)
-- Кнопка «Редактировать» → `/programs/[id]/edit` — **страницы нет**
+- Кнопка «Редактировать» → `/programs/[id]/edit` - **страницы нет**
 - Публикация/назначение требуют `template_file_url` (.xlsx)
 - Клиенты работают через Telegram бота
 - Нет клиентского веб-портала
@@ -431,7 +431,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 |---------|-------|
 | Хранение | Supabase как единый источник правды |
 | Публикация | Без .xlsx, по `parsed_content` |
-| Программы | Шаблоны + персональные — всё в `programs` |
+| Программы | Шаблоны + персональные - всё в `programs` |
 | Редактор | Табличный, 3 уровня: Неделя → День → Упражнение |
 | Клиентский портал | `/client/[token]`, магическая ссылка |
 | Логирование (веб) | Карточки упражнений, детальное (подходы/повторы/вес/RPE) |
@@ -447,26 +447,26 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | **10.3** | Обновить типы Supabase | Добавить `type`, `client_id` в `programs.Row` | ✅ |
 | **10.4** | Разблокировка публикации | `toggleProgramStatus`: убрать requirement `template_file_url`, проверять `parsed_content` | ✅ |
 | **10.5** | Разблокировка назначения | `assignToClient`: убрать requirement `template_file_url` | ✅ |
-| **10.6** | Страница редактора | `/programs/[id]/edit` — server component, загрузка программы | ✅ |
-| **10.7** | Server action: сохранение | `updateProgramContent(programId, content)` — валидация + запись в Supabase | ✅ |
+| **10.6** | Страница редактора | `/programs/[id]/edit` - server component, загрузка программы | ✅ |
+| **10.7** | Server action: сохранение | `updateProgramContent(programId, content)` - валидация + запись в Supabase | ✅ |
 | **10.8** | Компонент ProgramEditor | Табличный редактор: accordion по неделям → дни → таблица упражнений | ✅ |
 | **10.9** | Автокомплит упражнений | Поиск из `exercises` + ручной ввод, debounced | ✅ |
 | **10.10** | Типы редактора | `EditableParsedContent`, `EditableWeek`, `EditableDay`, `EditableExercise` | ✅ |
 | **10.11** | Обновить program-detail | Убрать алерт «Шаблон не загружен», показать тип программы | ✅ |
-| **10.12** | Server action: генерация токена | `generateClientToken(clientId)` — 6-символьный токен, сохранение в `client_tokens` | ✅ |
+| **10.12** | Server action: генерация токена | `generateClientToken(clientId)` - 6-символьный токен, сохранение в `client_tokens` | ✅ |
 | **10.13** | Middleware: проверка токена | Маршруты `/client/[token]/*`, проверка валидности, редирект | ✅ |
-| **10.14** | Layout клиентского портала | `/client/[token]/layout.tsx` — навигация, мини-дашборд | ✅ |
-| **10.15** | Главная страница клиента | `/client/[token]/page.tsx` — приветствие, текущая неделя, навигация | ✅ |
-| **10.16** | Просмотр программы | `/client/[token]/program/page.tsx` — недели, дни, упражнения | ✅ |
+| **10.14** | Layout клиентского портала | `/client/[token]/layout.tsx` - навигация, мини-дашборд | ✅ |
+| **10.15** | Главная страница клиента | `/client/[token]/page.tsx` - приветствие, текущая неделя, навигация | ✅ |
+| **10.16** | Просмотр программы | `/client/[token]/program/page.tsx` - недели, дни, упражнения | ✅ |
 | **10.17** | Логирование тренировки | Карточки упражнений: подходы/повторы/вес/RPE, кнопка «Завершить» | ✅ |
-| **10.18** | Server action: логирование | `logWorkoutFromWeb(clientId, date, exercises[])` — запись в `workout_logs` | ✅ |
-| **10.19** | Замеры тела | `/client/[token]/measurements/page.tsx` — форма + история + графики | ✅ |
-| **10.20** | Фото прогресса | `/client/[token]/photos/page.tsx` — загрузка + галерея | ✅ |
-| **10.21** | Чек-ин | `/client/[token]/checkin/page.tsx` — форма (wellbeing, sleep, stress, adherence) | ✅ |
+| **10.18** | Server action: логирование | `logWorkoutFromWeb(clientId, date, exercises[])` - запись в `workout_logs` | ✅ |
+| **10.19** | Замеры тела | `/client/[token]/measurements/page.tsx` - форма + история + графики | ✅ |
+| **10.20** | Фото прогресса | `/client/[token]/photos/page.tsx` - загрузка + галерея | ✅ |
+| **10.21** | Чек-ин | `/client/[token]/checkin/page.tsx` - форма (wellbeing, sleep, stress, adherence) | ✅ |
 | **10.22** | Кнопка «Ссылка для клиента» | В `client-profile.tsx`: генерация токена + отображение ссылки | ✅ |
 | **10.23** | Бот: команда `/myweb` | Показ ссылки на клиентский портал | ✅ |
 
-| **10.24** | **Настройки уведомлений (клиентский портал)** | `/client/[token]/settings` — клиент сам редактирует время тренировки, время замеров, день замеров, часовой пояс (как в Telegram `/settings`). Server action `updateClientSettings` в `client/[token]/actions.ts` | ✅ |
+| **10.24** | **Настройки уведомлений (клиентский портал)** | `/client/[token]/settings` - клиент сам редактирует время тренировки, время замеров, день замеров, часовой пояс (как в Telegram `/settings`). Server action `updateClientSettings` в `client/[token]/actions.ts` | ✅ |
 | **10.25** | **Middleware (proxy.ts → middleware.ts)** | Next.js 16 переименовал `middleware.ts` → `proxy.ts`. Файл уже называется `proxy.ts` с правильным экспортом, задача выполнена. | ✅ |
 
 ### Файлы для создания/изменения
@@ -508,7 +508,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 - Путь: `clients/{clientId}/week{N}_{date}/{type}.{ext}`
 - Upload: бот (Telegram → Supabase Storage) + веб (file upload → Supabase Storage)
 - Download: signed URLs через `supabase.storage.from("client-photos").createSignedUrl()`
-- Legacy: `drive_url` (Google Drive) — не используется, fallback только для старых данных
+- Legacy: `drive_url` (Google Drive) - не используется, fallback только для старых данных
 - Лимиты Supabase Storage: 1 GB free, далее платно
 
 Проблема:
@@ -518,7 +518,7 @@ Dev:        ngrok http 3001  (для тестирования локально)
 
 Цель:
 - Миграция на Cloudflare R2 (10 GB бесплатно, без egress fees)
-- S3-совместимый API — минимальные изменения в коде
+- S3-совместимый API - минимальные изменения в коде
 - Сохранить текущую логику signed URLs
 - Миграция существующих фото без потерь
 
@@ -539,14 +539,14 @@ Dev:        ngrok http 3001  (для тестирования локально)
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | **11.1** | Установка SDK | `npm install @aws-sdk/client-s2 @aws-sdk/s3-request-presigner` в `web/` и `bot/` | ⏭️ skipped |
-| **11.2** | Утилита R2-клиента | Создать `lib/r2.ts` — функция `getR2Client()` и `getR2SignedUrl(key, expiresIn)` | ⏭️ skipped |
+| **11.2** | Утилита R2-клиента | Создать `lib/r2.ts` - функция `getR2Client()` и `getR2SignedUrl(key, expiresIn)` | ⏭️ skipped |
 | **11.3** | Обновить env vars | Добавить `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` в `.env.local` и `.env.example` | ⏭️ skipped |
 | **11.4** | Обновить bot upload | В `bot/src/lib/photo-utils.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | ⏭️ skipped |
 | **11.5** | Обновить bot download | В `bot/src/lib/photo-utils.ts`: заменить `createSignedUrl()` → R2 `getSignedUrl()` | ⏭️ skipped |
 | **11.6** | Обновить web upload | В `web/src/app/client/[token]/actions.ts`: заменить Supabase Storage upload → R2 PutObjectCommand | ⏭️ skipped |
 | **11.7** | Обновить resolvePhotoUrls | В `web/src/lib/photos.ts`: заменить `supabase.storage.createSignedUrl()` → R2 `getSignedUrl()` | ⏭️ skipped |
 | **11.8** | Обновить admin photo pages | В `web/src/app/clients/[id]/photos/page.tsx` и `_components/photo-gallery.tsx`: использовать R2 signed URLs | ⏭️ skipped |
-| **11.9** | Скрипт миграции | Создать `scripts/migrate-photos.ts` — скачать все фото из Supabase Storage → загрузить в R2, обновить `storage_path` если нужно | ⏭️ skipped |
+| **11.9** | Скрипт миграции | Создать `scripts/migrate-photos.ts` - скачать все фото из Supabase Storage → загрузить в R2, обновить `storage_path` если нужно | ⏭️ skipped |
 | **11.10** | Удалить Supabase Storage код | Убрать все обращения к `supabase.storage.from("client-photos")` | ⏭️ skipped |
 | **11.11** | Тест загрузки | Проверить загрузку фото через бот и веб | ⏭️ skipped |
 | **11.12** | Тест показа | Проверить показ фото в боте, на веб-админке, в клиентском портале | ⏭️ skipped |
@@ -593,8 +593,8 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | **12.1** | Создать Supabase проект | Зарегистрироваться на supabase.com, создать проект, получить URL и service_role key | ✅ |
-| **12.2** | Заполнить env vars (бот) | В `bot/.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `COACH_CHAT_ID`, `CLIENT_PORTAL_URL` — реальные значения | ✅ (CLIENT_PORTAL_URL — только локально, см. 12.7) |
-| **12.3** | Заполнить env vars (веб) | В `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — реальные значения | ✅ |
+| **12.2** | Заполнить env vars (бот) | В `bot/.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `COACH_CHAT_ID`, `CLIENT_PORTAL_URL` - реальные значения | ✅ (CLIENT_PORTAL_URL - только локально, см. 12.7) |
+| **12.3** | Заполнить env vars (веб) | В `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` - реальные значения | ✅ |
 | **12.4** | Запустить миграции | Применить все миграции из `supabase/migrations/` (13 файлов) на продакшен через Supabase CLI `db push` | ✅ |
 | **12.5** | Исправить middleware | Next.js 16 использует `proxy.ts` (не `middleware.ts`). Файл уже корректный. | ⏭️ not needed |
 | **12.6** | Деплой бота | Бот развёрнут на **Render** (не Railway): `tvoi-trener-bot.onrender.com`, `/health` → 200 | ✅ |
@@ -604,14 +604,14 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **12.10** | Настроить Vercel env vars | Переменные из 12.3 заданы (страницы рендерятся, база отвечает) | ✅ |
 | **12.11** | Проверить деплой веба | `/` → 200, `/login` → 200, `/clients/...` → 307 (редирект на auth), клиентский портал `/client/[token]` → 200 | ✅ |
 | **12.12** | Переключить webhook | `setWebhook` = `https://tvoi-trener-bot.onrender.com/webhook`, secret token задан | ✅ |
-| **12.19** | Витрина программ + заявки на покупку | Бот: кнопка «📚 Смотреть программы» в `/start`, каталог шаблонов (active=true, client_id IS NULL), кнопка «Купить» → `/buy/{id}?tg={telegramId}`. Веб: публичная страница `/buy/[id]` (формы, валидация, rate-limit 5/мин, dedup 120с), заявка в `bot_logs` (action=`purchase_request`), уведомление коучу в Telegram. Commit `e329e4f`, ревью 9.5/10. Деплой: на Render `CLIENT_PORTAL_URL`+`PAYMENT_BASE_URL`, на Vercel `TELEGRAM_BOT_TOKEN`+`COACH_CHAT_ID` — добавлены, e2e-тест заявки ✅ (логика `b9b19d54…`, уведомление коучу пришло) | ✅ (код) |
+| **12.19** | Витрина программ + заявки на покупку | Бот: кнопка «📚 Смотреть программы» в `/start`, каталог шаблонов (active=true, client_id IS NULL), кнопка «Купить» → `/buy/{id}?tg={telegramId}`. Веб: публичная страница `/buy/[id]` (формы, валидация, rate-limit 5/мин, dedup 120с), заявка в `bot_logs` (action=`purchase_request`), уведомление коучу в Telegram. Commit `e329e4f`, ревью 9.5/10. Деплой: на Render `CLIENT_PORTAL_URL`+`PAYMENT_BASE_URL`, на Vercel `TELEGRAM_BOT_TOKEN`+`COACH_CHAT_ID` - добавлены, e2e-тест заявки ✅ (логика `b9b19d54…`, уведомление коучу пришло) | ✅ (код) |
 | **12.20** | Фиксы после продакшен-теста | Роутинг `message:text` (state-флоу → игнор неизвестных `/команд` → coach → free-text), команда `/settings` → портал, DB-дедупликация заявок через `bot_dedup` (мульти-инстанс, окно 15 мин), мультивыбор тренировочных дней (7 дней, ✅/⚪️, plural ru). Commit `a33a384`, ревью 9.5/10 | ✅ |
 | **12.21** | Фокус тренировки + дни клиента + запрос программы | «Фокус» на уровне дня в редакторе программ (показ в `/today` и превью; убран фейковый `Фокус: неделя N` из лейбла недели). Отображение реальных тренировочных дней клиента в `/today`, `/myprogram` и веб-вкладке «Тренировка» (были имена дней из программы). Запрос программы: уведомление коучу с контактом клиента (@username/ссылка), логирование `program_request`/`coach_notification_failed` в `bot_logs`. Commits `7a62e7f`, `23cfb4a`, `2a65ba5`. Ревью 9.0→фиксы lang/таймзоны. Проверено в продакшене ✅ | ✅ |
-| **12.13** | Тест бота в продакшене | ✅ Полностью (07.08.2026). Webhook `https://tvoi-trener-bot.onrender.com/webhook` (pending_update_count=0, allowed_updates message+callback_query). Команды проверены end-to-end через прод-вебхук: `/start`, `/menu`, `/myweb`, `/today`, `/mystats`, `/checkin` → HTTP 200; `/myweb` переиспользует существующий `client_tokens` (новых нет); `/checkin` корректно создаёт state `checkin/wellbeing` (тестовый state сразу очищен). Уведомления в проде: утро (08:00 МСК) — `cron:morning_notification` `sent 1 notification(s)` + dedup `morning:*` (07.08), замеры — `cron:measurement_reminder` (06.08) + запись в `measurements` клиентом. Дублей от legacy нет | ✅ |
-| **12.14** | Тест веба в продакшене | ✅ Полностью (07.08.2026). `/` `/login` `/dashboard` — 200; защищённые `/dashboard` `/clients` `/programs` → 307 на `/login`. Портал `/client/[token]`, `/history`, `/measurements` → 200, показывают данные из общей базы: «Медленный бег», «Норм», RPE; замеры — комментарий «Готово», вес 85, талия 80, %жира 11. Дублей в `workout_logs`/`measurements` нет. Админ-доступ подтверждён: Auth-аккаунт `admin@tvoitrener.ru` (email подтверждён, вход 30.07.2026), профиль `profiles.role=coach` (допускается наравне с admin) | ✅ |
+| **12.13** | Тест бота в продакшене | ✅ Полностью (07.08.2026). Webhook `https://tvoi-trener-bot.onrender.com/webhook` (pending_update_count=0, allowed_updates message+callback_query). Команды проверены end-to-end через прод-вебхук: `/start`, `/menu`, `/myweb`, `/today`, `/mystats`, `/checkin` → HTTP 200; `/myweb` переиспользует существующий `client_tokens` (новых нет); `/checkin` корректно создаёт state `checkin/wellbeing` (тестовый state сразу очищен). Уведомления в проде: утро (08:00 МСК) - `cron:morning_notification` `sent 1 notification(s)` + dedup `morning:*` (07.08), замеры - `cron:measurement_reminder` (06.08) + запись в `measurements` клиентом. Дублей от legacy нет | ✅ |
+| **12.14** | Тест веба в продакшене | ✅ Полностью (07.08.2026). `/` `/login` `/dashboard` - 200; защищённые `/dashboard` `/clients` `/programs` → 307 на `/login`. Портал `/client/[token]`, `/history`, `/measurements` → 200, показывают данные из общей базы: «Медленный бег», «Норм», RPE; замеры - комментарий «Готово», вес 85, талия 80, %жира 11. Дублей в `workout_logs`/`measurements` нет. Админ-доступ подтверждён: Auth-аккаунт `admin@tvoitrener.ru` (email подтверждён, вход 30.07.2026), профиль `profiles.role=coach` (допускается наравне с admin) | ✅ |
 | **12.15** | Тест end-to-end | ✅ Полностью (07.08.2026). Один источник правды (Supabase): бот (Telegram) → запись тренировки и замеров → видно в `/history` и `/measurements` клиентского портала (SSR) и в админке. Крёстная проверка: по 1 строке в `workout_logs`/`measurements`, дублей нет | ✅ |
-| **12.16** | Ротировать GitHub PAT | ✅ Полностью: новый fine-grained PAT создан (Contents: read/write), сохранён в osxkeychain, push работает без PAT в URL; remote без токена (`git remote set-URL`); старый PAT отозван — API даёт 401; новые коммиты пушатся без ввода кредов. (Коммит `c6869a9` — фикс measurement day, 07.08.2026) | ✅ |
-| **12.17** | Отключить GAS | ✅ (07.08.2026): триггер `sendDueMessages` удалён в Google Apps Script; Web App развёртывание заархивировано (URL `/exec` неактивен, развёртывание сохранено для отката). Legacy-дублей не было на 06.08–07.08 | ✅ |
+| **12.16** | Ротировать GitHub PAT | ✅ Полностью: новый fine-grained PAT создан (Contents: read/write), сохранён в osxkeychain, push работает без PAT в URL; remote без токена (`git remote set-URL`); старый PAT отозван - API даёт 401; новые коммиты пушатся без ввода кредов. (Коммит `c6869a9` - фикс measurement day, 07.08.2026) | ✅ |
+| **12.17** | Отключить GAS | ✅ (07.08.2026): триггер `sendDueMessages` удалён в Google Apps Script; Web App развёртывание заархивировано (URL `/exec` неактивен, развёртывание сохранено для отката). Legacy-дублей не было на 06.08-07.08 | ✅ |
 | **12.18** | Остановить Worker | ✅ (07.08.2026): Cloudflare Worker деактивирован/маршрут не отвечает (субдомены не резолвятся), Telegram webhook уже напрямую на Render, pending=0 | ✅ |
 
 ---
@@ -626,13 +626,13 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
     (по одной на упражнение) → «8 тренировок» из 8 упражнений;
   - `adherence.ts` считал уникальные даты с любым логом (частичная и
     пропущенная тренировка засчитывались);
-  - бот `/mystats` — день с ≥1 логом ≠ выполненная тренировка, псевдо-строки
+  - бот `/mystats` - день с ≥1 логом ≠ выполненная тренировка, псевдо-строки
     (`[EVENING_*]`) считались реальными.
-- «История тренировок» (`client/[token]/history`) — строки = дни, в ячейках
+- «История тренировок» (`client/[token]/history`) - строки = дни, в ячейках
   только вес + подходы×повторы (нет RPE, комментария, даты).
 
 Решение:
-- `day_order` в `workout_logs` — точная привязка лога к дню плана
+- `day_order` в `workout_logs` - точная привязка лога к дню плана
   (пишется ботом при логировании + бэкфилл старых данных).
 - Единый алгоритм подсчёта (веб и бот): тренировка выполнена, если в
   запланированную дату залогированы **все** упражнения дня
@@ -644,30 +644,30 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **13.1** | Миграция: `day_order` | `ALTER TABLE workout_logs ADD COLUMN day_order INTEGER;` — применена к production через Management API | ✅ |
-| **13.2** | Бэкфилл `day_order` | `bot/scripts/backfill-workout-day-order.ts`: `isoWeekday(date)` → `training_days` → `day_order`; для `[SKIP]` ещё `week` по дате; idempotent — выполнен (6 обновлено, 2 пропущено) | ✅ |
+| **13.1** | Миграция: `day_order` | `ALTER TABLE workout_logs ADD COLUMN day_order INTEGER;` - применена к production через Management API | ✅ |
+| **13.2** | Бэкфилл `day_order` | `bot/scripts/backfill-workout-day-order.ts`: `isoWeekday(date)` → `training_days` → `day_order`; для `[SKIP]` ещё `week` по дате; idempotent - выполнен (6 обновлено, 2 пропущено) | ✅ |
 | **13.3** | Бот: запись `day_order` | `workout-utils.ts` (`TodayWorkout.day_order`, экспорт `getIsoWeekday`/`dayOrderForDate`/`matchDayByOrder`/`isPseudoName`); `wizard.ts` → insert; skip → `week`+`day_order`; evening-poll → `day_order` | ✅ |
 | **13.4** | Бот: `/mystats` по плану | `my-stats.ts`: completed = полное покрытие плана, skipped отдельно, псевдо-строки исключены | ✅ |
 | **13.5** | Веб: `adherence.ts` | `calculateAdherence(+trainingDays, лог +exercise)`; частичные/пропуски не считаются; fallback по `day_order`; реген `src/types/supabase.ts` (+`day_order`), фикс `ClientWithProgram` под строгий select-парсинг | ✅ |
 | **13.6** | Портал: «Текущая неделя» | `client/[token]/page.tsx`: +`exercise` в select, замена inline-счётчика строк на план-подсчёт через `adherence.weeks` | ✅ |
 | **13.7** | Дашборд тренера | `clients/[id]/workouts/page.tsx`: +`training_days` у клиента, +`exercise` в select логов | ✅ |
 | **13.8** | История: таблица как план | `client/[token]/history/page.tsx` + `history-grid.tsx`: строки = упражнения (секции по дням), столбцы = недели, ячейка = вес/подходы×повторы/RPE/коммент/дата; бейдж «⏭ пропуск» (legacy-скипы: дата → неделя/день); матчинг по `day_order`, иначе по имени | ✅ |
-| **13.9** | Тесты бота | vitest: `getIsoWeekday`, `dayOrderForDate`, `matchDayByOrder`, `isPseudoName` (+ существующие) — 154/154 ✅ | ✅ |
+| **13.9** | Тесты бота | vitest: `getIsoWeekday`, `dayOrderForDate`, `matchDayByOrder`, `isPseudoName` (+ существующие) - 154/154 ✅ | ✅ |
 | **13.10** | Верификация + gate | bot `tsc` ✅ + vitest (160) ✅; web `tsc` ✅ + vitest (15) ✅ + `next build` ✅; код-ревью 4 раунда (7.6 → 8.7 → 9.3 → **9.5**); TASKS.md; коммит+push (Render/Vercel); бэкфилл после деплоя | ✅ |
 
 ### Осознанные решения (задокументировано после ревью)
 
 - **Точный матчинг имён** (I6): тренировка считается выполненной только при
   совпадении ВСЕХ имён плана после `trim().toLowerCase()`. Опечатка клиента
-  или «Жим лежа» vs «Жим лёжа» не засчитается — это компромисс в пользу
-  строгого учёта; нормализация (схлопывание пробелов, ё→е) — на будущее.
+  или «Жим лежа» vs «Жим лёжа» не засчитается - это компромисс в пользу
+  строгого учёта; нормализация (схлопывание пробелов, ё→е) - на будущее.
 - **Частичная тренировка не отображается в /mystats** (M1): день с частью
   логов не попадает ни в «выполнено», ни в «пропущено». В вебе такой день
-  виден как «не выполнено» (снижает %). Третий бакет «частично» — на будущее.
+  виден как «не выполнено» (снижает %). Третий бакет «частично» - на будущее.
 - **Разная семантика путей подсчёта**: date-путь (с `training_days`) требует
   все упражнения на точную плановую дату; order-путь (fallback) допускает
   набор по `day_order` с любой даты недели + подмешивание логов плановой даты.
-  Fallback-путь — для legacy-клиентов без `training_days`.
+  Fallback-путь - для legacy-клиентов без `training_days`.
 - **Неизвестный `day_name`** (напр. англ. «Monday») не даёт future-фильтр
   в order-пути: день всегда считается наступившим. Программы хранятся
   на русском, поэтому в проде не проявляется.
@@ -676,7 +676,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 - **Асимметрия бот/веб при двойном логировании** (P3.4): если тренировка
   залогирована и на плановой дате (legacy, без `day_order`), и повторно с
   `day_order` в другой день, веб засчитает день один раз, а `/mystats`
-  может дать два «выполнено» (счёт по датам). Принято, клампинг — на будущее.
+  может дать два «выполнено» (счёт по датам). Принято, клампинг - на будущее.
 - **Дублирование `plannedDateForDay`** (P3.6): приватная копия в
   `web/src/lib/adherence.ts` + экспорт из `bot/src/lib/workout-utils.ts`;
   вынесение в общий пакет отложено, реализации синхронизированы.
@@ -700,7 +700,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 ---
 
-## Фаза 14 — Счётчик «Тренировок» в блоке «Статистика» тренера
+## Фаза 14 - Счётчик «Тренировок» в блоке «Статистика» тренера
 
 ### Проблема
 
@@ -709,12 +709,12 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 ### Решение
 
-- Серверный RPC `count_client_workout_days(client_id)` — подсчёт по правилам
+- Серверный RPC `count_client_workout_days(client_id)` - подсчёт по правилам
   Фазы 13 (полное покрытие упражнений планового дня), а не строк логов.
 - `SECURITY INVOKER`, пустой `search_path`, `authenticated`/`service_role`.
 - timezone клиента валидируется через `pg_timezone_names` (fallback Moscow);
   JSON-разбор программы защищён от legacy/malformed структур.
-- При ошибке RPC UI показывает `—` (не ложный ноль); ошибка логируется.
+- При ошибке RPC UI показывает `-` (не ложный ноль); ошибка логируется.
 - `web/src/lib/workout-stats.ts` (`resolveWorkoutCount`) + 3 теста;
   `adherence.ts`: псевдо-упражнения `[...` исключаются и из плана (+ тест).
 - Индекс `(client_id, date)`.
@@ -723,9 +723,9 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **14.1** | RPC + миграция | `20260804010000_count_client_workout_days.sql` — применена к production через Management API | ✅ |
-| **14.2** | Веб-интеграция | `page.tsx` → `rpc`, `resolveWorkoutCount`, `—` при ошибке, тип в `supabase.ts` | ✅ |
-| **14.3** | Тесты | `workout-stats.test.ts` (3), `adherence.test.ts` (16: псевдо-упражнение в плане) — 19/19 | ✅ |
+| **14.1** | RPC + миграция | `20260804010000_count_client_workout_days.sql` - применена к production через Management API | ✅ |
+| **14.2** | Веб-интеграция | `page.tsx` → `rpc`, `resolveWorkoutCount`, `-` при ошибке, тип в `supabase.ts` | ✅ |
+| **14.3** | Тесты | `workout-stats.test.ts` (3), `adherence.test.ts` (16: псевдо-упражнение в плане) - 19/19 | ✅ |
 | **14.4** | Верификация + gate | web `tsc` ✅ + vitest (19) ✅ + `next build` ✅; ревью 2 раунда (8.7 → 9.3 → **9.8**); production RPC проверен: 8 строк → **2** тренировочных дня | ✅ |
 | **14.5** | Деплой | коммит + push (Vercel) | ✅ |
 
@@ -736,7 +736,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `supabase/migrations/20260804010000_count_client_workout_days.sql` | Новый |
 | `web/src/lib/workout-stats.ts` + `.test.ts` | Новые |
 | `web/src/app/clients/[id]/page.tsx` | Изменение (RPC вместо count) |
-| `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (`—` при ошибке) |
+| `web/src/app/clients/[id]/_components/client-profile.tsx` | Изменение (`-` при ошибке) |
 | `web/src/types/supabase.ts` | Изменение (тип RPC) |
 
 ---
@@ -754,7 +754,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 Цель:
 - Суперсеты отображаются в боте как ОДНО упражнение (выполняются подряд)
 - AMRAP/круговые: «20 минут, максимум раундов (присед 20×60кг, берпи ×10, бег 500м)»
-- Кардио-упражнения: вместо веса/RPE — дистанция/время/темп/пульс
+- Кардио-упражнения: вместо веса/RPE - дистанция/время/темп/пульс
 
 ### Архитектурные решения
 
@@ -765,7 +765,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | Логирование суперсета | По строке на каждого ребёнка (реальные имена → прошлый раз/история/объём) |
 | Логирование круга | Одна строка: `exercise = имя круга`, `rounds`, `duration_sec` |
 | Логирование кардио | Одна строка: `distance_km`, `duration_sec`, `pace`, `heart_rate` |
-| Units vs leaves | Units — показ/навигация (композит = 1 карточка); Leaves — завершённость/аналитика (`flattenLoggableExercises`) |
+| Units vs leaves | Units - показ/навигация (композит = 1 карточка); Leaves - завершённость/аналитика (`flattenLoggableExercises`) |
 | Хранилище метрик | Числовые + темп текстом (для аналитики) |
 
 ### Задачи
@@ -824,15 +824,15 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 ### Контекст
 
 Сейчас напоминание замеров привязано к дню недели (`measurement_day`, ISO 1-7)
-и уходит **каждую неделю**. Чек-ин — только ручной (`/checkin`), авто-напоминаний
+и уходит **каждую неделю**. Чек-ин - только ручной (`/checkin`), авто-напоминаний
 и настроек чек-ина у клиента нет.
 
 Цель:
-- Замеры — **раз в месяц**: напоминание в выбранное **число месяца** (1-31)
+- Замеры - **раз в месяц**: напоминание в выбранное **число месяца** (1-31)
   в заданное время.
 - После напоминания клиент может **перенести замеры на другой день**
   (дефер по конкретному числу), и клиент сам меняет день/время в настройках.
-- Чек-ин — **еженедельно** по конфигурируемым `checkin_day`/`checkin_time`, флоу
+- Чек-ин - **еженедельно** по конфигурируемым `checkin_day`/`checkin_time`, флоу
   стартует сразу (без кнопки «Начать»).
 
 ### Осознанные решения
@@ -840,7 +840,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | Решение | Выбор |
 |---------|-------|
 | Семантика `measurement_day` | меняется: ISO-день недели (1-7) → **число месяца** (1-31) |
-| Дефолты миграции | `measurement_day=1`, `measurement_time='08:00'` — всем клиентам с заданным днём; **новым** клиентам так же по умолчанию |
+| Дефолты миграции | `measurement_day=1`, `measurement_time='08:00'` - всем клиентам с заданным днём; **новым** клиентам так же по умолчанию |
 | Проверка месяца | Напоминание не уходит, если `measurements` уже есть за **текущий месяц** клиента |
 | Defer | Кнопка «⏭ Перенести на другой день» → выбор **числа** (1-31) → `measurement_defer_date` = ближайшее наступление числа (если день прошёл в этому месяце → следующий месяц); после отправки перенесённого напоминания крон чистит поле |
 | Dedup | Месячный: `measurement:{clientId}:YYYY-MM` (TTL ~45 дней) |
@@ -861,12 +861,12 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **16.7** | Бот: кнопка переноса | `cron/measurement-reminder.ts` + `handlers/callbacks.ts`: кнопка «Перенести на другой день», эдитор выбора числа (1-31), колбэки `measurements_defer`/`measurements_defer_set:{n}`, запись `measurement_defer_date`, подтверждение, крон очищает поле после отправки | ✅ |
 | **16.8** | Бот: крон чек-ина | Новый `cron/checkin-reminder.ts` (+ регистр в `scheduler.ts`, guard `*/15 * * * *`): день+время, пропуск при чек-ине за 7 дней, лог `cron:checkin_reminder` | ✅ |
 | **16.9** | Бот: общий старт чек-ина | `handlers/checkin.ts`: вынести хелпер старта (первый вопрос + setState) для `/checkin` и крона | ✅ |
-| **16.10** | Бот: настройки | `handlers/settings.ts`: панель «День замера» (число месяца), «Время замера», «Чек-ин — день», «Чек-ин — время»; эдиторы и `settings_measure_day` (1-31), `settings_checkin_day` (Пн-Вс), `settings_checkin_time`; валидация | ✅ |
+| **16.10** | Бот: настройки | `handlers/settings.ts`: панель «День замера» (число месяца), «Время замера», «Чек-ин - день», «Чек-ин - время»; эдиторы и `settings_measure_day` (1-31), `settings_checkin_day` (Пн-Вс), `settings_checkin_time`; валидация | ✅ |
 | **16.11** | Бот: i18n | `i18n/index.ts` ru/en: `measure.reminder.monthly`, `measure.defer_button`, `measure.defer_choose`, `measure.deferred`, `settings.checkin_*`, переформулировка `settings.measure_day` | ✅ |
 | **16.12** | Веб-портал | `client/[token]/settings/*` + `actions.ts`: `measurement_day` 1-31, поля `checkin_day`/`checkin_time`, валидация, типы | ✅ |
 | **16.13** | Админка | `clients/[id]/_components/client-actions.tsx` + `actions.ts` + `page.tsx` + `client-profile.tsx`: день замеров 1-31, поля чек-ина в edit-форме и профиле | ✅ |
 | **16.14** | Верификация + gate | bot tsc + vitest (223/223); web tsc + vitest (34/34) + next build; ревью `@code-reviewer` 9.9 ≥9.5; TASKS.md; коммит+push | ✅ |
-| **16.15** | E2E прод | Миграция применена (колонки+дефолты ✅). Бэкфилл: единственный активный клиент получил `checkin_day=7/10:00`, `measurement_day=1` ✅. Vercel: новый код развёрнут (поля чек-ина в HTML портала ✅). GitHub-статус: Railway-failure pre-existing (бот жив на Render, `/health` 200). Естес. срабатывание кронов заблокировано guards (check-in 06.08 в 7-дн окне → авто-чек-ин ~13.08; замеры 04–06.08 → след. 01.09). E2E-тест юзером: временно удалены данные клиента, крон `cron:measurement_reminder`/`cron:checkin_reminder` отправили напоминания ✅, defer-флоу в Telegram (перенос на 09.08) подтверждён в БД `measurement_defer_date=2026-08-09` ✅ | ✅ |
+| **16.15** | E2E прод | Миграция применена (колонки+дефолты ✅). Бэкфилл: единственный активный клиент получил `checkin_day=7/10:00`, `measurement_day=1` ✅. Vercel: новый код развёрнут (поля чек-ина в HTML портала ✅). GitHub-статус: Railway-failure pre-existing (бот жив на Render, `/health` 200). Естес. срабатывание кронов заблокировано guards (check-in 06.08 в 7-дн окне → авто-чек-ин ~13.08; замеры 04-06.08 → след. 01.09). E2E-тест юзером: временно удалены данные клиента, крон `cron:measurement_reminder`/`cron:checkin_reminder` отправили напоминания ✅, defer-флоу в Telegram (перенос на 09.08) подтверждён в БД `measurement_defer_date=2026-08-09` ✅ | ✅ |
 
 ### Файлы для создания/изменения
 
@@ -898,14 +898,14 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 Кнопка «Перенести» в вечернем опросе («Тренировка сегодня была?») сейчас только
 пишет маркер `[EVENING_POSTPONE]` в `workout_logs` и отвечает «перенесём на
-следующий день» — **тренировка никуда не переносится**, следующий день по
+следующий день» - **тренировка никуда не переносится**, следующий день по
 расписанию остаётся без изменений, пропущенная тренировка просто теряется.
 
-Цель — реальный перенос в пределах **текущей недели**:
-- Клиент жмёт «Перенести» → видит дни недели (вт–вс до конца недели),
+Цель - реальный перенос в пределах **текущей недели**:
+- Клиент жмёт «Перенести» → видит дни недели (вт-вс до конца недели),
   занятые дни помечены, перенос возможен только на свободный день.
-- Отдельная опция «Изменить всё расписание недели» — перевыбор всех
-  тренировочных дней недели заново (мультивыбор пн–вс).
+- Отдельная опция «Изменить всё расписание недели» - перевыбор всех
+  тренировочных дней недели заново (мультивыбор пн-вс).
 - В день, с которого тренировка перенесена, тренировка не показывается
   (и вечерний опрос не приходит).
 - Перенос на следующую неделю не имеет смысла (там уже другой микроцикл).
@@ -914,11 +914,11 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | Решение | Выбор |
 |---------|-------|
-| Хранение | Колонка `program_schedule.training_days INTEGER[] NULL` — оверрайд списка дней **только для недели**; `NULL` = глобальные `clients.training_days` |
+| Хранение | Колонка `program_schedule.training_days INTEGER[] NULL` - оверрайд списка дней **только для недели**; `NULL` = глобальные `clients.training_days` |
 | Перенос пн→вт | Изменение списка недели `[1,3,5] → [2,3,5]`; `day_order` дня плана определяется позицией в эффективном списке (`matchDayForToday` уже так работает) |
 | Занятость дней | Обычные `training_days` недели + дни, куда уже сделаны переносы (в списке недели) |
 | Ограничение | Только дни **после сегодня и до `end_date`** текущей недели |
-| Опция «Изменить расписание недели» | Перевыбор всех дней заново (тоглы пн–вс, кол-во = число тренировок недели); переиспользуем редактор из `training-days.ts`, но пишем в `program_schedule.training_days` |
+| Опция «Изменить расписание недели» | Перевыбор всех дней заново (тоглы пн-вс, кол-во = число тренировок недели); переиспользуем редактор из `training-days.ts`, но пишем в `program_schedule.training_days` |
 | Вечерний опрос в перенесённый день | Не отправляется автоматически: `getTodayWorkout` по новой маске не найдёт тренировку в этот день |
 | Авто-показ в новом дне | Утреннее напоминание/`/today`/`/my-program` подхватывают перенесённую тренировку автоматически через `getTodayWorkout` |
 | Веб-портал | `web/src/app/client/[token]/workout/page.tsx` и `client/[token]/page.tsx` (adherence) получают недельный оверрайд, чтобы показывать ту же картину |
@@ -938,9 +938,9 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **17.9** | Тесты | Бот 276: `postpone-utils` (21), `finalizeSchedule`, mid-week `weekdayDateInWeek`+`plannedDateForDay`, adherence оверрайд; Web 58: `week-days`, adherence mid-week window | ✅ |
 | **17.10** | Верификация + gate | bot/web tsc + vitest + next build; ревью `@code-reviewer` 9.6/10 (4 раунда: 8.8 → 8.6 → 8.4 → 9.0 → 9.4 → 9.6); коммиты 606a66b…f00fdfb, все запушены | ✅ |
 | **17.11** | E2E прод | Миграция применена через Management API (direct DB недоступен) ✅; перенос в Telegram на проде подтверждён: `program_schedule` неделя 2 `training_days=[3]` (после теста снято) ✅; вечерний опрос в старый день не приходит (день убран из effective days → `getTodayWorkout` null, код-проверено); найден и исправлен баг: веб игнорировал недельный оверрайд (select без `training_days` в `/clients/[id]/workouts` + history) ✅ | ✅ |
-| **17.12** | Фича: перенос из утреннего уведомления + ревью-цикл | `morning.ts` — кнопка «🔁 Перенести» (`morning_postpone`); общий пикер `openPostponePicker(source)` для morning/evening, source в callback_data (`postpone_move:{iso}:{source}`), фолбэк legacy `""` → evening; маркеры `[MORNING_POSTPONE]`/`[EVENING_POSTPONE]`; `hasCompletion` исключает `[MORNING_*]`. Ревью `@code-reviewer` 4 раунда (8.0 → 8.5 → 9.3 → 9.6): M1-фолбэк занятых дней из `day_name` для клиентов без `training_days` (`getOccupiedDaysForWeek`, lenient `weekdayIsoFromName`, сорт по day_order); константы маркеров в `log-markers.ts`; `hasCompletionLogs/hasSkipLog` вынесены; web lenient-матчинг в `day-names.ts` (+ `plannedDateForDay` фикс в my-stats); тесты: бот 298 (16 новых flow), web 61 (3 day-names); коммиты 0d7063f, 58c081b — запушены | ✅ |
-| **17.13** | Веб тренера: «Следующая тренировка» | `/clients/[id]` — `InfoRow` в секции «Доступ и программа» после «Статус программы»: «Сегодня»/«Завтра»/«Чт, 13.08» + условная подсветка. Данные: добавить `training_days` в селект клиента и расписания (page.tsx), запрос логов текущей недели | ✅ |
-| **17.14** | Главная клиента: «Следующая тренировка» | `/client/[token]` — кликабельная `Card` между приветствием и «Текущая неделя», ссылка на `/program`: «Следующая тренировка: Четверг, 13 августа», при совпадении с сегодня — «Сегодня» + подсветка | ✅ |
+| **17.12** | Фича: перенос из утреннего уведомления + ревью-цикл | `morning.ts` - кнопка «🔁 Перенести» (`morning_postpone`); общий пикер `openPostponePicker(source)` для morning/evening, source в callback_data (`postpone_move:{iso}:{source}`), фолбэк legacy `""` → evening; маркеры `[MORNING_POSTPONE]`/`[EVENING_POSTPONE]`; `hasCompletion` исключает `[MORNING_*]`. Ревью `@code-reviewer` 4 раунда (8.0 → 8.5 → 9.3 → 9.6): M1-фолбэк занятых дней из `day_name` для клиентов без `training_days` (`getOccupiedDaysForWeek`, lenient `weekdayIsoFromName`, сорт по day_order); константы маркеров в `log-markers.ts`; `hasCompletionLogs/hasSkipLog` вынесены; web lenient-матчинг в `day-names.ts` (+ `plannedDateForDay` фикс в my-stats); тесты: бот 298 (16 новых flow), web 61 (3 day-names); коммиты 0d7063f, 58c081b - запушены | ✅ |
+| **17.13** | Веб тренера: «Следующая тренировка» | `/clients/[id]` - `InfoRow` в секции «Доступ и программа» после «Статус программы»: «Сегодня»/«Завтра»/«Чт, 13.08» + условная подсветка. Данные: добавить `training_days` в селект клиента и расписания (page.tsx), запрос логов текущей недели | ✅ |
+| **17.14** | Главная клиента: «Следующая тренировка» | `/client/[token]` - кликабельная `Card` между приветствием и «Текущая неделя», ссылка на `/program`: «Следующая тренировка: Четверг, 13 августа», при совпадении с сегодня - «Сегодня» + подсветка | ✅ |
 | **17.15** | Утилита next-workout + тесты | `web/src/lib/next-workout.ts`: `getNextWorkoutDay({ schedule, clientTrainingDays, parsed, workoutLogs, today })` → `{ date, iso, weekNumber, isToday } | null`; эффективные дни `week.training_days ?? client.training_days`, позиционный fallback по `day_name`/`day_order`; «сегодня» = тренировочный день без завершённых реальных логов; переход через границу недели. Тест `next-workout.test.ts` (сегодня, завершён сегодня, оверрайд, fallback, граница недели, пустой schedule); vitest + tsc в `web/`. Ревью 8.5 → 9.0: общие хелперы `collectDayOrderLogs`/`isDayCompletedByOrder` в adherence.ts, TZ-безопасный «Завтра», полный fetch логов | ✅ |
 
 ### Файлы для создания/изменения
@@ -962,12 +962,12 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 ---
 
-## Фаза 18: Отображение круговой — состав упражнений, время убрано
+## Фаза 18: Отображение круговой - состав упражнений, время убрано
 
 ### Контекст
 
 Круговая тренировка логируется как одна строка `exercise = имя круга` + `rounds` + `duration_sec`.
-При отображении показывается только «Круговая» + сколько раундов + сколько минут — **без состава**,
+При отображении показывается только «Круговая» + сколько раундов + сколько минут - **без состава**,
 хотя в программе у круговой есть `children` (упражнения, которые тренер указал при создании).
 
 Цель:
@@ -981,30 +981,30 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | Решение | Выбор |
 |---------|-------|
-| Отображение состава | Дети круговой (`children`) показываются как в суперсетах: «A1. Берпи — 3×15 · 20 кг» |
+| Отображение состава | Дети круговой (`children`) показываются как в суперсетах: «A1. Берпи - 3×15 · 20 кг» |
 | Логирование | Останется одна строка на круг (`rounds` + комментарий); дети логируются вместе с кругом |
 | Время круговой | `duration_sec` больше не спрашивается и не пишется для `type=circuit`; для старых записей время скрывается везде, где `rounds != null` |
-| История | Состав круговой — под названием круга в левой колонке таблицы (повторы/подходы и вес из плана) |
+| История | Состав круговой - под названием круга в левой колонке таблицы (повторы/подходы и вес из плана) |
 | Предпросмотр программы | Для круговой в метриках остаётся только «Раунды», «Время» убирается (кардио не трогаем) |
 
 ### Известные ограничения
 
-- Круг с кардио-детьми: в боте такой ребёнок рендерится с кардио-деталями, в веб-истории — голым именем (рендер детей в истории учитывает только sets/reps/weight). Редкий кейс, принят осознанно.
+- Круг с кардио-детьми: в боте такой ребёнок рендерится с кардио-деталями, в веб-истории - голым именем (рендер детей в истории учитывает только sets/reps/weight). Редкий кейс, принят осознанно.
 - Состав круга в истории берётся из плана первой встреченной недели (дедуп строк по имени); при смене состава круга между неделями в истории может остаться состав первой недели. Для снятия ограничения стоит хранить состав круга в самой записи лога (JSON-колонка).
 
 ### Задачи
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **18.1** | Бот: рендер круговой с детьми | `bot/src/lib/workout-utils.ts` — ветка `circuit` в `formatExercise()` и `formatSingleExercise()` (заголовок `circuit_label`, дети список «A1. Название — 3×15 · 20 кг», цель «Цель: N раунд(а/ов)», отдых/заметки) | ✅ |
-| **18.2** | Бот: планируемые детали | `formatPlannedDetail()` — для круговой только раунды; `formatPreviousLog()` — при `rounds != null` время не показывать (старые записи тоже) | ✅ |
-| **18.3** | Бот: wizard без времени | `bot/src/handlers/wizard.ts` — `CIRCUIT_STEPS = ["rounds", "comment"]`, сводка без «Время», вставка `duration_sec: null` | ✅ |
-| **18.4** | Бот: i18n | `bot/src/i18n/index.ts` — удалить неиспользуемые `planned_duration_prefix`, `planned_rounds`, `exercise_weight`, `exercise_rpe` (ru/en) | ✅ |
-| **18.5** | Бот: тесты | `bot/src/lib/__tests__/workout-utils.test.ts` — тест круговой: дети с деталями, нет «за 20 мин»; кейс `formatSingleExercise` для круга; скрытие времени у старых circuit-логов, сохранение у cardio; «Прошлый раз» родителя круга; плюрализация цели | ✅ |
-| **18.6** | История: состав круговой | `web/src/app/client/[token]/history/page.tsx` — `HistoryRow.children` из `ex.children` + буквы композита; `history-grid.tsx` — вывод «A1. Берпи — 3×15 · 20 кг» под названием круга | ✅ |
-| **18.7** | История: без времени | `history-format.ts` — `formatMetrics()`: при `rounds != null` время не показывается (включая старые записи) | ✅ |
-| **18.8** | Веб-форма: без времени | `web/src/app/client/[token]/workout/workout-form.tsx` — убрать поле «Время» и валидацию для круговой; `actions.ts` — серверная проверка: `duration_sec !== null` для `circuit` отклоняется | ✅ |
-| **18.9** | Превью программы | `web/src/app/programs/[id]/_components/program-week-preview.tsx` — для круговой метрика «Время» убрана, остаётся «Раунды»; колонка «Время» для круга рендерит «—»; `program-editor.tsx` — у круга нет поля «Время», автоимя без duration | ✅ |
+| **18.1** | Бот: рендер круговой с детьми | `bot/src/lib/workout-utils.ts` - ветка `circuit` в `formatExercise()` и `formatSingleExercise()` (заголовок `circuit_label`, дети список «A1. Название - 3×15 · 20 кг», цель «Цель: N раунд(а/ов)», отдых/заметки) | ✅ |
+| **18.2** | Бот: планируемые детали | `formatPlannedDetail()` - для круговой только раунды; `formatPreviousLog()` - при `rounds != null` время не показывать (старые записи тоже) | ✅ |
+| **18.3** | Бот: wizard без времени | `bot/src/handlers/wizard.ts` - `CIRCUIT_STEPS = ["rounds", "comment"]`, сводка без «Время», вставка `duration_sec: null` | ✅ |
+| **18.4** | Бот: i18n | `bot/src/i18n/index.ts` - удалить неиспользуемые `planned_duration_prefix`, `planned_rounds`, `exercise_weight`, `exercise_rpe` (ru/en) | ✅ |
+| **18.5** | Бот: тесты | `bot/src/lib/__tests__/workout-utils.test.ts` - тест круговой: дети с деталями, нет «за 20 мин»; кейс `formatSingleExercise` для круга; скрытие времени у старых circuit-логов, сохранение у cardio; «Прошлый раз» родителя круга; плюрализация цели | ✅ |
+| **18.6** | История: состав круговой | `web/src/app/client/[token]/history/page.tsx` - `HistoryRow.children` из `ex.children` + буквы композита; `history-grid.tsx` - вывод «A1. Берпи - 3×15 · 20 кг» под названием круга | ✅ |
+| **18.7** | История: без времени | `history-format.ts` - `formatMetrics()`: при `rounds != null` время не показывается (включая старые записи) | ✅ |
+| **18.8** | Веб-форма: без времени | `web/src/app/client/[token]/workout/workout-form.tsx` - убрать поле «Время» и валидацию для круговой; `actions.ts` - серверная проверка: `duration_sec !== null` для `circuit` отклоняется | ✅ |
+| **18.9** | Превью программы | `web/src/app/programs/[id]/_components/program-week-preview.tsx` - для круговой метрика «Время» убрана, остаётся «Раунды»; колонка «Время» для круга рендерит «-»; `program-editor.tsx` - у круга нет поля «Время», автоимя без duration | ✅ |
 | **18.10** | Верификация + gate | bot `npm run test:unit` (304 ✓) + `npm run build` ✓; web tsc ✓ + vitest (84 ✓) + next build ✓; ревью `@code-reviewer` 9.6/10 (гейт ≥9.5 пройден) | ✅ |
 
 ### Файлы для создания/изменения
@@ -1037,7 +1037,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 Цель:
 - «Выполнено» = число дней, когда клиент реально тренировался: в логе есть хотя бы одно реальное
   упражнение (любая дата, включая дни не по плану). Псевдо-записи (`[SKIP]`, `[EVENING_*]`) не считаются.
-- На главной клиента в окошке «Следующая тренировка» — индикатор «✅ Выполнена сегодня», если
+- На главной клиента в окошке «Следующая тренировка» - индикатор «✅ Выполнена сегодня», если
   сегодня есть реальные записи.
 
 ### Осознанные решения
@@ -1045,8 +1045,8 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | Решение | Выбор |
 |---------|-------|
 | Семантика «Выполнено» | День засчитывается, если есть ≥1 реальная запись (частичная тренировка и офф-план день тоже). «Ожидалось» = плановые тренировочные дни недели |
-| Индикатор «Выполнена сегодня» | Любые реальные записи сегодня; если сегодня есть плановая тренировка, но она не завершена — показывается подсказка «Завершите сегодняшнюю тренировку» |
-| Формулировки | «X тренировок (плановых: Y)» — чтобы счётчик не выглядел багом, когда выполнено больше плана (офф-план дни) |
+| Индикатор «Выполнена сегодня» | Любые реальные записи сегодня; если сегодня есть плановая тренировка, но она не завершена - показывается подсказка «Завершите сегодняшнюю тренировку» |
+| Формулировки | «X тренировок (плановых: Y)» - чтобы счётчик не выглядел багом, когда выполнено больше плана (офф-план дни) |
 | RPC | Единая логика: `count_client_workout_days` считает DISTINCT дни с реальными записями до `today` по timezone клиента |
 
 ### Задачи
@@ -1054,7 +1054,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | **19.1** | Веб: `adherence.ts` | `completed` в `countWeekByDates`/`countWeekByDayOrder` = `countTrainedDays` (дни недели до today с ≥1 реальным упражнением); экспорт `isRealExercise` | ✅ |
-| **19.2** | Веб: `next-workout.ts` | Новый хелпер `hasTrainedOnDate(workoutLogs, date)` — есть ли реальные записи за дату | ✅ |
+| **19.2** | Веб: `next-workout.ts` | Новый хелпер `hasTrainedOnDate(workoutLogs, date)` - есть ли реальные записи за дату | ✅ |
 | **19.3** | Портал: индикатор «Выполнена сегодня» | `client/[token]/page.tsx`: `trainedToday`, рендер ✅ + «Следующая: …» / «Завершите сегодняшнюю тренировку»; формулировки счётчиков «X (плановых: Y)» | ✅ |
 | **19.4** | Миграция RPC | `20260813000000_count_trained_workout_days.sql`: `count_client_workout_days` = DISTINCT даты реальных записей ≤ today (timezone клиента), псевдо-записи исключены | ✅ |
 | **19.5** | Тесты | `adherence.test.ts` (офф-план день, псевдо-только дни, частичная тренировка, дни после today, distinct-дни); `next-workout.test.ts` (`hasTrainedOnDate`) | ✅ |
@@ -1076,15 +1076,15 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 ### Контекст
 
 Таблица `exercises` существует, но пуста и используется только как автокомплит в редакторе программ.
-Программы хранят упражнения как свободное имя (`ParsedExercise.name`), логи пишут имя текстом — связи с
-`exercises.id` нет. Клиенту нужна библиотека: описание, техника выполнения, особенности, видео-инструкция —
+Программы хранят упражнения как свободное имя (`ParsedExercise.name`), логи пишут имя текстом - связи с
+`exercises.id` нет. Клиенту нужна библиотека: описание, техника выполнения, особенности, видео-инструкция -
 доступная в боте во время тренировки и на клиентском портале.
 
 Цель:
 - Расширить `exercises` контентом (ru/en): описание, техника, особенности (буллеты), YouTube-видео, алиасы.
-- Связывание с программами — по нормализованному имени + алиасам (без правки контента программ и логов).
+- Связывание с программами - по нормализованному имени + алиасам (без правки контента программ и логов).
 - Бот `/today`: под карточкой упражнения компактная кнопка «Техника и видео» → отдельное сообщение
-  (техника + особенности + ссылка). Команда `/exercise <название>` — поиск по имени/алиасам.
+  (техника + особенности + ссылка). Команда `/exercise <название>` - поиск по имени/алиасам.
 - Клиентский портал: под упражнением раскрывающаяся карточка: техника + особенности + встроенный YouTube-плеер.
 - Веб-панель: CRUD-страница `/exercises` + подсказка в редакторе программ при совпадении с библиотекой.
 
@@ -1092,35 +1092,35 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | Решение | Выбор |
 |---------|-------|
-| Хостинг видео | Только YouTube-ссылки (`video_url`); на портале — iframe, в боте — ссылка |
+| Хостинг видео | Только YouTube-ссылки (`video_url`); на портале - iframe, в боте - ссылка |
 | Связывание | `name_key` (нормализация: lowercase, без пунктуации/пробелов) + `aliases TEXT[]`; матч в рантайме (JS-мап), без SQL-функций |
 | Поверхности | Бот (/today-кнопка, /exercise) + веб (CRUD, подсказка в редакторе) + портал (карточки) |
-| Бот: формат | Компактная кнопка → отдельное сообщение (не раздувать карточку /today); у суперсетов — кнопка на суперсет целиком |
+| Бот: формат | Компактная кнопка → отдельное сообщение (не раздувать карточку /today); у суперсетов - кнопка на суперсет целиком |
 | Портал: формат | Раскрывающаяся карточка: текст техники + буллеты особенностей + YouTube iframe |
 | Языки | RU + EN (description_ru/en, technique_ru/en, features_ru/en) |
 | Резолвер | Дубликат `exercise-library.ts` в `web/src/lib/` и `bot/src/lib/` (keep-in-sync, как program-utils) |
-| Наполнение | Сид: топ-15 движений текущих программ с реальными публичными ссылками (Buff Dudes / Фитнес Преп) + полный ru/en текст (AI-черновик, тренер правит в CRUD); остальные — текст + плейсхолдер video_url |
+| Наполнение | Сид: топ-15 движений текущих программ с реальными публичными ссылками (Buff Dudes / Фитнес Преп) + полный ru/en текст (AI-черновик, тренер правит в CRUD); остальные - текст + плейсхолдер video_url |
 | Существующие поля | `muscle_group, equipment, difficulty, contraindications` сохраняются без изменений |
 
 ### Задачи
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **20.1** | Миграция БД + типы | `20260815000000_exercise_library.sql`: ALTER `exercises` — `name_key TEXT UNIQUE NOT NULL`, `aliases TEXT[] DEFAULT '{}'`, `description_ru TEXT`, `description_en TEXT`, `technique_ru TEXT`, `technique_en TEXT`, `features_ru TEXT[]`, `features_en TEXT[]`, `video_url TEXT`; бэкап `name_key` из существующих `name` при миграции. Обновить `web/src/types/supabase.ts`, `bot/src/lib/types.ts` | ✅ |
+| **20.1** | Миграция БД + типы | `20260815000000_exercise_library.sql`: ALTER `exercises` - `name_key TEXT UNIQUE NOT NULL`, `aliases TEXT[] DEFAULT '{}'`, `description_ru TEXT`, `description_en TEXT`, `technique_ru TEXT`, `technique_en TEXT`, `features_ru TEXT[]`, `features_en TEXT[]`, `video_url TEXT`; бэкап `name_key` из существующих `name` при миграции. Обновить `web/src/types/supabase.ts`, `bot/src/lib/types.ts` | ✅ |
 | **20.2** | Резолвер библиотеки | `web/src/lib/exercise-library.ts` + `bot/src/lib/exercise-library.ts` (синк-комментарий): `normalizeExerciseName`, `buildExerciseLibraryMap(rows)`, `findLibraryEntry(map, programName)`, `formatExerciseInfo(ex, lang) → { text, videoUrl }` (техника буллетами + особенности + ссылка), `collectLibraryKeys(exercises)` | ✅ |
-| **20.3** | Сид библиотеки | `bot/scripts/seed-exercise-library.ts` — идемпотентный upsert по `name_key`: топ-15 движений программ (Гипертрофия FB, домашняя, HYROX) с реальными ссылками + ~35 с плейсхолдером; ru/en текст, алиасы (варианты/дети суперсетов) | ✅ |
+| **20.3** | Сид библиотеки | `bot/scripts/seed-exercise-library.ts` - идемпотентный upsert по `name_key`: топ-15 движений программ (Гипертрофия FB, домашняя, HYROX) с реальными ссылками + ~35 с плейсхолдером; ru/en текст, алиасы (варианты/дети суперсетов) | ✅ |
 | **20.4** | Бот: кнопка в /today | `workout-utils.ts`: `formatWorkoutMessage` грузит карту библиотеки (1 запрос), передаёт в `formatExercise` (опц. параметр, дефолт без данных); строка кнопки + колбэк `exercise_info:<key>` | ✅ |
-| **20.5** | Бот: callback и сообщение | `callbacks.ts`: обработчик `exercise_info` — отдельное сообщение (техника + особенности + 📺 ссылка); суперсет/циркут — техника детей внутри | ✅ |
+| **20.5** | Бот: callback и сообщение | `callbacks.ts`: обработчик `exercise_info` - отдельное сообщение (техника + особенности + 📺 ссылка); суперсет/циркут - техника детей внутри | ✅ |
 | **20.6** | Бот: команда /exercise | Новый обработчик (поиск по имени/алиасам, `exercise_lib` не найдено → подсказка), регистрация команды в `bot.ts` и меню | ✅ |
 | **20.7** | Бот i18n | `bot/src/i18n/index.ts` ru/en: `workout.exercise_info_button`, секция `exercise_lib.*` (заголовки техники/особенностей/видео, not_found) | ✅ |
 | **20.8** | Веб: CRUD-страница | `web/src/app/exercises/page.tsx` (список + карточка) + `_components/exercise-form.tsx` (имя, алиасы, описание/техника/особенности ru/en, оборудование, сложность, группа мышц, contraindications, video_url) | ✅ |
 | **20.9** | Веб: server actions | `web/src/app/exercises/actions.ts`: валидация, вычисление `name_key`, guard admin/coach, revalidate | ✅ |
-| **20.10** | Веб: подсказка в редакторе | `program-editor.tsx` (рядом с autocomplete): при матче с библиотекой — коллапс «В библиотеке: ⇢ техника · 📺 видео» | ✅ |
-| **20.11** | Портал: карточки | `client/[token]/workout/page.tsx` (server: карта библиотеки) + `workout-form.tsx`: раскрывающаяся карточка под упражнением — техника + особенности + YouTube iframe (хелпер извлечения video ID из ссылки) | ✅ |
+| **20.10** | Веб: подсказка в редакторе | `program-editor.tsx` (рядом с autocomplete): при матче с библиотекой - коллапс «В библиотеке: ⇢ техника · 📺 видео» | ✅ |
+| **20.11** | Портал: карточки | `client/[token]/workout/page.tsx` (server: карта библиотеки) + `workout-form.tsx`: раскрывающаяся карточка под упражнением - техника + особенности + YouTube iframe (хелпер извлечения video ID из ссылки) | ✅ |
 | **20.12** | Тесты | Резолвер: `normalizeExerciseName` (регистр/пунктуация), матч по алиасам/детям суперсетов, `formatExerciseInfo` ru/en; бот: кнопка при матче, callback шлёт сообщение, карточка без данных не ломается, `/exercise` найден/не найден; веб: CRUD-валидация, guard, рендер карточки портала | ✅ |
-| **20.13** | Верификация + gate | tsc ✓, vitest web ✓, vitest bot ✓, eslint ✓; ревью `@code-reviewer` — гейт ≥9.5; отметка фазы в TASKS.md | ✅ |
+| **20.13** | Верификация + gate | tsc ✓, vitest web ✓, vitest bot ✓, eslint ✓; ревью `@code-reviewer` - гейт ≥9.5; отметка фазы в TASKS.md | ✅ |
 | **20.14** | Покрытие программ | Сид расширен 51 → 84 записи: все имена упражнений H/T/X покрыты (name/алиасы); заглушки «Бег», «Жим гантелей стоя», «Казак-приседания», «Тяга горилла», «Молотки» и др.; `check-exercise-coverage.ts` (collection child/ex/machine/inline); миграция применена к проду (`supabase db push`), сид в прод (84 записи), чистка «переехавших» алиасов; name_key заморожен при updateExercise (CRUD-переименование не ломает матчинг программ); ревью 9.5/10 | ✅ |
-| **20.15** | Фикс 500 на /exercises | Next.js 16 запрещает передавать функции через server→client границу: баг-фикс — `onDone` в `exercise-form.tsx` стал опциональным (`onDone?: () => void`), из `page.tsx:100` убран (`revalidatePath` в actions уже обновляет страницу). Коммит `e3b02b7`, продиагностировано curl-сессией (500 на проде), проверено: tsc ✓, vitest 169/169 ✓, HTTP 200 на проде; ревью `@code-reviewer` 9.5/10 | ✅ |
+| **20.15** | Фикс 500 на /exercises | Next.js 16 запрещает передавать функции через server→client границу: баг-фикс - `onDone` в `exercise-form.tsx` стал опциональным (`onDone?: () => void`), из `page.tsx:100` убран (`revalidatePath` в actions уже обновляет страницу). Коммит `e3b02b7`, продиагностировано curl-сессией (500 на проде), проверено: tsc ✓, vitest 169/169 ✓, HTTP 200 на проде; ревью `@code-reviewer` 9.5/10 | ✅ |
 
 ### Файлы для создания/изменения
 
@@ -1152,32 +1152,32 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 ---
 
-## Фаза 21: Продамус — онлайн-оплата программ (разовая, доступ на срок программы)
+## Фаза 21: Продамус - онлайн-оплата программ (разовая, доступ на срок программы)
 
 > **Флоу:** `/programs` → «Купить» у программы (цена обязательна) → согласие на обработку данных **до оплаты** (кнопка `consent_purchase:<request_id>`) → ссылка на payform (`do=pay&products[0][name]=<программа>&products[0][price]=<цена>&products[0][quantity]=1&order_id=<UUID заявки>`) → webhook (`Sign` = HMAC-SHA256) → создание/переактивация профиля + назначение выбранной программы на `duration_weeks` (напр. 10 нед.) + инструкции. Тренер получает «Заявка на покупку» и «Оплата подтверждена» (имя/фамилия из Telegram, @ник, TG ID, программа, цена).
 >
-> **Автоистечение:** доступ автоматически прекращается по `access_end_date` (бот + портал), за 5 дней — напоминание клиенту. Повторная покупка той же программы — новая заявка/оплата → новое окно доступа.
+> **Автоистечение:** доступ автоматически прекращается по `access_end_date` (бот + портал), за 5 дней - напоминание клиенту. Повторная покупка той же программы - новая заявка/оплата → новое окно доступа.
 >
-> **«Связаться с тренером»:** заявка на индивидуальное ведение/кураторство (sub_type='individ') из бота и со страниц каталога — уведомление тренеру со всеми данными клиента.
+> **«Связаться с тренером»:** заявка на индивидуальное ведение/кураторство (sub_type='individ') из бота и со страниц каталога - уведомление тренеру со всеми данными клиента.
 
 ### Задачи
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | **21.1** | Миграция БД + типы | `20260816000000_prodamus_payments.sql`: таблица `purchase_requests` (id UUID PK, program_id UUID FK NULL, client_id UUID FK NULL, name TEXT, contact TEXT, telegram_id BIGINT NULL, first_name TEXT NULL, last_name TEXT NULL, status TEXT NOT NULL DEFAULT 'pending' (pending/paid/cancelled), order_id TEXT UNIQUE NULL, amount NUMERIC NULL, sub_type TEXT NOT NULL ('program'/'individ'), consent_given BOOL NOT NULL DEFAULT false, consent_at TIMESTAMPTZ, consent_version TEXT, created_at, updated_at) + индексы по status, telegram_id, order_id. Обновить `web/src/types/supabase.ts` + `bot/src/lib/types.ts` | ✅ (миграция +12 колонок: `amount NUMERIC(10,2)` + `CHECK (amount IS NULL OR amount > 0)`, `paid_at TIMESTAMPTZ`; FKs `ON DELETE SET NULL`; RLS: чтение только `profiles.role IN ('admin','coach')`, `REVOKE ALL FROM anon`, `REVOKE DML FROM authenticated`, GRANT SELECT authenticated + ALL service_role; типы web (Insert: name/contact/sub_type обязательны, status/consent_given опциональны) + bot (dedicated Insert по паттерну exercises); tsc web+bot ✓, vitest web 169 ✓, bot 367 ✓; ревью 2 раунда 8.5 → fix'ы (anon REVOKE, staff-политика, paid_at, bot Insert) → **10/10**) |
-| **21.2** | lib/prodamus.ts | `buildPaymentUrl({ payformUrl, orderId, amount, productName, customerPhone, urlSuccess, urlReturn })` — `do=pay&products[0][name]=...&products[0][price]=...&products[0][quantity]=1&order_id=...&customer_phone=...&urlSuccess=...` (развёрнутая ссылка, SYS-код не нужен); `verifyProdamusSignature(rawBody, signHeader, secretKey)` — значения к строкам, рекурсивная сортировка ключей, экранирование `/`, SHA-256, `crypto.timingSafeEqual`; `parseProdamusOrder` (order_id, sum, payment_status, products). Тесты на официальный пример payload докахов Продамуса | ✅ (HMAC-SHA256 по офиц. алгоритму docs.prodamus.ru; golden-фикстура докахов `ec3d935e…` совпадает байт-в-байт; поддержка multipart/form-data (FormData) + urlencoded; хардненинг pre-auth парсера по ревью: prototype pollution закрыта (BLOCKED_HEADS + Object.hasOwn), OOM-кап индексов ≤1000, глубина ≤32, last-wins для конфликтующих ключей, verify никогда не бросает; 27/27 тестов, tsc+eslint ✓; ревью 2 раунда 6.5 → fix'ы → **9.5/10**) |
+| **21.2** | lib/prodamus.ts | `buildPaymentUrl({ payformUrl, orderId, amount, productName, customerPhone, urlSuccess, urlReturn })` - `do=pay&products[0][name]=...&products[0][price]=...&products[0][quantity]=1&order_id=...&customer_phone=...&urlSuccess=...` (развёрнутая ссылка, SYS-код не нужен); `verifyProdamusSignature(rawBody, signHeader, secretKey)` - значения к строкам, рекурсивная сортировка ключей, экранирование `/`, SHA-256, `crypto.timingSafeEqual`; `parseProdamusOrder` (order_id, sum, payment_status, products). Тесты на официальный пример payload докахов Продамуса | ✅ (HMAC-SHA256 по офиц. алгоритму docs.prodamus.ru; golden-фикстура докахов `ec3d935e…` совпадает байт-в-байт; поддержка multipart/form-data (FormData) + urlencoded; хардненинг pre-auth парсера по ревью: prototype pollution закрыта (BLOCKED_HEADS + Object.hasOwn), OOM-кап индексов ≤1000, глубина ≤32, last-wins для конфликтующих ключей, verify никогда не бросает; 27/27 тестов, tsc+eslint ✓; ревью 2 раунда 6.5 → fix'ы → **9.5/10**) |
 | **21.3** | Бот: покупка программы | `bot/src/handlers/purchase.ts`: в `/programs` кнопка «Купить» (только у программ с `price > 0`) → INSERT `purchase_requests` (sub_type='program', status pending, данные из `ctx.from.first_name/last_name/username/id`) → текст политики + кнопка `consent_purchase:<request_id>` **до оплаты**; у клиентов с `client_consent_given` шаг согласия пропускается → после приёма: consent в заявке + `buildPaymentUrl` + кнопка «Оплатить» (url); уведомление тренеру «Заявка на покупку» (имя + фамилия, @ник, TG ID, программа, цена); i18n ru/en, регистрация в `bot.ts` и меню | ✅ (3 коммита: `830c0bb` feat-флоу, `22b8647` хардненинг раунда 1 (статус-гварды, order_id=id, amount-снапшот, уникальный pending-индекс `20260817000000`, антиспам 3, PRODAMUS_PAYFORM_BASE_URL, buildBuyUrl удалён), `51fcd14`+`0c7b6d7` раунды 2-3 (ссылка строго из снапшота amount, финальная ре-верификация consent, assertNoPriorPayment fail-closed на всех 3 путях выдачи ссылки (owned/paid/error), retry при cancelled-winner, consent-текст цитирует снапшот); бот 408/17 ✓ tsc ✓; ревью 4 раунда 7.5+8.0 → 9.0+9.0 → 9.0+9.2 → **9.5/10 + 9.6/10** ✅) |
 | **21.4** | Бот: кнопка «Связаться с тренером» | `purchase.ts` + меню (новые и активные клиенты): callback `coach_request` → согласие (если нет, `consent_purchase`-механика) → INSERT `purchase_requests` (sub_type='individ', данные из Telegram) → тренеру «Хочу индивидуальное ведение/кураторство» (имя, фамилия, @ник, TG ID, ссылка t.me) → клиенту «Тренер скоро свяжется с вами»; i18n ru/en | ✅ (2 коммита: `5e77ed9` feat (согласие ДО вставки: кнопка = согласие, согласие записывается атомарно при INSERT; дедуп пре-чтение + 23505 с единичным retry; частичный unique-индекс `20260818000000_purchase_unique_pending_individ`; кнопки в /programs (вкл. пустой каталог), меню активного клиента, /start для новых; pre-guard в bot.ts; бот 427/19) + `0d4ba76`+`3fe82a8` хардненинг (try/catch-контейнер submitIndividRequest, fail-closed dedup, ClientLookupResult-union, версия политики: standing-consent только при совпадении PRIVACY_POLICY_VERSION, иначе свежий шаг; bot_logs не бросает); бот 433/19 ✓ tsc ✓; ревью 2 раунда 9.4 → **9.6/10 + 9.6/10** ✅) |
-| **21.5** | Веб: заявка на страницах каталога | На `/buy/[id]` блок «Хотите индивидуальное ведение?» (текст + кнопка заявки): server action `createCoachRequest` в `web/src/app/buy/[id]/actions.ts` — реюз валидации, rate-limit и дедупликации `createPurchaseRequest` (имя, контакт, обязательный чекбокс согласия с /privacy из `lib/consent.ts`) → INSERT sub_type='individ' → уведомление тренеру | ✅ (4 коммита: `b07793a` feat (карточка «или — индивидуальное ведение», чекбокс согласия, createCoachRequest: rate-limit IP, dedupMap, bot_dedup 23505, INSERT с consent_given/at/version, bot_logs coach_request, уведомление тренеру; рефактор insertBotLog; 10 новых тестов) → `2ee2dce` (ревью R1 кода 7.0: fail-closed пре-риды без try/catch-поглощений, telegram_id всегда NULL для веб-строк — недоверенный ?tg= не блокирует чужие слоты и не попадает в сообщение тренера/логи, insertBotLog никогда не бросает, order по created_at, GENERIC_ERROR_MESSAGE + deleteDedupKey, тесты fail-closed) → `9bddf2d` (R2 код 9.3: fail-closed на non-23505 dedup-записи, регрессионные тесты на чистоту личности) → `742fe39`+`e68a915` (security R1 9.2: нормализация телефона в dedup-ключах и пре-риде, снят limit(50), fail-closed dedup-запись в purchase-флоу, строгий boolean consentGiven, \u2028\u2029 в sanitizeText; security R2 9.6 + L1-гейт на PHONE_REGEX (цифро-ведущие username ≠ телефон) + тесты); web tsc ✓, vitest 212/18 ✓ (было 196, +16 тестов); ревью: код 7.0 → 9.3 → **9.6/10**, security **9.6/10** ✅ |
-| **21.6** | Автоактивация | `web/src/lib/activate-purchase.ts`: вынос логики `markPurchased` (actions.ts) без проверки сессии — найти клиента по telegram_id, иначе создать (name из first_name+last_name, consent переносится в `client_consent_given/at/version`); если статус `access_expired`/`inactive` → переактивация (status active, заново `program_id`, `access_start_date=now`, `access_end_date=now+duration_weeks`); назначение через существующие `resetPlanAssignments` + `generateSchedule` + `deliverProgramInstructions`; клиенту «оплачено + инструкции», тренеру «Оплата подтверждена» (все данные клиента + программа + сумма). `markPurchased` и webhook вызывают её | ✅ |
+| **21.5** | Веб: заявка на страницах каталога | На `/buy/[id]` блок «Хотите индивидуальное ведение?» (текст + кнопка заявки): server action `createCoachRequest` в `web/src/app/buy/[id]/actions.ts` - реюз валидации, rate-limit и дедупликации `createPurchaseRequest` (имя, контакт, обязательный чекбокс согласия с /privacy из `lib/consent.ts`) → INSERT sub_type='individ' → уведомление тренеру | ✅ (4 коммита: `b07793a` feat (карточка «или - индивидуальное ведение», чекбокс согласия, createCoachRequest: rate-limit IP, dedupMap, bot_dedup 23505, INSERT с consent_given/at/version, bot_logs coach_request, уведомление тренеру; рефактор insertBotLog; 10 новых тестов) → `2ee2dce` (ревью R1 кода 7.0: fail-closed пре-риды без try/catch-поглощений, telegram_id всегда NULL для веб-строк - недоверенный ?tg= не блокирует чужие слоты и не попадает в сообщение тренера/логи, insertBotLog никогда не бросает, order по created_at, GENERIC_ERROR_MESSAGE + deleteDedupKey, тесты fail-closed) → `9bddf2d` (R2 код 9.3: fail-closed на non-23505 dedup-записи, регрессионные тесты на чистоту личности) → `742fe39`+`e68a915` (security R1 9.2: нормализация телефона в dedup-ключах и пре-риде, снят limit(50), fail-closed dedup-запись в purchase-флоу, строгий boolean consentGiven, \u2028\u2029 в sanitizeText; security R2 9.6 + L1-гейт на PHONE_REGEX (цифро-ведущие username ≠ телефон) + тесты); web tsc ✓, vitest 212/18 ✓ (было 196, +16 тестов); ревью: код 7.0 → 9.3 → **9.6/10**, security **9.6/10** ✅ |
+| **21.6** | Автоактивация | `web/src/lib/activate-purchase.ts`: вынос логики `markPurchased` (actions.ts) без проверки сессии - найти клиента по telegram_id, иначе создать (name из first_name+last_name, consent переносится в `client_consent_given/at/version`); если статус `access_expired`/`inactive` → переактивация (status active, заново `program_id`, `access_start_date=now`, `access_end_date=now+duration_weeks`); назначение через существующие `resetPlanAssignments` + `generateSchedule` + `deliverProgramInstructions`; клиенту «оплачено + инструкции», тренеру «Оплата подтверждена» (все данные клиента + программа + сумма). `markPurchased` и webhook вызывают её | ✅ |
 | **21.7** | Вебхук | `web/src/app/api/webhooks/prodamus/route.ts` (runtime nodejs): POST, проверка `Sign` + секретный ключ → иначе 400; `payment_status=success` → активация по order_id (21.6), идемпотентность (заявка уже paid → 200); `order_canceled`/`order_denied` → status cancelled + уведомление тренеру | ✅ |
-| **21.8** | Блок «Оплаты» в панели | `client-profile.tsx`: список `purchase_requests` клиента (тип — программа/индивидуальное, программа, сумма, статус, дата) | ✅ (запрос в page.tsx: client_id ИЛИ (client_id IS NULL + telegram_id клиента — заявки бота до активации), embedded program title, limit 20; секция SectionCard с бейджами статуса/типа, ссылкой на программу, датой заявки и оплаты; ревью 9.2 → 9.5/10) |
-| **21.9** | Кнопка тренера | `client-actions.tsx`: «Ссылка на оплату» — выбор программы → `buildPaymentUrl` (с `customer_phone` клиента, если есть) → копирование и/или отправка клиенту в Telegram (кнопка «Оплатить программу») | ✅ (createPaymentLink: pending заявка с consent_given/order_id=id/amount-снимок, reuse бот-заявок через guarded bind (client_id IS NULL + status=pending), 23505-retry; sendPaymentLinkToClient: троттлинг 60с через bot_dedup; миграция 20260822000000 — дедуп дублей + unique partial index (client_id, program_id) WHERE pending; activatePurchaseByOrder: идемпотентный алерт тренеру при оплате отменённой заявки (bot_dedup). Ревью 6 раундов: 8.0→7.5→8.5→9.2→7.5→8.5→9.0→**9.6/10**) |
+| **21.8** | Блок «Оплаты» в панели | `client-profile.tsx`: список `purchase_requests` клиента (тип - программа/индивидуальное, программа, сумма, статус, дата) | ✅ (запрос в page.tsx: client_id ИЛИ (client_id IS NULL + telegram_id клиента - заявки бота до активации), embedded program title, limit 20; секция SectionCard с бейджами статуса/типа, ссылкой на программу, датой заявки и оплаты; ревью 9.2 → 9.5/10) |
+| **21.9** | Кнопка тренера | `client-actions.tsx`: «Ссылка на оплату» - выбор программы → `buildPaymentUrl` (с `customer_phone` клиента, если есть) → копирование и/или отправка клиенту в Telegram (кнопка «Оплатить программу») | ✅ (createPaymentLink: pending заявка с consent_given/order_id=id/amount-снимок, reuse бот-заявок через guarded bind (client_id IS NULL + status=pending), 23505-retry; sendPaymentLinkToClient: троттлинг 60с через bot_dedup; миграция 20260822000000 - дедуп дублей + unique partial index (client_id, program_id) WHERE pending; activatePurchaseByOrder: идемпотентный алерт тренеру при оплате отменённой заявки (bot_dedup). Ревью 6 раундов: 8.0→7.5→8.5→9.2→7.5→8.5→9.0→**9.6/10**) |
 | **21.10** | Автоистечение доступа | Бот: в `baseGuard` (guards.ts) у активных клиентов проверка `access_end_date < now` → сообщение `access_expired` (i18n есть) + ленивое проставление `status='access_expired'`; портал: серверный guard по `access_end_date` в `client/[token]/layout.tsx` → страница `/client/expired` (существует); панель: фильтр «Доступ истёк» уже работает | ✅ (ленивое истечение в bot guards.ts + web layout.tsx: учёт активной паузы plan_pauses (бот), идемпотентный условный UPDATE (.select → 0 строк при гонке с продлением = доступ сохранён), fallback для уже истёкших; ревью 8.0→9.2→**9.6/10**) |
-| **21.11** | Напоминание за 5 дней | `bot/src/cron/access-expiry.ts` (по образцу `measurement-reminder.ts`): ежедневный cron — активные клиенты с `access_end_date` в диапазоне [now+5д, now+5д+24ч], без записи в `notification_log` (type='access_expiring') → «Доступ заканчивается {дата}. Продлите программу в боте» + запись в `notification_log` (дедупликация — 1 раз); регистрация в `cron/scheduler.ts`; i18n ru/en | ✅ (окно UTC [now+5д, now+6д), дедуп bot_dedup `access_expiring:{clientId}:{access_end_date}` TTL 30д — ровно 1 раз на окно доступа, skip активных пауз, дата в сообщении в tz клиента, перманентные ошибки TG (400/403) без ретраев, миграции: enum access_expiring + частичный индекс clients(access_end_date); ревью 9.4→**9.7/10**) |
+| **21.11** | Напоминание за 5 дней | `bot/src/cron/access-expiry.ts` (по образцу `measurement-reminder.ts`): ежедневный cron - активные клиенты с `access_end_date` в диапазоне [now+5д, now+5д+24ч], без записи в `notification_log` (type='access_expiring') → «Доступ заканчивается {дата}. Продлите программу в боте» + запись в `notification_log` (дедупликация - 1 раз); регистрация в `cron/scheduler.ts`; i18n ru/en | ✅ (окно UTC [now+5д, now+6д), дедуп bot_dedup `access_expiring:{clientId}:{access_end_date}` TTL 30д - ровно 1 раз на окно доступа, skip активных пауз, дата в сообщении в tz клиента, перманентные ошибки TG (400/403) без ретраев, миграции: enum access_expiring + частичный индекс clients(access_end_date); ревью 9.4→**9.7/10**) |
 | **21.12** | Env + README | `web/env.example`: `PRODAMUS_PAYFORM_BASE_URL`, `PRODAMUS_SECRET_KEY`; инструкция настройки кабинета Продамуса (платёжная страница, urlNotification → `/api/webhooks/prodamus`, секретный ключ страницы, тестовая оплата тестовой картой) | ✅ (env.example с комментариями и ссылкой на README; раздел «Настройка Продамуса» в web/README.md: payform-ссылка, urlNotification, секретный ключ = HMAC-SHA256 Sign, проверка тестовой картой, коды вебхука 200/400/503; ревью **9.5/10**) |
-| **21.13** | Тесты | prodamus.test.ts (подпись по офиц. payload, buildPaymentUrl, parse); webhook: валидная/битая подпись → 400, не POST, дубликат (идемпотентность), success, canceled; activate-purchase: клиент найден/создан, access_expired → переактивация, consent перенесён, без tg_id → connect_code; бот: покупка (согласие → ссылка), coach_request, автоблок по дате, i18n ru/en; cron: 5-дневное уведомление шлётся 1 раз (дедуп); веб: createCoachRequest (валидация, consent обязателен, дедупликация) | ✅ (существующие: prodamus 27, webhook route, activate-purchase, purchase.test.ts (покупка+coach_request), buy actions; добавлены: guards.test.ts — ленивое истечение (6 кейсов: будущая дата, UPDATE payload с eq(id)/eq(status)/lt, пауза, гонка 0 строк, уже истёкший, NULL), access-expiry.test.ts — окно [now+5д, now+6д), формат даты ru/en/tz, отправка 1 раз + payload notification_log, двойной вызов = 1 отправка, пропуск паузы, 403 сохраняет ключ / транзиент снимает; бот 449/21 ✓, веб 267/20 ✓; ревью 8.0→**9.6/10**) |
-| **21.14** | Верификация + gate | tsc web+bot ✓, vitest web ✓, vitest bot ✓, eslint ✓; ревью `@code-reviewer` — гейт ≥9.5; отметка задач в этом файле | ✅ (bot: tsc ✓, build ✓, vitest 449/21 ✓; web: tsc ✓, vitest 267/20 ✓, next build ✓; eslint — только pre-existing ошибки/варнинги в немодифицированных файлах. Финальный гейт фазы 21 (21.8–21.14): 9.2 → фикс верификации client_consent_given в createPaymentLink + consent-check и снятие троттлинга при неудаче в sendPaymentLinkToClient → **9.6/10**. Миграции применены к проду: `supabase db push` 22.08.2026 применил ВСЕ 6 отставших (20260816/17/18/22×3 — выяснилось, что 21.1-21.3 фактически не были применены; верифицировано: purchase_requests создана, unique partial index → 23505 на дубль, enum access_expiring работает; тестовые строки удалены). **E2E 24.08 ✅**: демо-оплата СБП → вебхук подпись ✓ → активация (paid, программа, доступ) → инструкции клиенту + уведомление тренеру. Найдено и исправлено 2 бага: (1) наш order_id приходит в поле `order_num` — фикс parseProdamusOrder (`13ecf4b`); (2) панельная заявка с предзаполненным client_id падала в 503 in_progress на первой доставке (~11 мин задержки уведомлений до stale-takeover) — фикс recovery-ветки (`896eebe`), оба с регрессионными тестами; ревью 9.5→**9.7**) |
+| **21.13** | Тесты | prodamus.test.ts (подпись по офиц. payload, buildPaymentUrl, parse); webhook: валидная/битая подпись → 400, не POST, дубликат (идемпотентность), success, canceled; activate-purchase: клиент найден/создан, access_expired → переактивация, consent перенесён, без tg_id → connect_code; бот: покупка (согласие → ссылка), coach_request, автоблок по дате, i18n ru/en; cron: 5-дневное уведомление шлётся 1 раз (дедуп); веб: createCoachRequest (валидация, consent обязателен, дедупликация) | ✅ (существующие: prodamus 27, webhook route, activate-purchase, purchase.test.ts (покупка+coach_request), buy actions; добавлены: guards.test.ts - ленивое истечение (6 кейсов: будущая дата, UPDATE payload с eq(id)/eq(status)/lt, пауза, гонка 0 строк, уже истёкший, NULL), access-expiry.test.ts - окно [now+5д, now+6д), формат даты ru/en/tz, отправка 1 раз + payload notification_log, двойной вызов = 1 отправка, пропуск паузы, 403 сохраняет ключ / транзиент снимает; бот 449/21 ✓, веб 267/20 ✓; ревью 8.0→**9.6/10**) |
+| **21.14** | Верификация + gate | tsc web+bot ✓, vitest web ✓, vitest bot ✓, eslint ✓; ревью `@code-reviewer` - гейт ≥9.5; отметка задач в этом файле | ✅ (bot: tsc ✓, build ✓, vitest 449/21 ✓; web: tsc ✓, vitest 267/20 ✓, next build ✓; eslint - только pre-existing ошибки/варнинги в немодифицированных файлах. Финальный гейт фазы 21 (21.8-21.14): 9.2 → фикс верификации client_consent_given в createPaymentLink + consent-check и снятие троттлинга при неудаче в sendPaymentLinkToClient → **9.6/10**. Миграции применены к проду: `supabase db push` 22.08.2026 применил ВСЕ 6 отставших (20260816/17/18/22×3 - выяснилось, что 21.1-21.3 фактически не были применены; верифицировано: purchase_requests создана, unique partial index → 23505 на дубль, enum access_expiring работает; тестовые строки удалены). **E2E 24.08 ✅**: демо-оплата СБП → вебхук подпись ✓ → активация (paid, программа, доступ) → инструкции клиенту + уведомление тренеру. Найдено и исправлено 2 бага: (1) наш order_id приходит в поле `order_num` - фикс parseProdamusOrder (`13ecf4b`); (2) панельная заявка с предзаполненным client_id падала в 503 in_progress на первой доставке (~11 мин задержки уведомлений до stale-takeover) - фикс recovery-ветки (`896eebe`), оба с регрессионными тестами; ревью 9.5→**9.7**) |
 
 ### Файлы для создания/изменения
 

@@ -52,7 +52,7 @@ function getStepPrompt(step: MeasurementStep, lang: Language): string {
   const hintKey = `measure.hint_${step}` as `measure.hint_${MeasurementStep}`;
   const prompt = t(promptKey, lang);
   const hint = t(hintKey, lang);
-  return `${prompt}\n${hint}\n\n💡 /skip — пропустить`;
+  return `${prompt}\n${hint}\n\n💡 /skip - пропустить`;
 }
 
 function getNextStep(current: MeasurementStep): MeasurementStep | null {

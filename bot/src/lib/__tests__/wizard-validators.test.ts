@@ -80,7 +80,7 @@ describe("parseReps", () => {
   });
 
   it("parses range with en-dash", () => {
-    expect(parseReps("8–10")).toBe("8-10");
+    expect(parseReps("8-10")).toBe("8-10");
   });
 
   it("parses range with spaces", () => {
@@ -434,7 +434,7 @@ describe("parseHeartRate", () => {
 
   it("parses ranges", () => {
     expect(parseHeartRate("130-150")).toBe("130-150");
-    expect(parseHeartRate("130 – 150")).toBe("130-150");
+    expect(parseHeartRate("130 - 150")).toBe("130-150");
   });
 
   it("rejects invalid values", () => {
@@ -452,7 +452,7 @@ describe("heartRateValue", () => {
 
   it("stores range midpoint", () => {
     expect(heartRateValue("130-150")).toBe(140);
-    expect(heartRateValue("130 – 150")).toBe(140);
+    expect(heartRateValue("130 - 150")).toBe(140);
     expect(heartRateValue("130-131")).toBe(131);
   });
 

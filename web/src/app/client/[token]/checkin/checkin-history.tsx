@@ -7,21 +7,21 @@ import type { Database } from "@/types/supabase";
 type CheckinRow = Database["public"]["Tables"]["checkins"]["Row"];
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     const d = new Date(date + "T00:00:00");
-    if (isNaN(d.getTime())) return "—";
+    if (isNaN(d.getTime())) return "-";
     return d.toLocaleDateString("ru-RU", {
       day: "numeric",
       month: "short",
     });
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function ScoreBadge({ value, max = 10, inverted = false }: { value: number | null; max?: number; inverted?: boolean }) {
-  if (value == null) return <span className="text-xs text-muted-foreground">—</span>;
+  if (value == null) return <span className="text-xs text-muted-foreground">-</span>;
   const effectivePct = inverted ? ((max - value) / max) * 100 : (value / max) * 100;
   let variant: "default" | "secondary" | "destructive" = "default";
   if (effectivePct <= 30) variant = "destructive";
@@ -30,7 +30,7 @@ function ScoreBadge({ value, max = 10, inverted = false }: { value: number | nul
 }
 
 function AdherenceBadge({ value }: { value: number | null }) {
-  if (value == null) return <span className="text-xs text-muted-foreground">—</span>;
+  if (value == null) return <span className="text-xs text-muted-foreground">-</span>;
   let variant: "default" | "secondary" | "destructive" = "default";
   if (value < 50) variant = "destructive";
   else if (value < 80) variant = "secondary";
@@ -71,7 +71,7 @@ export function CheckinHistory({ checkins }: { checkins: CheckinRow[] }) {
                   🧠 <ScoreBadge value={c.wellbeing} />
                 </span>
                 <span title="Сон">
-                  😴 {c.sleep != null ? <Badge variant="outline">{c.sleep}ч</Badge> : <span className="text-xs">—</span>}
+                  😴 {c.sleep != null ? <Badge variant="outline">{c.sleep}ч</Badge> : <span className="text-xs">-</span>}
                 </span>
                 <span title="Стресс">
                   ⚡ <ScoreBadge value={c.stress} inverted />
@@ -80,7 +80,7 @@ export function CheckinHistory({ checkins }: { checkins: CheckinRow[] }) {
                   🍽 <AdherenceBadge value={c.nutrition_adherence} />
                 </span>
                 <span title="Пропущено тренировок">
-                  🏋️ {c.missed_workouts != null ? <Badge variant={c.missed_workouts > 0 ? "destructive" : "outline"}>{c.missed_workouts}</Badge> : <span className="text-xs">—</span>}
+                  🏋️ {c.missed_workouts != null ? <Badge variant={c.missed_workouts > 0 ? "destructive" : "outline"}>{c.missed_workouts}</Badge> : <span className="text-xs">-</span>}
                 </span>
               </div>
             </div>

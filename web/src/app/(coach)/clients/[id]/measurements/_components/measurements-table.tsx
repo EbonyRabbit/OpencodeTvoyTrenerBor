@@ -31,17 +31,17 @@ import type { Database } from "@/types/supabase";
 type MeasurementRow = Database["public"]["Tables"]["measurements"]["Row"];
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     return new Date(date).toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function MeasureValue({ value, suffix = "" }: { value: number | null; suffix?: string }) {
   if (value === null) {
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">-</span>;
   }
   const formatted = Number.isInteger(value) ? String(value) : value.toFixed(1);
   return <span className="font-medium tabular-nums">{formatted}{suffix}</span>;
@@ -73,7 +73,7 @@ export function MeasurementsTable({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Замеры тела — {clientName}</CardTitle>
+            <CardTitle>Замеры тела - {clientName}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -98,7 +98,7 @@ export function MeasurementsTable({
 
       <Card>
         <CardHeader>
-          <CardTitle>Замеры тела — {clientName}</CardTitle>
+          <CardTitle>Замеры тела - {clientName}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <Table aria-label="Замеры тела клиента">
@@ -166,7 +166,7 @@ export function MeasurementsTable({
                       {m.comment ? (
                         <span className="text-muted-foreground">{m.comment}</span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   </TableRow>,

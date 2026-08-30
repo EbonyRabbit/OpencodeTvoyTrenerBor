@@ -1,4 +1,4 @@
-// DISABLED: photo storage removed — photos are saved by clients on their own devices
+// DISABLED: photo storage removed - photos are saved by clients on their own devices
 // Original file preserved for reference in case photo storage is re-enabled later
 
 /*

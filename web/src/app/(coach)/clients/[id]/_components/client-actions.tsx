@@ -528,7 +528,7 @@ export function ClientActions({
                   {programs.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.title}
-                      {p.type === "personal" ? " — персональная" : ""}
+                      {p.type === "personal" ? " - персональная" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -760,7 +760,7 @@ export function ClientActions({
                     {programs.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.title}
-                        {p.type === "personal" ? " — персональная" : ""}
+                        {p.type === "personal" ? " - персональная" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -889,7 +889,7 @@ export function ClientActions({
               <DialogHeader>
                 <DialogTitle>Ссылка на оплату</DialogTitle>
                 <DialogDescription>
-                  Выберите программу — клиент получит ссылку на оплату через Продамус.
+                  Выберите программу - клиент получит ссылку на оплату через Продамус.
                   После оплаты доступ откроется автоматически.
                 </DialogDescription>
               </DialogHeader>
@@ -911,7 +911,7 @@ export function ClientActions({
                     {payPrograms.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.title}
-                        {p.price != null ? ` — ${p.price.toLocaleString("ru-RU")} ₽` : ""}
+                        {p.price != null ? ` - ${p.price.toLocaleString("ru-RU")} ₽` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1042,7 +1042,7 @@ export function ClientActions({
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="edit-checkin-day" className="text-sm font-medium">Чек-ин — день недели</label>
+              <label htmlFor="edit-checkin-day" className="text-sm font-medium">Чек-ин - день недели</label>
               <Select
                 value={editForm.checkin_day}
                 onValueChange={(v) => setEditForm((f) => ({ ...f, checkin_day: v ?? "" }))}
@@ -1059,7 +1059,7 @@ export function ClientActions({
               </Select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="edit-checkin-time" className="text-sm font-medium">Чек-ин — время (HH:MM)</label>
+              <label htmlFor="edit-checkin-time" className="text-sm font-medium">Чек-ин - время (HH:MM)</label>
               <Input
                 id="edit-checkin-time"
                 type="time"

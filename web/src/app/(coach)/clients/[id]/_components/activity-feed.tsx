@@ -55,9 +55,9 @@ function EventContent({ event }: { event: ActivityEvent }) {
       return <span>{exercise}{formatExercise({ sets: d.sets, reps: d.reps })}</span>;
     }
     case "checkin": {
-      const wb = String(d.wellbeing ?? "—");
-      const sl = String(d.sleep ?? "—");
-      const st = String(d.stress ?? "—");
+      const wb = String(d.wellbeing ?? "-");
+      const sl = String(d.sleep ?? "-");
+      const st = String(d.stress ?? "-");
       return <span>Самочувствие: {wb}/10, Сон: {sl}/10, Стресс: {st}/10</span>;
     }
     case "measurement": {
@@ -81,7 +81,7 @@ function EventContent({ event }: { event: ActivityEvent }) {
         morning: "Утро", evening: "Вечер", measurement: "Замеры",
         checkin: "Чек-ин", alert: "Оповещение", payment: "Платёж",
       };
-      return <span>{ntLabels[String(d.type ?? "")] ?? String(d.type ?? "")} — {String(d.status ?? "")}</span>;
+      return <span>{ntLabels[String(d.type ?? "")] ?? String(d.type ?? "")} - {String(d.status ?? "")}</span>;
     }
     default:
       return null;

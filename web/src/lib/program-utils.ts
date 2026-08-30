@@ -201,7 +201,7 @@ export function getCellValue(exercise: ParsedExercise, column: string): string {
     "Пульс": exercise.heart_rate,
     "Раунды": exercise.rounds,
   };
-  return map[column] ?? "—";
+  return map[column] ?? "-";
 }
 
 export const BLOCK_COLORS: Record<string, string> = {

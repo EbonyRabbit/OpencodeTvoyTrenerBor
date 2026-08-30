@@ -1,5 +1,5 @@
 // ⚠️ MUST stay in sync with web/src/lib/prodamus.ts (buildPaymentUrl).
-// Бот — отдельный пакет и не может импортировать web/; здесь только URL-билдер
+// Бот - отдельный пакет и не может импортировать web/; здесь только URL-билдер
 // платёжной страницы. Подпись webhook'а верифицируется на стороне веба.
 
 export type PaymentUrlOptions = {
@@ -17,7 +17,7 @@ export type PaymentUrlOptions = {
 // dingbats и т.п.): × ✕ ✖, тире, типографские кавычки, emoji.
 export function sanitizeProductName(name: string): string {
   // Fallback: если после санитизации пусто (название целиком из emoji),
-  // оставляем нейтральное наименование — пустой товар Продамус не примет.
+  // оставляем нейтральное наименование - пустой товар Продамус не примет.
   const sanitized = sanitizeInner(name);
   return sanitized || "Программа";
 }
@@ -71,15 +71,15 @@ export function buildPaymentUrl(opts: PaymentUrlOptions): string {
 const SHORT_LINK_TIMEOUT_MS = 8000;
 
 /**
- * Короткая ссылка вида https://payform.ru/u8zDE/ — Продамус регистрирует
+ * Короткая ссылка вида https://payform.ru/u8zDE/ - Продамус регистрирует
  * заказ и возвращает компактный URL без скобок и параметров. Использовать
  * вместо buildPaymentUrl в сообщениях клиентам: длинная ссылка с
  * products[0][...] ломается при копировании текстом (`[` вырезается),
- * и клиент видит пустую сумму. Fallback на buildPaymentUrl — у вызывающих.
+ * и клиент видит пустую сумму. Fallback на buildPaymentUrl - у вызывающих.
  */
 /**
  * Короткая ссылка с автоматическим fallback на прямую: если API коротких
- * ссылок недоступен/ответил мусором — клиент получает длинную ссылку
+ * ссылок недоступен/ответил мусором - клиент получает длинную ссылку
  * (менее устойчивую к копированию, но рабочую).
  */
 export async function resolvePaymentUrl(opts: PaymentUrlOptions): Promise<string> {
@@ -105,7 +105,7 @@ export async function createShortPaymentUrl(opts: PaymentUrlOptions): Promise<st
     throw new Error(`Prodamus link API responded ${res.status}`);
   }
   const text = (await res.text()).trim();
-  // Ответ — просто URL; что-либо иное означает ошибку на стороне Продамуса.
+  // Ответ - просто URL; что-либо иное означает ошибку на стороне Продамуса.
   if (!/^https:\/\/\S+$/.test(text)) {
     throw new Error(`Prodamus link API returned unexpected response: ${text.slice(0, 100)}`);
   }

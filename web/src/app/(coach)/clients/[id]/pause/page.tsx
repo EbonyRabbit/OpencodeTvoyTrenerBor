@@ -19,7 +19,7 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle<{ name: string }>();
   return {
-    title: data?.name ? `Паузы — ${data.name}` : "Паузы",
+    title: data?.name ? `Паузы - ${data.name}` : "Паузы",
   };
 }
 
@@ -39,11 +39,11 @@ const STRATEGY_LABELS: Record<string, string> = {
 };
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     return new Date(date).toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
@@ -79,7 +79,7 @@ export default async function PauseHistoryPage({
           ← Назад к клиенту
         </Link>
 
-        <h1 className="text-2xl font-bold">Паузы — {client.name}</h1>
+        <h1 className="text-2xl font-bold">Паузы - {client.name}</h1>
 
         {pauses.length === 0 ? (
           <Card>
@@ -121,7 +121,7 @@ export default async function PauseHistoryPage({
                         {REASON_LABELS[p.reason] ?? p.reason}
                       </td>
                       <td className="px-4 py-3">
-                        {p.strategy ? STRATEGY_LABELS[p.strategy] ?? p.strategy : "—"}
+                        {p.strategy ? STRATEGY_LABELS[p.strategy] ?? p.strategy : "-"}
                       </td>
                       <td className="px-4 py-3">
                         {p.status === "active" ? "Активна" : "Завершена"}

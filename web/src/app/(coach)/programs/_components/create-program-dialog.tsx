@@ -217,7 +217,7 @@ export function CreateProgramDialog() {
                 min="0"
                 step="0.01"
                 inputMode="decimal"
-                placeholder="Например: 9900. Пусто — по запросу"
+                placeholder="Например: 9900. Пусто - по запросу"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 disabled={loading}
@@ -263,10 +263,10 @@ export function CreateProgramDialog() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="template">
-                    Шаблон — видна в каталоге бота
+                    Шаблон - видна в каталоге бота
                   </SelectItem>
                   <SelectItem value="personal">
-                    Персональная — скрыта из каталога бота
+                    Персональная - скрыта из каталога бота
                   </SelectItem>
                 </SelectContent>
               </Select>

@@ -158,7 +158,7 @@ async function testPingPongDirect(): Promise<boolean> {
     return true;
   } catch (err: any) {
     if (err.message?.includes("sendMessage") || err.message?.includes("401")) {
-      console.log("  PASS: Bot middleware ran, reply failed (mock token — expected)");
+      console.log("  PASS: Bot middleware ran, reply failed (mock token - expected)");
       return true;
     }
     console.error(`  FAIL: Unexpected error: ${err}`);
@@ -184,7 +184,7 @@ async function testWebhookPostValidSecret(): Promise<boolean> {
       return true;
     }
     if (res.status === 500) {
-      console.log("  PASS: Webhook accepted valid secret (500 — mock token, reply failed as expected)");
+      console.log("  PASS: Webhook accepted valid secret (500 - mock token, reply failed as expected)");
       return true;
     }
     console.error(`  FAIL: Webhook returned unexpected status ${res.status}`);

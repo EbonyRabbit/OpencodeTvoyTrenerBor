@@ -181,7 +181,7 @@ export async function saveMeasurements(
   }
 }
 
-// DISABLED: photo storage removed — clients save photos on their own devices
+// DISABLED: photo storage removed - clients save photos on their own devices
 // const PHOTO_STORAGE_BUCKET = "client-photos";
 // const MAX_FILE_SIZE = 10 * 1024 * 1024;
 // const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -216,7 +216,7 @@ export async function saveMeasurements(
 //     }
 //
 //     if (file.size > MAX_FILE_SIZE) {
-//       return { error: "Максимальный размер файла — 10 МБ" };
+//       return { error: "Максимальный размер файла - 10 МБ" };
 //     }
 //
 //     const { data: client } = await supabaseAdmin

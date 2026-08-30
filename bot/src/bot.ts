@@ -262,7 +262,7 @@ bot.on("callback_query:data", async (ctx, next) => {
     return;
   }
   // coach_request must bypass guardActiveClient: new users (no clients row)
-  // and active clients both use it — same rationale as purchase_start.
+  // and active clients both use it - same rationale as purchase_start.
   if (data === "coach_request") {
     await startCoachRequest(ctx);
     return;

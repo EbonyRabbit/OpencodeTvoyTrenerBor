@@ -206,7 +206,7 @@ export default async function ClientHomePage({
             )}
             {currentWeek.start_date && currentWeek.end_date && (
               <p className="text-xs text-muted-foreground">
-                {new Date(currentWeek.start_date).toLocaleDateString("ru-RU")} —{" "}
+                {new Date(currentWeek.start_date).toLocaleDateString("ru-RU")} -{" "}
                 {new Date(currentWeek.end_date).toLocaleDateString("ru-RU")}
               </p>
             )}

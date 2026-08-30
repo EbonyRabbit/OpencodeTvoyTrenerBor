@@ -119,7 +119,7 @@ describe("calculateAdherence (date path)", () => {
   });
 
   it("counts a workout done off-plan (on a rest day)", () => {
-    // Клиент потренировался во вторник (не плановый день) — день засчитан.
+    // Клиент потренировался во вторник (не плановый день) - день засчитан.
     const result = calculateAdherence(
       SCHEDULE,
       MON_WED_FRI_WEEK,

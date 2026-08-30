@@ -32,10 +32,10 @@ import {
 function formatDate(dateStr: string) {
   try {
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "—";
+    if (isNaN(date.getTime())) return "-";
     return date.toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
@@ -213,7 +213,7 @@ export function ClientsTable({
                 </Link>
               </TableCell>
               <TableCell className="text-muted-foreground">
-                {client.telegram_id ?? "—"}
+                {client.telegram_id ?? "-"}
               </TableCell>
               <TableCell>
                 <Badge variant={CLIENT_STATUS_VARIANTS[client.status] ?? "secondary"}>
@@ -226,7 +226,7 @@ export function ClientsTable({
                 </Badge>
               </TableCell>
               <TableCell className="max-w-32 truncate text-muted-foreground">
-                {client.program?.title ?? "—"}
+                {client.program?.title ?? "-"}
               </TableCell>
               <TableCell>{client.language.toUpperCase()}</TableCell>
               <TableCell className="text-muted-foreground">

@@ -1,5 +1,5 @@
 /**
- * Seed: Triathlon — силовая база (12 недель, 3 дня/нед, средний уровень).
+ * Seed: Triathlon - силовая база (12 недель, 3 дня/нед, средний уровень).
  * Идемпотентно (программа по title, упражнения по name_key).
  *
  * Run from bot/:
@@ -12,11 +12,11 @@ import { normalizeExerciseName } from "../src/lib/exercise-library.js";
 import type { Json } from "../src/lib/types.js";
 import { buildTriathlonProgram } from "./sport-programs/triathlon.js";
 
-const PROGRAM_TITLE = "Triathlon — силовая база (12 нед, 3 дня)";
+const PROGRAM_TITLE = "Triathlon - силовая база (12 нед, 3 дня)";
 const DESCRIPTION =
   "Спорт-специфичный шаблон для триатлета среднего уровня: 3 силовых дня. " +
   "Блоки: нижняя цепь/одностороннее → плечо/манжета/широчайшие → гибрид+плио+кардио. " +
-  "Фазы: база → гипертрофия → сила → мощь+ВИИТ → делoad. Плавание/велик/бег — вне шаблона.";
+  "Фазы: база → гипертрофия → сила → мощь+ВИИТ → делoad. Плавание/велик/бег - вне шаблона.";
 const EQUIPMENT = "Зал: штанга, гантели, гиря 16-24кг, тумба, кабель, резинка, медбол";
 
 type NewExercise = {
@@ -35,7 +35,7 @@ const NEW_EXERCISES: NewExercise[] = [
   {
     name: "Односторонняя румынская тяга",
     aliases: ["single leg RDL", "одноногая румынка"],
-    descriptionRu: "Румынская тяга на одной ноге — задняя цепь и баланс.",
+    descriptionRu: "Румынская тяга на одной ноге - задняя цепь и баланс.",
     techniqueRu: "Опора на одну ногу, наклон с прямой спиной, лёгкий вес, таз без ротации.",
     featuresRu: ["задняя цепь", "односторонняя сила", "баланс"],
     muscleGroup: "Ягодицы/ЗЦ",
@@ -85,12 +85,12 @@ const NEW_EXERCISES: NewExercise[] = [
     muscleGroup: "Плечо",
     equipment: "Кабель",
     difficulty: "beginner",
-    contraindications: "При передней боли в плече — снизить объём.",
+    contraindications: "При передней боли в плече - снизить объём.",
   },
   {
     name: "Боковые запрыгивания/приземления",
     aliases: ["lateral bound", "боковые прыжки"],
-    descriptionRu: "Латеральные прыжки с мягким приземлением — плиометрика.",
+    descriptionRu: "Латеральные прыжки с мягким приземлением - плиометрика.",
     techniqueRu: "Прыжок в сторону с мягким приземлением на опорную ногу, без вальгуса колена.",
     featuresRu: ["плиометрика", "латеральная мощь"],
     muscleGroup: "НК/стабильность",
@@ -101,7 +101,7 @@ const NEW_EXERCISES: NewExercise[] = [
   {
     name: "Запрыгивания на тумбу",
     aliases: ["box jump", "запрыгивание"],
-    descriptionRu: "Вертикальное запрыгивание на тумбу — взрывная плиометрика.",
+    descriptionRu: "Вертикальное запрыгивание на тумбу - взрывная плиометрика.",
     techniqueRu: "Взрывной прыжок вверх с мягким приземлением, без удара пятками. Только после разминки.",
     featuresRu: ["плиометрика", "взрывная сила"],
     muscleGroup: "НК",
@@ -112,29 +112,29 @@ const NEW_EXERCISES: NewExercise[] = [
   {
     name: "Медбол-слэм",
     aliases: ["medicine ball slam", "слэм"],
-    descriptionRu: "Бросок медбола в пол — взрывная вертикальная/ротационная работа.",
+    descriptionRu: "Бросок медбола в пол - взрывная вертикальная/ротационная работа.",
     techniqueRu: "Подъём медбола над головой и бросок в пол с усилием всего тела. Только после разминки.",
     featuresRu: ["взрывная сила", "кор", "кондиция"],
     muscleGroup: "Кор/НК",
     equipment: "Медбол",
     difficulty: "beginner",
-    contraindications: "Только после разминки; при боли в пояснице — стоп.",
+    contraindications: "Только после разминки; при боли в пояснице - стоп.",
   },
   {
     name: "Ротационный бросок медбола",
     aliases: ["med ball rotation", "медбол ротация"],
-    descriptionRu: "Взрывной поворот туловища с броском медбола — ротационная мощь.",
+    descriptionRu: "Взрывной поворот туловища с броском медбола - ротационная мощь.",
     techniqueRu: "Поворот корпуса с броском медбола в стену/партнёру. Взрывно, но без переразгибания поясницы. Только после разминки.",
     featuresRu: ["ротационная мощь", "X-factor", "взрывная сила"],
     muscleGroup: "Кор/плечо",
     equipment: "Медбол",
     difficulty: "intermediate",
-    contraindications: "Только после разминки; при боли в пояснице — стоп.",
+    contraindications: "Только после разминки; при боли в пояснице - стоп.",
   },
   {
     name: "Dead bug",
     aliases: ["мёртвый жук", "deadbug"],
-    descriptionRu: "Лёжа на спине, противофазные движения рук/ног — анти-экстензия кор.",
+    descriptionRu: "Лёжа на спине, противофазные движения рук/ног - анти-экстензия кор.",
     techniqueRu: "Поясница прижата к полу, медленные движения конечностями без отрыва поясницы.",
     featuresRu: ["анти-экстензия", "стабильность поясницы", "кор"],
     muscleGroup: "Кор",
@@ -145,7 +145,7 @@ const NEW_EXERCISES: NewExercise[] = [
   {
     name: "Паллоф-пресс",
     aliases: ["pallof press", "антиротация кор"],
-    descriptionRu: "Жим троса от груди с сохранением нейтрального туловища — антиротация кор.",
+    descriptionRu: "Жим троса от груди с сохранением нейтрального туловища - антиротация кор.",
     techniqueRu: "Стоя боком к тросу, жим от груди вперёд с удержанием таза/плеч без поворота. Медленно.",
     featuresRu: ["антиротация", "кор", "защита поясницы"],
     muscleGroup: "Кор",
@@ -156,8 +156,8 @@ const NEW_EXERCISES: NewExercise[] = [
   {
     name: "Велосипед",
     aliases: ["cycling", "велик"],
-    descriptionRu: "Езда на велосипеде — аэробная кондиция триатлета.",
-    techniqueRu: "Постоянный темп педалирования; в интервалах — удержание Z4 по ЧСС/мощности. Посадка без перенапряжения поясницы.",
+    descriptionRu: "Езда на велосипеде - аэробная кондиция триатлета.",
+    techniqueRu: "Постоянный темп педалирования; в интервалах - удержание Z4 по ЧСС/мощности. Посадка без перенапряжения поясницы.",
     featuresRu: ["аэроб", "кондиция", "велик"],
     muscleGroup: "НК/кардио",
     equipment: "Велосипед/турбо",
@@ -195,8 +195,8 @@ async function upsertExercises(): Promise<void> {
       contraindications: ex.contraindications,
     });
     if (error) {
-      if (error.code === "23505") console.warn(`  ${ex.name}: race на name_key — skip`);
-      else console.error(`  ${ex.name}: ошибка вставки — ${error.message}`);
+      if (error.code === "23505") console.warn(`  ${ex.name}: race на name_key - skip`);
+      else console.error(`  ${ex.name}: ошибка вставки - ${error.message}`);
       continue;
     }
     console.log(`  + упражнение: ${ex.name}`);

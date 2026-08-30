@@ -442,12 +442,12 @@ export async function activatePurchaseByOrder({
     if (request.status === "cancelled") {
       if (paymentStatus === "success") {
         // Деньги списаны по отменённой заявке: доступ не выдаём автоматически,
-        // но молча терять оплату нельзя — требуем возврата или ручной выдачи.
+        // но молча терять оплату нельзя - требуем возврата или ручной выдачи.
         console.error(
           "[ACTIVATION] Payment received for CANCELLED request:",
           orderId,
         );
-        // Идемпотентность: вебхук Продамуса может ретраиться — алерт шлём один
+        // Идемпотентность: вебхук Продамуса может ретраиться - алерт шлём один
         // раз на заявку (bot_dedup с TTL 30 дней).
         const dedupKey = `cancelled_payment:${orderId}`;
         const expiresAt = new Date(
@@ -482,7 +482,7 @@ export async function activatePurchaseByOrder({
                 : "";
             const sent = await sendTelegramMessage(
               coachChatId,
-              `⚠️ Получена оплата${amountText} по ОТМЕНЁННОЙ заявке ${orderId} (клиент: ${sanitizeText(request.name)}, контакт: ${formatContact(request.contact)}). Доступ не выдан — сделайте возврат или выдайте доступ вручную.`,
+              `⚠️ Получена оплата${amountText} по ОТМЕНЁННОЙ заявке ${orderId} (клиент: ${sanitizeText(request.name)}, контакт: ${formatContact(request.contact)}). Доступ не выдан - сделайте возврат или выдайте доступ вручную.`,
             );
             if (!sent) {
               console.error(
@@ -678,15 +678,15 @@ export async function activatePurchaseByOrder({
           };
         }
         // Регрессия e2e 24.08.2026: панельные заявки (21.9) приходят с
-        // предзаполненным client_id — линковка «промахивается», и раньше
+        // предзаполненным client_id - линковка «промахивается», и раньше
         // поток проваливался в recovery, где свежий paid_at означал
         // «чужая незавершённая активация» → 503 in_progress на каждой
         // доставке, пока paid_at не состарится (10 мин). Если клейм у этой
-        // инвокации и заявка изначально указывала на резолвленного клиента —
+        // инвокации и заявка изначально указывала на резолвленного клиента -
         // это первичная активация: идемпотентность обеспечил CAS-клейм,
-        // продолжаем сразу. Recovery — для повторных доставок (клейм
+        // продолжаем сразу. Recovery - для повторных доставок (клейм
         // проигран) и для гонок линковки у заявок без исходного client_id.
-        // (клейм проигран). NB: !linkedClientId здесь недостижим — строка
+        // (клейм проигран). NB: !linkedClientId здесь недостижим - строка
         // выше уже вернула in-progress при пустом client_id.
         if (
           !claimed ||
@@ -842,7 +842,7 @@ async function hasInstructionsFor(
 ): Promise<boolean> {
   // Accepted limitation: any to_client message sent after paid_at counts as
   // delivered instructions, and the message row is inserted before the Telegram
-  // send. A false positive can only mask auto-redelivery — the coach keeps the
+  // send. A false positive can only mask auto-redelivery - the coach keeps the
   // synchronous warning and the manual "Отправить инструкции" action.
   const { data, error } = await supabaseAdmin
     .from("messages")

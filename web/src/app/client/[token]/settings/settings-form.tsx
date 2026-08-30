@@ -230,7 +230,7 @@ export function SettingsForm({
 
           <div className="space-y-2">
             <label htmlFor="settings-checkin-day" className="text-xs text-muted-foreground">
-              Чек-ин — день недели
+              Чек-ин - день недели
             </label>
             <Select value={checkinDay} onValueChange={(v) => setCheckinDay(v ?? "")}>
               <SelectTrigger id="settings-checkin-day" className="w-full">
@@ -247,7 +247,7 @@ export function SettingsForm({
 
           <div className="space-y-2">
             <label htmlFor="settings-checkin-time" className="text-xs text-muted-foreground">
-              Чек-ин — время (HH:MM)
+              Чек-ин - время (HH:MM)
             </label>
             <Input
               id="settings-checkin-time"

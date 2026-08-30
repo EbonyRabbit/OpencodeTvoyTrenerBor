@@ -21,7 +21,7 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle<{ name: string }>();
   return {
-    title: data?.name ? `Чек-ины — ${data.name}` : "Чек-ины",
+    title: data?.name ? `Чек-ины - ${data.name}` : "Чек-ины",
   };
 }
 

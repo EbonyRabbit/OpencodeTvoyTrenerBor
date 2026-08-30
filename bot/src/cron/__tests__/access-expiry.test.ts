@@ -137,7 +137,7 @@ describe("formatExpiryDate / buildAccessExpiryMessage", () => {
     expect(en.toLowerCase()).toContain("august");
   });
 
-  it("без имени — дефолтное обращение", () => {
+  it("без имени - дефолтное обращение", () => {
     const msg = buildAccessExpiryMessage(null, "2026-08-27T12:00:00.000Z", "ru");
     expect(msg.length).toBeGreaterThan(0);
   });

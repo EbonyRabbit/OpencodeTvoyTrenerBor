@@ -164,7 +164,7 @@ export async function runCheckinReminder(bot: Bot<MyContext>): Promise<void> {
         console.warn(`[CHECKIN_REMINDER] Failed to send to ${client.telegram_id}:`, msg);
         const retryKey = `checkin:${client.id}:${getWeekStartDate(getTodayDateStr(tz))}`;
         await deleteDedup(retryKey);
-        // setState из beginCheckin мог пройти до того, как send() упал —
+        // setState из beginCheckin мог пройти до того, как send() упал -
         // сбрасываем состояние, чтобы гард activeState не блокировал неделю.
         await clearState(client.telegram_id).catch(() => {});
         await logBotEvent("cron:checkin_reminder", {

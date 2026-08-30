@@ -32,7 +32,7 @@ export function parseReps(input: string): string | null {
     return nums.join("/");
   }
 
-  const rangeMatch = trimmed.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+  const rangeMatch = trimmed.match(/^(\d+)\s*[--]\s*(\d+)$/);
   if (rangeMatch) {
     const a = Number(rangeMatch[1]);
     const b = Number(rangeMatch[2]);
@@ -152,7 +152,7 @@ export function parsePace(input: string): string | null {
 export function parseHeartRate(input: string): string | null {
   const trimmed = input.trim().toLowerCase().replace(/уд\/мин|уд\б|bpm|пульс/g, "").replace(/\s+/g, " ").trim();
   if (!trimmed) return null;
-  const range = trimmed.match(/^(\d{2,3})\s*[-–]\s*(\d{2,3})$/);
+  const range = trimmed.match(/^(\d{2,3})\s*[--]\s*(\d{2,3})$/);
   if (range) {
     const a = Number(range[1]);
     const b = Number(range[2]);
@@ -184,7 +184,7 @@ export function roundsValue(validated: string | undefined): number | null {
 
 export function heartRateValue(validated: string | undefined): number | null {
   if (!validated) return null;
-  const range = validated.match(/^(\d{2,3})\s*[-–]\s*(\d{2,3})$/);
+  const range = validated.match(/^(\d{2,3})\s*[--]\s*(\d{2,3})$/);
   if (range) {
     const a = Number(range[1]);
     const b = Number(range[2]);

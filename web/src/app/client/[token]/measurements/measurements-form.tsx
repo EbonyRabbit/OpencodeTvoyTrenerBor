@@ -156,7 +156,7 @@ export function MeasurementsForm({
     <Card>
       <CardHeader>
         <CardTitle className="text-sm">
-          {existing ? "Замеры тела — сегодня" : "Новые замеры"}
+          {existing ? "Замеры тела - сегодня" : "Новые замеры"}
         </CardTitle>
       </CardHeader>
       <CardContent>

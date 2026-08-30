@@ -281,13 +281,13 @@ function validateDayExercises(exercises: EditableExercise[]): string | null {
     if (ex.type === "superset") {
       const children = ex.children ?? [];
       if (children.length < 2) {
-        return `Суперсет «${ex.name}» — нужно минимум 2 упражнения в группе`;
+        return `Суперсет «${ex.name}» - нужно минимум 2 упражнения в группе`;
       }
     }
     if (ex.type === "circuit") {
       const children = ex.children ?? [];
       if (children.length < 1) {
-        return `Круг «${ex.name}» — добавьте хотя бы одно упражнение`;
+        return `Круг «${ex.name}» - добавьте хотя бы одно упражнение`;
       }
     }
   }
@@ -813,10 +813,10 @@ export function ProgramEditor({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="template">
-                  Шаблон — видна в каталоге бота
+                  Шаблон - видна в каталоге бота
                 </SelectItem>
                 <SelectItem value="personal">
-                  Персональная — скрыта из каталога бота
+                  Персональная - скрыта из каталога бота
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -846,7 +846,7 @@ export function ProgramEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">— Не задан —</SelectItem>
+                <SelectItem value="none">- Не задан -</SelectItem>
                 <SelectItem value="general">Общее</SelectItem>
                 <SelectItem value="tennis">🎾 Теннис</SelectItem>
                 <SelectItem value="running">🏃 Бег</SelectItem>
@@ -899,11 +899,11 @@ export function ProgramEditor({
 
       <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">Типы упражнений:</span>
-        <span>Сила — подходы/повторы/вес/RPE</span>
+        <span>Сила - подходы/повторы/вес/RPE</span>
         <span>·</span>
-        <span>Кардио — дистанция/время/темп/пульс</span>
+        <span>Кардио - дистанция/время/темп/пульс</span>
         <span>·</span>
-        <span>Суперсет/Круг — группа упражнений, выполняется подряд (A1, A2…)</span>
+        <span>Суперсет/Круг - группа упражнений, выполняется подряд (A1, A2…)</span>
       </div>
 
       <Accordion multiple value={openPanels} onValueChange={setOpenPanels}>
@@ -913,7 +913,7 @@ export function ProgramEditor({
               <AccordionTrigger className="text-base">
                 <span>
                   Неделя {week.week_number}
-                  {week.week_label ? ` — ${week.week_label}` : ""}
+                  {week.week_label ? ` - ${week.week_label}` : ""}
                   {week.is_deload ? " (Deload)" : ""}
                 </span>
               </AccordionTrigger>

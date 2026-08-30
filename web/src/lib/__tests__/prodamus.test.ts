@@ -10,7 +10,7 @@ import {
 } from "../prodamus";
 
 // Официальный пример из докахов Продамуса
-// (help.prodamus.ru — «Webhook об оплате» → «Примеры webhook payload»):
+// (help.prodamus.ru - «Webhook об оплате» → «Примеры webhook payload»):
 // body «Обычная плата» + Sign ec3d935e... + демо-ключ.
 const DOCS_SECRET_KEY = "2y2aw4oknnke80bp1a8fniwuuq7tdkwmmuq7vwi4nzbr8z1182ftbn6p8mhw3bhz";
 const DOCS_SIGN = "ec3d935e7abe95a4929bc3c7029ca9832fe5c20f8041e7c4eba602d9ecd90ca9";
@@ -105,7 +105,7 @@ describe("canonicalizeProdamusBody", () => {
     });
   });
 
-  it("некорректные индексы массивов пропускаются, большие — не раздувают память", () => {
+  it("некорректные индексы массивов пропускаются, большие - не раздувают память", () => {
     expect(parseBracketForm("products[x][y]=B")).toEqual({ products: { x: { y: "B" } } });
     expect(parseBracketForm("products[999999999][name]=A")).toEqual({ products: [] });
     expect(parseBracketForm("list[0]=x&list[999999999][y]=1")).toEqual({ list: ["x"] });
@@ -214,7 +214,7 @@ describe("parseProdamusOrder", () => {
   it("официальный пример: order_id, sum, status, products", () => {
     const order = parseProdamusOrder(docsBody());
     // В доках order_id=1 (внутренний ID Продамуса), order_num="test" (наш номер
-    // заказа) — приоритет у order_num.
+    // заказа) - приоритет у order_num.
     expect(order.orderId).toBe("test");
     expect(order.sum).toBe(1000);
     expect(order.paymentStatus).toBe("success");
@@ -260,7 +260,7 @@ describe("parseProdamusOrder", () => {
 
   it("реальный продовый payload: наш UUID в order_num, внутренний ID Продамуса в order_id", () => {
     // Регрессия e2e 24.08.2026: вебхук приходил с order_id="47987743"
-    // (внутренний ID Продамуса) и order_num=<наш UUID> — активация падала.
+    // (внутренний ID Продамуса) и order_num=<наш UUID> - активация падала.
     const body = new URLSearchParams();
     body.set("date", "2026-08-24T15:33:17+03:00");
     body.set("order_id", "47987743");
@@ -302,12 +302,12 @@ describe("buildPaymentUrl", () => {
       productName: "HYROX 5\u00D712 \u2014 подготовка к гонке",
     });
     const parsed = new URL(url);
-    // × → x, — → - : страница Продамуса (windows-1251) не распознаёт их
+    // × → x, - → - : страница Продамуса (windows-1251) не распознаёт их
     expect(parsed.searchParams.get("products[0][name]")).toBe(
       "HYROX 5x12 - подготовка к гонке",
     );
     expect(url).not.toContain("%C3%97"); // UTF-8 ×
-    expect(url).not.toContain("%E2%80%94"); // UTF-8 —
+    expect(url).not.toContain("%E2%80%94"); // UTF-8 -
   });
 
   it("санитизирует кавычки и вырезает символы вне windows-1251 (emoji, стрелки)", () => {

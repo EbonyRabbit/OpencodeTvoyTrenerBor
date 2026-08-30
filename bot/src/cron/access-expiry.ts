@@ -32,7 +32,7 @@ async function getPausedClientIds(): Promise<Set<string>> {
 
 /**
  * Окно «истекает через REMIND_DAYS_AHEAD»: [now + 5д, now + 6д) в UTC.
- * access_end_date — TIMESTAMPTZ (пишется как toISOString), поэтому
+ * access_end_date - TIMESTAMPTZ (пишется как toISOString), поэтому
  * диапазон считается строго в UTC; tz клиента нужен только для текста.
  */
 export function accessExpiryWindow(now: Date = new Date()): {

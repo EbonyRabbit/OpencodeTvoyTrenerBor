@@ -1,5 +1,5 @@
 /**
- * Seed: HYROX 5×12 — подготовка к гонке (12 недель, 5 тренировок/нед).
+ * Seed: HYROX 5×12 - подготовка к гонке (12 недель, 5 тренировок/нед).
  *
  * Собирает согласованный грид в parsed_content и вставляет/обновляет
  * программу в Supabase (programs). Идемпотентно: ищет по названию.
@@ -13,9 +13,9 @@ import { getParsedContent } from "../src/lib/program-utils.js";
 import type { Json } from "../src/lib/types.js";
 import type { ParsedContent, ParsedDay, ParsedExercise, ParsedWeek } from "../src/lib/program-utils.js";
 
-const PROGRAM_TITLE = "HYROX 5×12 — подготовка к гонке";
+const PROGRAM_TITLE = "HYROX 5×12 - подготовка к гонке";
 const DESCRIPTION =
-  "Подготовка к HYROX: 5 тренировок в неделю. Пн — сила/взрыв + выносливость, Вт — гипертрофия (суперсеты) + AMRAP, Ср — лёгкий бег + кор + мобильность, Чт — сила + станции + темповый бег/брик, Пт — гипертрофия + AMRAP. Фазы: база → развитие → пик → тейпер → гонка. Разгрузки на 4-й и 8-й неделях.";
+  "Подготовка к HYROX: 5 тренировок в неделю. Пн - сила/взрыв + выносливость, Вт - гипертрофия (суперсеты) + AMRAP, Ср - лёгкий бег + кор + мобильность, Чт - сила + станции + темповый бег/брик, Пт - гипертрофия + AMRAP. Фазы: база → развитие → пик → тейпер → гонка. Разгрузки на 4-й и 8-й неделях.";
 const EQUIPMENT =
   "Полный зал: штанга, гантели, гири, санки, скиэрг, гребной тренажёр, тумба, санбэг, wall ball 9 кг";
 
@@ -48,7 +48,7 @@ const STRENGTH: Record<Phase, { sets: string; reps: string; weight: string; rpe:
   peak: { sets: "4", reps: "4-5", weight: "85%", rpe: "8-9", rest: "120 с" },
   taper: { sets: "3", reps: "6", weight: "70%", rpe: "6-7", rest: "90 с" },
   deload: { sets: "3", reps: "6", weight: "65%", rpe: "6", rest: "120 с" },
-  race: { sets: "1", reps: "—", weight: "", rpe: "", rest: "" },
+  race: { sets: "1", reps: "-", weight: "", rpe: "", rest: "" },
 };
 
 const POWER: Record<Phase, { sets: string; reps: string; weight: string; rpe: string; rest: string }> = {
@@ -57,7 +57,7 @@ const POWER: Record<Phase, { sets: string; reps: string; weight: string; rpe: st
   peak: { sets: "3", reps: "3", weight: "70%", rpe: "8", rest: "120 с" },
   taper: { sets: "3", reps: "3", weight: "60%", rpe: "6-7", rest: "90 с" },
   deload: { sets: "3", reps: "3", weight: "50%", rpe: "6", rest: "90 с" },
-  race: { sets: "1", reps: "—", weight: "", rpe: "", rest: "" },
+  race: { sets: "1", reps: "-", weight: "", rpe: "", rest: "" },
 };
 
 const WEIGHTED: Record<Phase, { sets: string; reps: string; weight: string; rpe: string }> = {
@@ -66,7 +66,7 @@ const WEIGHTED: Record<Phase, { sets: string; reps: string; weight: string; rpe:
   peak: { sets: "3", reps: "6", weight: "+15 кг", rpe: "8-9" },
   taper: { sets: "2", reps: "8", weight: "+5 кг", rpe: "6-7" },
   deload: { sets: "2", reps: "8", weight: "+2.5 кг", rpe: "6" },
-  race: { sets: "1", reps: "—", weight: "", rpe: "" },
+  race: { sets: "1", reps: "-", weight: "", rpe: "" },
 };
 
 const ROW: Record<Phase, { sets: string; reps: string; rpe: string; notes: string }> = {
@@ -75,7 +75,7 @@ const ROW: Record<Phase, { sets: string; reps: string; rpe: string; notes: strin
   peak: { sets: "4-5", reps: "500 м", rpe: "9", notes: "Отдых 90 с между раундами, максимальное качество" },
   taper: { sets: "3", reps: "500 м", rpe: "8", notes: "Отдых 90 с между раундами" },
   deload: { sets: "3", reps: "500 м", rpe: "6", notes: "Лёгкий темп, отдых 90 с" },
-  race: { sets: "1", reps: "—", rpe: "", notes: "" },
+  race: { sets: "1", reps: "-", rpe: "", notes: "" },
 };
 
 const SLED: Record<Phase, { sets: string; reps: string; weight: string; notes: string }> = {
@@ -84,7 +84,7 @@ const SLED: Record<Phase, { sets: string; reps: string; weight: string; notes: s
   peak: { sets: "3", reps: "50 м", weight: "80-102 кг", notes: "Гоночный формат: полная дистанция за раз" },
   taper: { sets: "3", reps: "20 м", weight: "лёгкий", notes: "" },
   deload: { sets: "3", reps: "20 м", weight: "лёгкий", notes: "" },
-  race: { sets: "1", reps: "—", weight: "", notes: "" },
+  race: { sets: "1", reps: "-", weight: "", notes: "" },
 };
 
 const BOX_JUMPS: Record<Phase, { sets: string; reps: string; weight: string }> = {
@@ -93,7 +93,7 @@ const BOX_JUMPS: Record<Phase, { sets: string; reps: string; weight: string }> =
   peak: { sets: "3", reps: "10", weight: "тумба 75 см" },
   taper: { sets: "2", reps: "8", weight: "тумба 60 см" },
   deload: { sets: "2", reps: "8", weight: "тумба 60 см" },
-  race: { sets: "1", reps: "—", weight: "" },
+  race: { sets: "1", reps: "-", weight: "" },
 };
 
 const HYP: Record<Phase, { sets: string; reps: string; rpe: string }> = {
@@ -102,7 +102,7 @@ const HYP: Record<Phase, { sets: string; reps: string; rpe: string }> = {
   peak: { sets: "4", reps: "8", rpe: "8" },
   taper: { sets: "3", reps: "10-12", rpe: "6-7" },
   deload: { sets: "2", reps: "12", rpe: "6" },
-  race: { sets: "1", reps: "—", rpe: "" },
+  race: { sets: "1", reps: "-", rpe: "" },
 };
 
 const HYP_ACC: Record<Phase, { sets: string; reps: string; rpe: string }> = {
@@ -111,7 +111,7 @@ const HYP_ACC: Record<Phase, { sets: string; reps: string; rpe: string }> = {
   peak: { sets: "3", reps: "10-12", rpe: "8" },
   taper: { sets: "3", reps: "10-12", rpe: "6-7" },
   deload: { sets: "2", reps: "12", rpe: "6" },
-  race: { sets: "1", reps: "—", rpe: "" },
+  race: { sets: "1", reps: "-", rpe: "" },
 };
 
 const TEMPO_REST = { sets: "1", reps: "20 мин", rpe: "8", notes: "Пороговый темп (Z3, разговор в 2-3 слова)" };
@@ -238,7 +238,7 @@ function buildDay1(phase: Phase): ParsedDay {
   const w = WEIGHTED[phase];
   const r = ROW[phase];
   return {
-    day_name: "Пн — Сила/Взрыв + Выносливость",
+    day_name: "Пн - Сила/Взрыв + Выносливость",
     day_order: 1,
     focus: "Присед, жим лёжа, взрывная работа, подтягивания/брусья с весом, гребля",
     exercises: [
@@ -273,7 +273,7 @@ function buildDay2(week: number, phase: Phase): ParsedDay {
       ];
 
   const day: ParsedDay = {
-    day_name: "Вт — Гипертрофия (суперсеты) + AMRAP",
+    day_name: "Вт - Гипертрофия (суперсеты) + AMRAP",
     day_order: 2,
     focus: "8 паттернов в суперсетах: колено/тазо-дом, вертикальные и горизонтальные тяги/жимы, руки",
     exercises: [
@@ -306,12 +306,12 @@ function buildDay2(week: number, phase: Phase): ParsedDay {
 
 function buildDay3(week: number, phase: Phase): ParsedDay {
   return {
-    day_name: "Ср — Лёгкий бег + Кор + Мобильность",
+    day_name: "Ср - Лёгкий бег + Кор + Мобильность",
     day_order: 3,
     focus: "Восстановительная работа: аэробная база, кор, мобильность",
     exercises: [
       cardioRun(`${EASY_RUN_KM[week]} км`),
-      ex("Кор-круг", "1", CORE_MIN[phase], "", "", "", "Планка, русский твист, bird-dog, подъём ног, супермен — 2-3 круга", "Кор"),
+      ex("Кор-круг", "1", CORE_MIN[phase], "", "", "", "Планка, русский твист, bird-dog, подъём ног, супермен - 2-3 круга", "Кор"),
       ex("Мобильность", "1", "15 мин", "", "", "", "ТБ-суставы, грудной отдел, голеностоп, хамстринг", "Мобильность"),
     ],
   };
@@ -361,7 +361,7 @@ function buildDay4(week: number, phase: Phase): ParsedDay {
   }
 
   return {
-    day_name: "Чт — Сила + Станции + Бег",
+    day_name: "Чт - Сила + Станции + Бег",
     day_order: 4,
     focus: "Становая, силовой армейский жим, санки, запрыгивания, темповый бег/брик",
     exercises: [
@@ -396,7 +396,7 @@ function buildDay5(week: number, phase: Phase): ParsedDay {
       ];
 
   const day: ParsedDay = {
-    day_name: "Пт — Гипертрофия (суперсеты) + AMRAP",
+    day_name: "Пт - Гипертрофия (суперсеты) + AMRAP",
     day_order: 5,
     focus: "8 паттернов в суперсетах: колено/тазо-дом, вертикальные и горизонтальные тяги/жимы, руки",
     exercises: [
@@ -622,7 +622,7 @@ const AMRAP_FRI: Record<number, AmrapEntry> = {
 function buildRaceWeek(): ParsedDay[] {
   return [
     {
-      day_name: "Пн — Лёгкое восстановление",
+      day_name: "Пн - Лёгкое восстановление",
       day_order: 1,
       focus: "Лёгкая активность перед гонкой",
       exercises: [
@@ -631,7 +631,7 @@ function buildRaceWeek(): ParsedDay[] {
       ],
     },
     {
-      day_name: "Вт — Активация",
+      day_name: "Вт - Активация",
       day_order: 2,
       focus: "Проверка техники станций, без утомления",
       exercises: [
@@ -644,7 +644,7 @@ function buildRaceWeek(): ParsedDay[] {
       ],
     },
     {
-      day_name: "Ср — Лёгкий бег",
+      day_name: "Ср - Лёгкий бег",
       day_order: 3,
       focus: "Финальная лёгкая сессия",
       exercises: [
@@ -653,7 +653,7 @@ function buildRaceWeek(): ParsedDay[] {
       ],
     },
     {
-      day_name: "Чт — Отдых",
+      day_name: "Чт - Отдых",
       day_order: 4,
       focus: "Полный отдых, лёгкая растяжка",
       exercises: [
@@ -661,11 +661,11 @@ function buildRaceWeek(): ParsedDay[] {
       ],
     },
     {
-      day_name: "Пт — Подготовка",
+      day_name: "Пт - Подготовка",
       day_order: 5,
       focus: "Отдых перед гонкой",
       exercises: [
-        ex("Отдых + подготовка", "1", "—", "", "", "", "Экипировка, документы, ранний сон. Завтра — ГОНКА!", "Восстановление"),
+        ex("Отдых + подготовка", "1", "-", "", "", "", "Экипировка, документы, ранний сон. Завтра - ГОНКА!", "Восстановление"),
       ],
     },
   ];
@@ -679,13 +679,13 @@ const WEEK_LABELS: Record<number, { label: string; focus: string }> = {
   1: { label: "База · Неделя 1", focus: "Фундамент: техника, аэробная база, адаптация" },
   2: { label: "База · Неделя 2", focus: "База: рост объёма и интенсивности" },
   3: { label: "База · Неделя 3", focus: "База: пик первого блока" },
-  4: { label: "Разгрузка", focus: "Объём −30–40%, вес 65–70%, RPE ≤ 7" },
+  4: { label: "Разгрузка", focus: "Объём −30-40%, вес 65-70%, RPE ≤ 7" },
   5: { label: "Развитие · Неделя 5", focus: "Развитие: рост интенсивности и специфики" },
   6: { label: "Развитие · Неделя 6", focus: "Развитие: объём и темп растут" },
   7: { label: "Развитие · Неделя 7", focus: "Брик: четверть гонки (SkiErg 1000 м + Wall Ball 100)" },
-  8: { label: "Разгрузка", focus: "Объём −30–40%, восстановление" },
+  8: { label: "Разгрузка", focus: "Объём −30-40%, восстановление" },
   9: { label: "Пик · Неделя 9", focus: "Брик: четверть гонки (Sled Push 50 м + Гребля 1000 м)" },
-  10: { label: "Пик · Неделя 10", focus: "Брик: половина гонки — 4 км бега + 4 станции" },
+  10: { label: "Пик · Неделя 10", focus: "Брик: половина гонки - 4 км бега + 4 станции" },
   11: { label: "Тейпер", focus: "Объём −50%, качество сохраняется" },
   12: { label: "Гоночная неделя", focus: "HYROX в субботу. Пн-Ср лёгкая активация, Чт-Пт отдых" },
 };
@@ -715,14 +715,14 @@ function buildWeeks(): ParsedWeek[] {
 }
 
 const PROGRAM_NOTES = [
-  "Схема недели: Пн — сила/взрыв + выносливость, Вт — гипертрофия (суперсеты) + AMRAP 20 мин, Ср — лёгкий бег + кор + мобильность, Чт — сила + станции + темповый бег/брик, Пт — гипертрофия + AMRAP 20 мин. Сб/Вс — отдых.",
-  "Разгрузка на 4-й и 8-й неделях обязательна: объём −30–40%, вес 65–70%, RPE ≤ 7, без брик и тяжёлых санок.",
+  "Схема недели: Пн - сила/взрыв + выносливость, Вт - гипертрофия (суперсеты) + AMRAP 20 мин, Ср - лёгкий бег + кор + мобильность, Чт - сила + станции + темповый бег/брик, Пт - гипертрофия + AMRAP 20 мин. Сб/Вс - отдых.",
+  "Разгрузка на 4-й и 8-й неделях обязательна: объём −30-40%, вес 65-70%, RPE ≤ 7, без брик и тяжёлых санок.",
   "Прогрессия весов: все подходы в верхней границе повторов при RPE ниже заданного → +2.5 кг на следующей неделе.",
   "Бег: длинный бег +10% в неделю; скорость интервалов растёт только при чистой технике.",
-  "AMRAP: 20 минут, отдых между кругами по плану (90 → 30 с), фиксируй количество кругов — цель растёт от недели к неделе.",
-  "Брик-тренировки: беговые км в гоночном темпе (≈5:00–5:30/км), станции на полных гоночных дистанциях, отдых = только переходы.",
-  "Зоны пульса: Z1 55–65% (восстановление), Z2 65–75% (лёгкий бег), Z3 75–85% (пороговый темп), Z4 85–92% (темп 5 км), Z5 92–100% (ускорения).",
-  "Сон 7–8 часов, белок 1.6–2 г/кг веса. За 48 часов до гонки — никаких нагрузок.",
+  "AMRAP: 20 минут, отдых между кругами по плану (90 → 30 с), фиксируй количество кругов - цель растёт от недели к неделе.",
+  "Брик-тренировки: беговые км в гоночном темпе (≈5:00-5:30/км), станции на полных гоночных дистанциях, отдых = только переходы.",
+  "Зоны пульса: Z1 55-65% (восстановление), Z2 65-75% (лёгкий бег), Z3 75-85% (пороговый темп), Z4 85-92% (темп 5 км), Z5 92-100% (ускорения).",
+  "Сон 7-8 часов, белок 1.6-2 г/кг веса. За 48 часов до гонки - никаких нагрузок.",
   "Гоночные веса станций: Wall Ball 9 кг в тренировках (гонка 6 кг), фермерская 2×24 кг, санки до 102 кг, SkiErg/гребля 1000 м.",
 ];
 

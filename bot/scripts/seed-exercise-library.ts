@@ -31,12 +31,12 @@ const EXERCISES: SeedExercise[] = [
   // ---------------------------------------------------------------- топ-15
   {
     name: "Жим штанги лёжа",
-    aliases: ["Жим лёжа", "Жим штанги лежа", "Бенч-пресс", "Bench Press", "Жим штанги лёжа (лёгкий)", "Жим штанги лёжа — тест на макс. повторы"],
+    aliases: ["Жим лёжа", "Жим штанги лежа", "Бенч-пресс", "Bench Press", "Жим штанги лёжа (лёгкий)", "Жим штанги лёжа - тест на макс. повторы"],
     descriptionRu: "Базовое упражнение на грудные мышцы, передние дельты и трицепс.",
     descriptionEn: "Basic compound exercise for chest, front delts and triceps.",
     techniqueRu: "Лягте на скамью, лопатки сведите и прижмите к скамье. Возьмите штангу чуть шире плеч, снимите и опускайте до касания груди, локти под углом 45° к корпусу. Жмите вверх до полного выпрямления, стопы плотно на полу.",
     techniqueEn: "Lie on the bench, squeeze your shoulder blades and keep them pressed. Grip the bar slightly wider than shoulders, lower it to touch your chest with elbows at ~45°. Press up until arms are locked, feet planted.",
-    featuresRu: ["Лопатки прижаты весь подход", "Ноги создают упор, а не лежат свободно", "Касание груди — контроль, а не отскок штанги"],
+    featuresRu: ["Лопатки прижаты весь подход", "Ноги создают упор, а не лежат свободно", "Касание груди - контроль, а не отскок штанги"],
     featuresEn: ["Keep shoulder blades retracted", "Drive through your feet", "Touch the chest under control"],
   },
   {
@@ -56,8 +56,8 @@ const EXERCISES: SeedExercise[] = [
     descriptionEn: "Powerful movement for back, glutes and hamstrings.",
     techniqueRu: "Штанга над серединой стопы, хват на ширине плеч. Наклонитесь, колени чуть согнуты, спина прямая. Подъём начинайте с работающих ног, штанга скользит по ногам, корпус выпрямляется в верхней точке.",
     techniqueEn: "Bar over mid-foot, grip shoulder-width. Hinge down with slightly bent knees, back flat. Push with your legs, bar stays close to the body, stand tall at the top.",
-    featuresRu: ["Спина прямая, лопатки не тяги (руки — «крюки»)", "Штанга максимально близко к ногам", "Не переразгибайтесь вверх"],
-    featuresEn: ["Keep the back flat — arms are hooks", "Drag the bar up your legs", "Don't overextend at the top"],
+    featuresRu: ["Спина прямая, лопатки не тяги (руки - «крюки»)", "Штанга максимально близко к ногам", "Не переразгибайтесь вверх"],
+    featuresEn: ["Keep the back flat - arms are hooks", "Drag the bar up your legs", "Don't overextend at the top"],
   },
   {
     name: "Тяга штанги в наклоне",
@@ -66,7 +66,7 @@ const EXERCISES: SeedExercise[] = [
     descriptionEn: "Works lats, traps and lower back.",
     techniqueRu: "Наклон корпуса ~45°, спина прямая, штанга в опущенных руках. Тяните штангу к животу, сводя лопатки, локти идут назад и вверх. Плавно опускайте, не раскачивая корпус.",
     techniqueEn: "Hinge to ~45°, back flat, bar at arm's length. Pull the bar to your belly, squeezing shoulder blades, elbows back. Lower under control without swinging.",
-    featuresRu: ["Корпус неподвижен, без рывков", "Локти ближе к корпусу — больше широчайшие", "Руки не сгибаются в полную «молоток»"],
+    featuresRu: ["Корпус неподвижен, без рывков", "Локти ближе к корпусу - больше широчайшие", "Руки не сгибаются в полную «молоток»"],
     featuresEn: ["Keep torso still", "Elbows close to the body for lats", "No swinging"],
   },
   {
@@ -104,9 +104,9 @@ const EXERCISES: SeedExercise[] = [
     aliases: ["Отжимание", "Отжимания от пола", "Push-up", "Push Ups", "Отжимания от пола (ноги на диван / колени)", "Отжимания от пола (с колен/полные)", "Отжимания от пола (носки / колени)"],
     descriptionRu: "Базовое упражнение на грудь, плечи и трицепс с собственным весом.",
     descriptionEn: "Bodyweight pressing for chest, shoulders and triceps.",
-    techniqueRu: "Планка на прямых руках, ладони под плечами. Опускайтесь, локти под 45°, грудь почти касается пола, корпус — прямая линия. Выжимайте до полного выпрямления.",
+    techniqueRu: "Планка на прямых руках, ладони под плечами. Опускайтесь, локти под 45°, грудь почти касается пола, корпус - прямая линия. Выжимайте до полного выпрямления.",
     techniqueEn: "High plank, hands under shoulders. Lower with elbows at 45°, chest almost touches the floor, body in a straight line. Press back up.",
-    featuresRu: ["Корпус — прямая линия, таз не провисает", "Локти ближе к корпусу", "Упрощение: с колен"],
+    featuresRu: ["Корпус - прямая линия, таз не провисает", "Локти ближе к корпусу", "Упрощение: с колен"],
     featuresEn: ["Straight body line", "Elbows tucked ~45°", "Easier: from the knees"],
   },
   {
@@ -126,7 +126,7 @@ const EXERCISES: SeedExercise[] = [
     descriptionEn: "The best exercise for hamstrings and glutes.",
     techniqueRu: "Стоя с гантелями у бёдер, колени чуть согнуты. Отводите таз назад, наклоняя корпус с прямой спиной, гантели скользят по ногам до растяжения задней поверхности. Вернитесь, сжимая ягодицы.",
     techniqueEn: "Stand with dumbbells at your hips, knees slightly bent. Push hips back, hinging with a flat back, dumbbells slide down the legs. Return squeezing glutes.",
-    featuresRu: ["Спина прямая весь подход", "Тяните таз назад, а не «садитесь»", "Растяжение внизу — контролируемое"],
+    featuresRu: ["Спина прямая весь подход", "Тяните таз назад, а не «садитесь»", "Растяжение внизу - контролируемое"],
     featuresEn: ["Flat back throughout", "Push hips back", "Stretch at the bottom is controlled"],
   },
   {
@@ -135,7 +135,7 @@ const EXERCISES: SeedExercise[] = [
     descriptionRu: "Дружелюбная к технике версия приседаний с гантелью у груди.",
     descriptionEn: "A technique-friendly squat variation with a dumbbell held at the chest.",
     techniqueRu: "Держите гантель вертикально у груди, локти вниз. Приседайте между коленей, стопы чуть шире плеч, корпус вертикален. Вставайте через упор в пол.",
-    techniqueEn: "Hold the dumbbell vertically at your chest, elbows down. Squat between your knees — feet slightly wider, torso upright. Stand up driving through the floor.",
+    techniqueEn: "Hold the dumbbell vertically at your chest, elbows down. Squat between your knees - feet slightly wider, torso upright. Stand up driving through the floor.",
     featuresRu: ["Локти между коленями внизу", "Пятки не отрываются", "Отлично для новичков"],
     featuresEn: ["Elbows go between knees at the bottom", "Heels stay down", "Great for beginners"],
   },
@@ -154,9 +154,9 @@ const EXERCISES: SeedExercise[] = [
     aliases: ["Планка прямая", "Планка с отягощением", "Планка боковая", "Боковая планка", "Планка прямая и боковая", "Plank"],
     descriptionRu: "Статическое упражнение на глубокие мышцы кора.",
     descriptionEn: "Isometric core exercise.",
-    techniqueRu: "Предплечья на полу, локти под плечами, корпус — прямая линия от стоп до головы. Пресс напряжён, ягодицы сжаты, не прогибайтесь в пояснице. Дышите ровно.",
+    techniqueRu: "Предплечья на полу, локти под плечами, корпус - прямая линия от стоп до головы. Пресс напряжён, ягодицы сжаты, не прогибайтесь в пояснице. Дышите ровно.",
     techniqueEn: "Forearms on the floor, elbows under shoulders, body in a straight line. Brace the core and glutes, don't sag the lower back. Breathe steadily.",
-    featuresRu: ["Таз не провисает и не задирается", "Взгляд в пол", "Наилучшее время — больше не значит лучше"],
+    featuresRu: ["Таз не провисает и не задирается", "Взгляд в пол", "Наилучшее время - больше не значит лучше"],
     featuresEn: ["No sagging or piking the hips", "Eyes on the floor", "Perfect form over long time"],
   },
   {
@@ -171,7 +171,7 @@ const EXERCISES: SeedExercise[] = [
   },
   {
     name: "Тяга горизонтальная в тренажёре",
-    aliases: ["Тяга горизонтальная", "Seated Cable Row", "Тяга горизонтальная (лёгкий)", "Тяга горизонтальная — тест на макс. повторы", "Горизонтальная тяга в тренажёре"],
+    aliases: ["Тяга горизонтальная", "Seated Cable Row", "Тяга горизонтальная (лёгкий)", "Тяга горизонтальная - тест на макс. повторы", "Горизонтальная тяга в тренажёре"],
     descriptionRu: "Упражнение на середину спины и бицепс без нагрузки на поясницу.",
     descriptionEn: "Cable row for the mid-back and biceps without lower back stress.",
     techniqueRu: "Сядьте прямо, грудь вперёд. Тяните рукоять к животу, локти назад, сводя лопатки. Плавно возвращайте, не округляя спину и не откидываясь корпусом.",
@@ -182,7 +182,7 @@ const EXERCISES: SeedExercise[] = [
   // ------------------------------------------------------------- остальные
   {
     name: "Жим ногами в тренажёре",
-    aliases: ["Жим ногами", "Leg Press", "Жим ногами (лёгкий вес)", "Жим ногами — тест на макс. повторы"],
+    aliases: ["Жим ногами", "Leg Press", "Жим ногами (лёгкий вес)", "Жим ногами - тест на макс. повторы"],
     descriptionRu: "Присед в тренажёре: квадрицепсы и ягодицы без нагрузки на поясницу.",
     descriptionEn: "Leg press: quads and glutes without lower back loading.",
     techniqueRu: "Стопы на платформе на ширине плеч, спина прижата к спинке. Опускайте платформу до угла 90° в коленях, не отрывая таз. Выжимайте без полного «щёлчка» коленей.",
@@ -193,8 +193,8 @@ const EXERCISES: SeedExercise[] = [
   {
     name: "Тяга верхнего блока",
     aliases: ["Тяга верхнего блока широким хватом", "Lat Pulldown", "Тяга верхнего блока шире плеч хватом", "Тяга верхнего блока обратным хватом"],
-    descriptionRu: "Вертикальная тяга — подготовка к подтягиваниям.",
-    descriptionEn: "Vertical pull — a progression toward pull-ups.",
+    descriptionRu: "Вертикальная тяга - подготовка к подтягиваниям.",
+    descriptionEn: "Vertical pull - a progression toward pull-ups.",
     techniqueRu: "Сядьте, бёдра зафиксированы валиком, грудь вперёд. Тяните перекладину к верхней части груди, локти вниз-назад. Плавно возвращайте вверх до полного выпрямления рук.",
     techniqueEn: "Sit with thighs secured, chest up. Pull the bar to your upper chest with elbows down and back. Return smoothly to a full stretch.",
     featuresRu: ["Не отклоняйтесь назад", "Тяните к груди, не за голову", "Кисти не доминируют над тягой"],
@@ -225,7 +225,7 @@ const EXERCISES: SeedExercise[] = [
     aliases: ["Болгарский сплит-присед", "Bulgarian Split Squat", "Болгарские выпады с гантелями", "Сплит-приседания (болгарские, опора на стул)"],
     descriptionRu: "Жёсткая односторонняя работа ног с опорой задней ногой на возвышение.",
     descriptionEn: "Tough single-leg work with the rear foot elevated.",
-    techniqueRu: "Задняя стопа на скамье, передняя — на полу. Опускайтесь вертикально, переднее колено над стопой. Вставайте без опоры на заднюю ногу.",
+    techniqueRu: "Задняя стопа на скамье, передняя - на полу. Опускайтесь вертикально, переднее колено над стопой. Вставайте без опоры на заднюю ногу.",
     techniqueEn: "Rear foot on a bench, front foot planted. Lower straight down, front knee over the foot. Stand up without pushing off the rear leg.",
     featuresRu: ["Корпус вертикален", "Минимум нагрузки на заднюю стопу", "Начните без веса"],
     featuresEn: ["Stay upright", "Rear foot for balance only", "Start unweighted"],
@@ -237,7 +237,7 @@ const EXERCISES: SeedExercise[] = [
     descriptionEn: "Knee-friendly lunge variation with a glute emphasis.",
     techniqueRu: "С гантелями в руках шагните назад одной ногой, опуская заднее колено к полу. Передняя нога работает основной. Вернитесь шагом вперёд.",
     techniqueEn: "With dumbbells, step back and lower the rear knee. Drive mostly through the front leg to return.",
-    featuresRu: ["Переднее колено над стопой", "Ритмичный шаг, без подпрыгиваний", "Передняя нога — основная"],
+    featuresRu: ["Переднее колено над стопой", "Ритмичный шаг, без подпрыгиваний", "Передняя нога - основная"],
     featuresEn: ["Front knee over the foot", "Steady rhythm", "Front leg does the work"],
   },
   {
@@ -252,7 +252,7 @@ const EXERCISES: SeedExercise[] = [
   },
   {
     name: "Ягодичный мостик с гантелью",
-    aliases: ["Ягодичный мост с гантелью на бёдрах", "Ягодичный мостик", "Glute Bridge", "Резинка — ягодичный мостик с разведением", "Ягодичный мост с отягощением"],
+    aliases: ["Ягодичный мост с гантелью на бёдрах", "Ягодичный мостик", "Glute Bridge", "Резинка - ягодичный мостик с разведением", "Ягодичный мост с отягощением"],
     descriptionRu: "Целевая работа на ягодицы без нагрузки на поясницу.",
     descriptionEn: "Targeted glute work without lower back stress.",
     techniqueRu: "Лягте на спину, стопы на полу, гантель на бёдрах. Поднимайте таз до прямой линии корпус-бёдра, сжимая ягодицы вверху. Опускайте без касания пола.",
@@ -343,9 +343,9 @@ const EXERCISES: SeedExercise[] = [
   {
     name: "Планка на прямых руках",
     aliases: ["Высокая планка", "High Plank", "Планка с касанием плеч"],
-    descriptionRu: "Планка на вытянутых руках — мягче для локтей, чем на предплечьях.",
-    descriptionEn: "High plank — easier on the elbows than a forearm plank.",
-    techniqueRu: "Ладони под плечами, ноги прямые, корпус — прямая линия. Пресс и ягодицы напряжены, взгляд в пол. Не поднимайте таз вверх.",
+    descriptionRu: "Планка на вытянутых руках - мягче для локтей, чем на предплечьях.",
+    descriptionEn: "High plank - easier on the elbows than a forearm plank.",
+    techniqueRu: "Ладони под плечами, ноги прямые, корпус - прямая линия. Пресс и ягодицы напряжены, взгляд в пол. Не поднимайте таз вверх.",
     techniqueEn: "Hands under shoulders, legs straight, straight body line. Brace abs and glutes. Don't pike the hips.",
     featuresRu: ["Прямая линия корпус-ноги", "Ладони активно давят в пол", "Дышите ровно"],
     featuresEn: ["Straight body line", "Press the floor away", "Breathe steadily"],
@@ -367,7 +367,7 @@ const EXERCISES: SeedExercise[] = [
     descriptionEn: "Middle-delt isolation for shoulder width.",
     techniqueRu: "Лёгкие гантели в опущенных руках, локти чуть согнуты. Поднимайте руки в стороны до уровня плеч, без рывка корпусом. Опускайте медленно.",
     techniqueEn: "Light dumbbells, elbows slightly bent. Raise the arms to shoulder height without swinging the torso. Lower slowly.",
-    featuresRu: ["Без раскачивания корпуса", "Мизинец чуть выше большого пальца", "Лёгкий вес — больше повторений"],
+    featuresRu: ["Без раскачивания корпуса", "Мизинец чуть выше большого пальца", "Лёгкий вес - больше повторений"],
     featuresEn: ["No torso swing", "Pinky slightly above the thumb", "Light weight, higher reps"],
   },
   {
@@ -393,10 +393,10 @@ const EXERCISES: SeedExercise[] = [
   {
     name: "Жим гантелей на наклонной",
     aliases: ["Жим гантелей на наклонной скамье", "Incline Dumbbell Press"],
-    descriptionRu: "Жим на наклонной скамье — акцент на верх груди.",
+    descriptionRu: "Жим на наклонной скамье - акцент на верх груди.",
     descriptionEn: "Incline press emphasizing the upper chest.",
     techniqueRu: "Скамья 30-45°, гантели у плеч. Выжимайте вверх, слегка сводя к центру. Не выталкивайте плечи вперёд из ограничителей.",
-    techniqueEn: "Bench at 30–45°, dumbbells at the shoulders. Press up slightly inwards. Keep the shoulders back.",
+    techniqueEn: "Bench at 30-45°, dumbbells at the shoulders. Press up slightly inwards. Keep the shoulders back.",
     featuresRu: ["Плечи не выходят вперёд", "Угол скамьи не более 45°", "Плавное опускание"],
     featuresEn: ["Shoulders stay back", "Bench angle max 45°", "Lower under control"],
   },
@@ -406,9 +406,9 @@ const EXERCISES: SeedExercise[] = [
     descriptionRu: "Аэробная база: восстанавливающий бег в разговорном темпе.",
     descriptionEn: "Aerobic base: conversational-pace recovery running.",
     techniqueRu: "Темп, в котором можно говорить. Каденс ~170-180 шагов/мин, приземление на середину стопы, корпус прямой. Начинайте с коротких дистанций и наращивайте постепенно.",
-    techniqueEn: "Pace where you can still talk. Cadence ~170–180 steps/min, land mid-foot, torso upright. Start short and build gradually.",
+    techniqueEn: "Pace where you can still talk. Cadence ~170-180 steps/min, land mid-foot, torso upright. Start short and build gradually.",
     featuresRu: ["Разговорный темп", "Пульс в зоне 60-70% от макс.", "Приземление мягкое, без «шлёпанья»"],
-    featuresEn: ["Conversational pace", "Heart rate at 60–70% of max", "Land softly"],
+    featuresEn: ["Conversational pace", "Heart rate at 60-70% of max", "Land softly"],
   },
   {
     name: "Гребной тренажёр",
@@ -427,7 +427,7 @@ const EXERCISES: SeedExercise[] = [
     descriptionEn: "Loaded walking: grip, core and traps.",
     techniqueRu: "Возьмите отягощение в обе руки, плечи назад, грудь вперёд. Идите мелкими уверенными шагами, корпус вертикален, без наклона в стороны.",
     techniqueEn: "Pick up the weights, shoulders back, chest up. Walk with short controlled steps, staying tall.",
-    featuresRu: ["Плечи не «уши» — лопатки опущены", "Корпус вертикален", "Больше вес — короче дистанция"],
+    featuresRu: ["Плечи не «уши» - лопатки опущены", "Корпус вертикален", "Больше вес - короче дистанция"],
     featuresEn: ["Keep shoulders down", "Stay tall", "Heavier loads, shorter distances"],
   },
   {
@@ -443,9 +443,9 @@ const EXERCISES: SeedExercise[] = [
   {
     name: "Трастеры",
     aliases: ["Трастер", "Приседания + жим над головой", "Thruster", "Присед + жим", "Трастеры (2×12 кг)", "Трастеры (2×14 кг)", "Трастеры (2×16 кг)"],
-    descriptionRu: "Присед с жимом над головой — силовое кардио на всё тело.",
-    descriptionEn: "Squat with an overhead press — full-body strength conditioning.",
-    techniqueRu: "Штанга или гантели у плеч. Присядьте и в подъёме выдавите снаряд над головой, не останавливая движение. Опустите снаряд к плечам вместе с новым приседом — один непрерывный поток.",
+    descriptionRu: "Присед с жимом над головой - силовое кардио на всё тело.",
+    descriptionEn: "Squat with an overhead press - full-body strength conditioning.",
+    techniqueRu: "Штанга или гантели у плеч. Присядьте и в подъёме выдавите снаряд над головой, не останавливая движение. Опустите снаряд к плечам вместе с новым приседом - один непрерывный поток.",
     techniqueEn: "Bar or dumbbells at your shoulders. Squat, then on the way up press overhead in one motion. Lower to the shoulders as you begin the next rep.",
     featuresRu: ["Единый ритм: присед-жим", "Локти высоко внизу", "Дыхание на каждый повтор"],
     featuresEn: ["Squat and press as one", "Elbows high at the bottom", "Breathe every rep"],
@@ -453,11 +453,11 @@ const EXERCISES: SeedExercise[] = [
   {
     name: "Подтягивания в гравитроне",
     aliases: ["Гравитрон", "Assisted Pull-up", "Подтягивания с противовесом"],
-    descriptionRu: "Подтягивания с поддержкой противовеса — путь к обычным подтягиваниям.",
-    descriptionEn: "Assisted pull-ups — a path to regular pull-ups.",
+    descriptionRu: "Подтягивания с поддержкой противовеса - путь к обычным подтягиваниям.",
+    descriptionEn: "Assisted pull-ups - a path to regular pull-ups.",
     techniqueRu: "Встаньте коленями на платформу, хват на ширине плеч. Подтягивайтесь до подбородка, сводя лопатки. Опускайтесь полностью, уменьшая вес противовеса с неделями.",
     techniqueEn: "Kneel on the platform, grip shoulder-width. Pull to a chin over the bar, squeezing the blades. Lower fully and reduce assistance over time.",
-    featuresRu: ["Меньше противовес — сложнее", "Без отбива внизу", "Лопатки работают вниз"],
+    featuresRu: ["Меньше противовес - сложнее", "Без отбива внизу", "Лопатки работают вниз"],
     featuresEn: ["Less assistance, harder", "No bounce at the bottom", "Drive the elbows down"],
   },
   {
@@ -473,8 +473,8 @@ const EXERCISES: SeedExercise[] = [
   {
     name: "Нордические наклоны",
     aliases: ["Нордик", "Нордические сгибания", "Nordic Curl"],
-    descriptionRu: "Эксцентрическая работа на заднюю поверхность бедра — профилактика травм.",
-    descriptionEn: "Eccentric hamstring work — injury prevention.",
+    descriptionRu: "Эксцентрическая работа на заднюю поверхность бедра - профилактика травм.",
+    descriptionEn: "Eccentric hamstring work - injury prevention.",
     techniqueRu: "Колени на полу, стопы зафиксированы партнёром/упором. Наклоняйтесь вперёд с прямой линией корпус-бёдра максимально медленно. Руками разрешается помощь в конце.",
     techniqueEn: "Kneel with feet anchored. Lower forward with a straight body line as slowly as possible, using your hands for support only at the end.",
     featuresRu: ["Наклон максимально медленный", "Спина прямая", "Начните с малой амплитуды"],
@@ -512,8 +512,8 @@ const EXERCISES: SeedExercise[] = [
   },
   {
     name: "Разведение рук с резинкой",
-    aliases: ["Резинка — разведение рук (задняя дельта)", "Резинка — разведение рук назад", "Band Rear Delt Fly"],
-    descriptionRu: "Разведение рук с резинкой — задняя дельта и осанка.",
+    aliases: ["Резинка - разведение рук (задняя дельта)", "Резинка - разведение рук назад", "Band Rear Delt Fly"],
+    descriptionRu: "Разведение рук с резинкой - задняя дельта и осанка.",
     descriptionEn: "Band fly for the rear delts and posture.",
     techniqueRu: "Держите резинку перед собой на уровне груди в натянутом состоянии в руках. Разводите руки в стороны, сводя лопатки. Возвращайте медленно.",
     techniqueEn: "Hold the band taut in front of your chest. Pull the hands apart, squeezing the blades together. Return slowly.",
@@ -522,9 +522,9 @@ const EXERCISES: SeedExercise[] = [
   },
   {
     name: "Боковые шаги с резинкой",
-    aliases: ["Резинка — боковые шаги (мини-банда)", "Band Lateral Walk", "Боковые шаги с мини-бандой"],
-    descriptionRu: "Боковые шаги с мини-бандой — средняя ягодичная мышца.",
-    descriptionEn: "Mini-band lateral walks — gluteus medius.",
+    aliases: ["Резинка - боковые шаги (мини-банда)", "Band Lateral Walk", "Боковые шаги с мини-бандой"],
+    descriptionRu: "Боковые шаги с мини-бандой - средняя ягодичная мышца.",
+    descriptionEn: "Mini-band lateral walks - gluteus medius.",
     techniqueRu: "Мини-банда выше колен или на щиколотках, ноги на ширине таза. Шагайте в сторону, сохраняя корпус вертикально и напряжение ленты. Вернитесь обратно.",
     techniqueEn: "Mini band above the knees or at the ankles, squatting slightly. Step sideways staying tall and keeping the band tension. Step back.",
     featuresRu: ["Лента всегда натянута", "Корпус не наклоняется", "Носки вперёд"],
@@ -532,7 +532,7 @@ const EXERCISES: SeedExercise[] = [
   },
   {
     name: "Отведение плеча назад",
-    aliases: ["Отведение руки в наклоне", "Rear Delt Raise", "Резинка — разведение рук в наклоне"],
+    aliases: ["Отведение руки в наклоне", "Rear Delt Raise", "Резинка - разведение рук в наклоне"],
     descriptionRu: "Изолированная работа задней дельты в наклоне.",
     descriptionEn: "Isolated rear-delt work in a hinge.",
     techniqueRu: "Наклонитесь с прямой спиной, руки с лёгкими гантелями вниз. Разводите руки в стороны-назад, локти чуть согнуты. Опускайте медленно.",
@@ -542,9 +542,9 @@ const EXERCISES: SeedExercise[] = [
   },
   {
     name: "Ягодичный мостик с резинкой",
-    aliases: ["Боковой мостик с резинкой", "Glute Bridge Band", "Резинка — ягодичный мостик"],
-    descriptionRu: "Мостик с разведением коленей с лентой — ягодицы + абдукторы.",
-    descriptionEn: "Bridge with banded knee openers — glutes plus abductors.",
+    aliases: ["Боковой мостик с резинкой", "Glute Bridge Band", "Резинка - ягодичный мостик"],
+    descriptionRu: "Мостик с разведением коленей с лентой - ягодицы + абдукторы.",
+    descriptionEn: "Bridge with banded knee openers - glutes plus abductors.",
     techniqueRu: "Банда на коленях, лягте на спину, стопы на полу. Поднимайте таз, одновременно разводя колени в стороны. Вверху удерживайте давление на ленту.",
     techniqueEn: "Band above the knees, lie on your back, feet planted. Lift the hips while pressing the knees outward. Hold the band tension at the top.",
     featuresRu: ["Колени не «проваливаются» внутрь", "Пауза вверху", "Поясница не переразгибается"],
@@ -785,7 +785,7 @@ const EXERCISES: SeedExercise[] = [
     aliases: ["Дьявольский жим (2×12 кг)", "Дьявольский жим (2×14 кг)", "Дьявольский жим (2×16 кг)", "Devil Press"],
     descriptionRu: "Бёрпи с взятием двух гантелей и жимом над головой.",
     descriptionEn: "Burpee into two dumbbell cleans and an overhead press.",
-    techniqueRu: "Из упора лёжа на гантелях отжмитесь, снимите гантели с пола, встаньте, возьмите их на грудь и выжмите над головой. Опускайте так же — переход в бёрпи.",
+    techniqueRu: "Из упора лёжа на гантелях отжмитесь, снимите гантели с пола, встаньте, возьмите их на грудь и выжмите над головой. Опускайте так же - переход в бёрпи.",
     techniqueEn: "From a push-up on dumbbells, stand, clean both weights to your chest and press overhead. Lower them back and repeat the burpee.",
     featuresRu: ["Взрывной темп", "Корпус прямой", "Жим полный"],
     featuresEn: ["Explosive tempo", "Stay tall", "Full press"],
@@ -797,7 +797,7 @@ const EXERCISES: SeedExercise[] = [
     descriptionEn: "Wall ball throws from a squat: legs and shoulders.",
     techniqueRu: "Мяч у подбородка, локти вниз. Приседайте и из приседа выпрыгивайте вверх, выпуская мяч в цель на стене. Ловите и сразу в следующий присед.",
     techniqueEn: "Ball at your chin, elbows down. Squat, then extend powerfully and throw the ball to the target. Catch and flow into the next squat.",
-    featuresRu: ["Цель — выше уровня головы", "Полный присед", "Ритм без пауз"],
+    featuresRu: ["Цель - выше уровня головы", "Полный присед", "Ритм без пауз"],
     featuresEn: ["Aim above head height", "Full squat", "Non-stop rhythm"],
   },
   {
@@ -845,8 +845,8 @@ const EXERCISES: SeedExercise[] = [
     aliases: ["Беговая дорожка"],
     descriptionRu: "Бег в ровном темпе: кардио и выносливость.",
     descriptionEn: "Steady pace running: conditioning and endurance.",
-    techniqueRu: "Держите корпус прямо, плечи расслаблены, каденс ровный. Дышите в такт шагам. Темп зависит от цели тренировки: лёгкий — разговорный, гоночный — темп соревнования.",
-    techniqueEn: "Stay upright with relaxed shoulders and a steady cadence. Breathe in rhythm with your steps. Pace depends on the goal: easy — conversational, race — competition pace.",
+    techniqueRu: "Держите корпус прямо, плечи расслаблены, каденс ровный. Дышите в такт шагам. Темп зависит от цели тренировки: лёгкий - разговорный, гоночный - темп соревнования.",
+    techniqueEn: "Stay upright with relaxed shoulders and a steady cadence. Breathe in rhythm with your steps. Pace depends on the goal: easy - conversational, race - competition pace.",
     featuresRu: ["Корпус прямой", "Каденс ровный", "Плечи расслаблены"],
     featuresEn: ["Upright posture", "Steady cadence", "Relaxed shoulders"],
   },
@@ -855,8 +855,8 @@ const EXERCISES: SeedExercise[] = [
     aliases: ["Темповый бег (пейс ниже 6:00)"],
     descriptionRu: "Бег в соревновательном темпе: пороговая выносливость.",
     descriptionEn: "Tempo run at race pace: threshold conditioning.",
-    techniqueRu: "Разогрейтесь лёгким бегом 5–8 минут. Бегите в темпе «разговор в коротких фразах», сохраняя каденс и прямую осанку. Завершите заминкой.",
-    techniqueEn: "Warm up with an easy jog for 5–8 min. Run at a pace where you can only say short phrases, keeping a steady cadence. Cool down after.",
+    techniqueRu: "Разогрейтесь лёгким бегом 5-8 минут. Бегите в темпе «разговор в коротких фразах», сохраняя каденс и прямую осанку. Завершите заминкой.",
+    techniqueEn: "Warm up with an easy jog for 5-8 min. Run at a pace where you can only say short phrases, keeping a steady cadence. Cool down after.",
     featuresRu: ["Темп «разговор краткими фразами»", "Каденс ровный", "Осанка прямая"],
     featuresEn: ["Short-phrase pace", "Steady cadence", "Stay tall"],
   },
@@ -930,9 +930,9 @@ async function main(): Promise<void> {
       });
       if (error) {
         if (error.code === "23505") {
-          console.warn(`  ${ex.name}: race on name_key — skip (exists)`);
+          console.warn(`  ${ex.name}: race on name_key - skip (exists)`);
         } else {
-          console.error(`  ${ex.name}: insert failed — ${error.message}`);
+          console.error(`  ${ex.name}: insert failed - ${error.message}`);
         }
         continue;
       }
@@ -940,7 +940,7 @@ async function main(): Promise<void> {
       continue;
     }
 
-    // Заполняем только пустые поля — не перетираем ручные правки тренера.
+    // Заполняем только пустые поля - не перетираем ручные правки тренера.
     const patch: {
       aliases?: string[];
       technique_ru?: string;
@@ -960,7 +960,7 @@ async function main(): Promise<void> {
     if (mergedAliases.length !== (row.aliases ?? []).length) {
       patch.aliases = mergedAliases;
     }
-    // Алиасы — управляемая сидом аддитивная часть: добавляем недостающие
+    // Алиасы - управляемая сидом аддитивная часть: добавляем недостающие
     // (для матчинга программ↔библиотека), никогда не удаляем тренерские.
     // Контентные поля выше заполняются только когда пусты.
     if (row.features_ru?.length === 0 && ex.featuresRu.length > 0) patch.features_ru = ex.featuresRu;
@@ -973,7 +973,7 @@ async function main(): Promise<void> {
 
     const { error } = await supabaseAdmin.from("exercises").update(patch).eq("id", row.id);
     if (error) {
-      console.error(`  ${ex.name}: update failed — ${error.message}`);
+      console.error(`  ${ex.name}: update failed - ${error.message}`);
       continue;
     }
     updated++;

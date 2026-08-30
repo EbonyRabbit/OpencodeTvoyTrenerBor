@@ -123,7 +123,7 @@ export function BuyForm({
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{program.type ?? "Программа"}</Badge>
             <Badge variant="outline">
-              {program.duration_weeks ?? "—"} нед.
+              {program.duration_weeks ?? "-"} нед.
             </Badge>
             {program.price !== null && program.price > 0 && (
               <Badge variant="outline">{formatPrice(program.price)} ₽</Badge>
@@ -139,7 +139,7 @@ export function BuyForm({
             )}
 
             <p className="text-sm">
-              Оставьте заявку — тренер пришлёт реквизиты для оплаты и активирует
+              Оставьте заявку - тренер пришлёт реквизиты для оплаты и активирует
               программу после подтверждения.
             </p>
 
@@ -176,7 +176,7 @@ export function BuyForm({
                 className="h-10"
               />
               <p className="text-xs text-muted-foreground">
-                Напишите @username или номер телефона — тренер свяжется с вами.
+                Напишите @username или номер телефона - тренер свяжется с вами.
               </p>
             </div>
 
@@ -258,7 +258,7 @@ export function BuyForm({
             <form onSubmit={handleCoachSubmit} className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Хотите персональную программу, питание и сопровождение 1-на-1?
-                Оставьте заявку — тренер свяжется с вами.
+                Оставьте заявку - тренер свяжется с вами.
               </p>
 
               <div className="space-y-2">

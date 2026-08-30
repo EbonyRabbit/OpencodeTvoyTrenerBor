@@ -95,7 +95,7 @@ export async function adminDebugToday(ctx: MyContext): Promise<void> {
       let weekInfo = "";
       if (schedule) {
         weekInfo = `📅 Неделя ${schedule.week_number}${schedule.is_deload ? " (дельоад)" : ""}`;
-        if (schedule.focus) weekInfo += ` — ${schedule.focus}`;
+        if (schedule.focus) weekInfo += ` - ${schedule.focus}`;
       } else if (client.program_id) {
         weekInfo = "📅 Нет активной недели";
       } else {

@@ -1,4 +1,4 @@
-// DISABLED: photo storage removed — clients save photos on their own devices
+// DISABLED: photo storage removed - clients save photos on their own devices
 // Original component preserved in git history
 
 /*

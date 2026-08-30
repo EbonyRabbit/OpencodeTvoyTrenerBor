@@ -17,7 +17,7 @@ async function lazyExpireAccess(client: ClientRow): Promise<boolean> {
   if (client.status !== "active" || !client.access_end_date) return false;
   if (new Date(client.access_end_date).getTime() >= Date.now()) return false;
 
-  // Активная пауза — доступ не истекает во время паузы.
+  // Активная пауза - доступ не истекает во время паузы.
   const { data: pause } = await supabaseAdmin
     .from("plan_pauses")
     .select("id")
@@ -39,7 +39,7 @@ async function lazyExpireAccess(client: ClientRow): Promise<boolean> {
     console.error("[client-layout] Failed to expire access:", error.message);
     return false;
   }
-  // 0 строк = дату успели продлить в гонке — доступ остаётся активным.
+  // 0 строк = дату успели продлить в гонке - доступ остаётся активным.
   return Array.isArray(data) && data.length > 0;
 }
 

@@ -154,7 +154,7 @@ export async function runMeasurementReminder(bot: Bot<MyContext>): Promise<void>
         }
 
         if (existingMonth && existingMonth.length > 0) {
-          // если было отложено и дата устарела — чистим
+          // если было отложено и дата устарела - чистим
           if (client.measurement_defer_date && client.measurement_defer_date < todayStr) {
             await clearDeferred(client.id);
           }
@@ -180,7 +180,7 @@ export async function runMeasurementReminder(bot: Bot<MyContext>): Promise<void>
           await deleteDedup(`measurement:deferred:${client.id}:${monthPrefix(client.measurement_defer_date)}`);
         }
 
-        // Если в этом месяце кто-то уже переносил замеры — штатное число не напоминаем.
+        // Если в этом месяце кто-то уже переносил замеры - штатное число не напоминаем.
         // При ошибке проверки действуем fail-closed (пропускаем): риск пропуска
         // одного напоминания меньше, чем риск дубля.
         if (isScheduledDay && !deferredToday) {
@@ -210,7 +210,7 @@ export async function runMeasurementReminder(bot: Bot<MyContext>): Promise<void>
         const message = `${greeting}\n\n${body}`;
         const keyboard = buildReminderKeyboard(lang);
 
-        // Отправка сама по себе: только если она БРОСИЛА исключение — снимаем
+        // Отправка сама по себе: только если она БРОСИЛА исключение - снимаем
         // day-ключ, чтобы повторный тик мог напомнить (транзиентный сбой сети).
         // 15-минутный крон совпадает с целевой минутой раз в сутки, поэтому при
         // транзиентном сбое напоминание фактически уходит следующим днём в то же время.
@@ -237,7 +237,7 @@ export async function runMeasurementReminder(bot: Bot<MyContext>): Promise<void>
           if (deferredToday) {
             // defer «заменяет» штатное число: на весь месяц помечаем, что напомнили.
             // Ошибки здесь НЕ снимают day-ключ (дубликат уже сходил);
-            // дубликат отправки не страшен — метка просто повторится в следующих тиках.
+            // дубликат отправки не страшен - метка просто повторится в следующих тиках.
             try {
               await markAsSent(`measurement:deferred:${client.id}:${month}`, DEFERRED_MONTH_TTL_HOURS);
               await clearDeferred(client.id);

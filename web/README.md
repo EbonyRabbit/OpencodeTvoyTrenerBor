@@ -46,7 +46,7 @@ PRODAMUS_PAYFORM_BASE_URL=https://pay.demo.prodamus.ru/payment
 PRODAMUS_SECRET_KEY=your-prodamus-secret-key
 ```
 
-Боту (`bot/`) нужен только `PRODAMUS_PAYFORM_BASE_URL` — подпись проверяет
+Боту (`bot/`) нужен только `PRODAMUS_PAYFORM_BASE_URL` - подпись проверяет
 только веб.
 
 ### 2. Кабинет Продамуса
@@ -60,7 +60,7 @@ PRODAMUS_SECRET_KEY=your-prodamus-secret-key
    ```
 
 3. Скопируйте секретный ключ платёжной страницы в `PRODAMUS_SECRET_KEY`
-   — ключ в кабинете и в env должны совпадать (по нему считается HMAC-SHA256
+   - ключ в кабинете и в env должны совпадать (по нему считается HMAC-SHA256
    подпись `Sign`).
 
 ### 3. Проверка

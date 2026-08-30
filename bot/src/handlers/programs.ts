@@ -59,7 +59,7 @@ function formatPrice(price: number | null): string {
 }
 
 function formatProgram(index: number, program: Program, lang: Language): string {
-  const type = program.type || "—";
+  const type = program.type || "-";
   const sport = program.sport ? (BOT_SPORT_LABELS[program.sport] ?? program.sport) : "";
   const weeks = program.duration_weeks ?? 12;
   const priceLine = program.price != null
@@ -145,15 +145,15 @@ export async function programsHandler(
     keyboard.row();
 
     // Короткие подписи: полное название программы уже в тексте блока выше,
-    // а лимит Telegram — 64 байта на надпись кнопки. При нескольких
-    // программах добавляем номер кнопкам — он соответствует нумерации
+    // а лимит Telegram - 64 байта на надпись кнопки. При нескольких
+    // программах добавляем номер кнопкам - он соответствует нумерации
     // блоков в тексте и однозначно связывает кнопки с программой.
     const numbered = programs.length > 1;
     programs.forEach((program, i) => {
       lines.push(formatProgram(i + 1, program, lang));
       lines.push("");
       // Короткие подписи: полное название программы уже в тексте блока выше,
-      // а лимит Telegram — 64 байта на надпись кнопки.
+      // а лимит Telegram - 64 байта на надпись кнопки.
       const num = numbered ? ` ${i + 1}` : "";
       const buyable =
         program.price != null && program.price > 0 && !ownedProgramIds.has(program.id);
@@ -186,7 +186,7 @@ export async function programsHandler(
 
 
 // ℹ️ Подробнее: полное описание программы отдельным сообщением.
-// Доступно всем (в т.ч. не-клиентам) — покупка начинается отсюда.
+// Доступно всем (в т.ч. не-клиентам) - покупка начинается отсюда.
 export async function handleProgramDetailsCallback(ctx: MyContext, programId: string): Promise<void> {
   if (!ctx.from?.id) {
     await ctx.answerCallbackQuery();
@@ -237,7 +237,7 @@ export async function handleProgramDetailsCallback(ctx: MyContext, programId: st
       : "";
     const lines: string[] = [
       program.title,
-      `${t("programs.item_type_label", lang)} ${program.type || "—"}`,
+      `${t("programs.item_type_label", lang)} ${program.type || "-"}`,
       `${t("programs.item_weeks_label", lang)} ${program.duration_weeks ?? 12}`,
       priceLine,
     ].filter((line) => line.trim() !== "");

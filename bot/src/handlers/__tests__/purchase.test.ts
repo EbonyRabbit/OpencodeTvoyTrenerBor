@@ -105,7 +105,7 @@ function firstReplyText(ctx: MyContext): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Короткая ссылка ходит в сеть — в юнит-тестах заставляем её падать:
+  // Короткая ссылка ходит в сеть - в юнит-тестах заставляем её падать:
   // sendPaymentLink уходит в fallback на длинную ссылку (buildPaymentUrl).
   vi.stubGlobal(
     "fetch",
@@ -471,7 +471,7 @@ describe("startPurchase", () => {
         }
         if (terminal === "maybeSingle") {
           maybeCalls += 1;
-          // первый read — ничего нет; после failed insert возвращаем "победителя"
+          // первый read - ничего нет; после failed insert возвращаем "победителя"
           if (maybeCalls === 1) return ok(null);
           return ok({ id: "req-1", status: "pending", consent_given: false, amount: 9900 });
         }
@@ -905,7 +905,7 @@ describe("buildCoachRequestCoachMessage", () => {
       username: null,
       telegramId: 1,
     });
-    expect(msg).toContain("👤 —");
+    expect(msg).toContain("👤 -");
   });
 });
 
@@ -1386,7 +1386,7 @@ describe("buildPaymentUrl (bot copy)", () => {
   });
 });
 describe("sanitizeProductName / buildPaymentUrl: кодировка названия", () => {
-  it("зеркало web-фикса e2e: × → x, — → - (страница Продамуса в windows-1251)", () => {
+  it("зеркало web-фикса e2e: × → x, - → - (страница Продамуса в windows-1251)", () => {
     expect(sanitizeProductName("HYROX 5\u00D712 \u2014 подготовка к гонке")).toBe(
       "HYROX 5x12 - подготовка к гонке",
     );

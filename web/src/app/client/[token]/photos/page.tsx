@@ -1,4 +1,4 @@
-// Photo storage disabled — clients save photos on their own devices
+// Photo storage disabled - clients save photos on their own devices
 // Original page preserved in git history
 
 export default async function PhotosPage() {

@@ -357,7 +357,7 @@ export async function deleteProgram(
       .eq("program_id", programId);
 
     if (assignedClients && assignedClients > 0) {
-      return { error: `Нельзя удалить — программа назначена ${assignedClients} клиент${assignedClients === 1 ? "у" : "ам"}` };
+      return { error: `Нельзя удалить - программа назначена ${assignedClients} клиент${assignedClients === 1 ? "у" : "ам"}` };
     }
 
     const { error: deleteError } = await supabaseAdmin

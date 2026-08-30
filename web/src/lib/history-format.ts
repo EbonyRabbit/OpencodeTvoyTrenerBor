@@ -59,7 +59,7 @@ export function formatPlannedChild(child: { name: string; sets?: string; reps?: 
   else if (child.reps) parts.push(child.reps);
   if (child.weight) parts.push(formatPlannedWeight(child.weight));
   const prefix = letter ? `${letter}${index + 1}. ` : "";
-  return `${prefix}${[child.name, parts.join(" · ")].filter(Boolean).join(" — ")}`;
+  return `${prefix}${[child.name, parts.join(" · ")].filter(Boolean).join(" - ")}`;
 }
 
 export function formatDate(entry: HistoryEntry): string | null {

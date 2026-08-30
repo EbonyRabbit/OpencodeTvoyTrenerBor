@@ -1,4 +1,4 @@
-// DISABLED: photo storage removed — clients save photos on their own devices
+// DISABLED: photo storage removed - clients save photos on their own devices
 // Original component preserved in git history
 
 /*
@@ -17,17 +17,17 @@ type PhotoRow = Database["public"]["Tables"]["photos"]["Row"] & {
 };
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     const d = new Date(date + "T00:00:00");
-    if (isNaN(d.getTime())) return "—";
+    if (isNaN(d.getTime())) return "-";
     return d.toLocaleDateString("ru-RU", {
       day: "numeric",
       month: "long",
       year: "numeric",
     });
   } catch {
-    return "—";
+    return "-";
   }
 }
 

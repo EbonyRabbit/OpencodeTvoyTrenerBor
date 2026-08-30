@@ -29,15 +29,15 @@ interface StatCard {
 function formatDate(dateStr: string) {
   try {
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "—";
+    if (isNaN(date.getTime())) return "-";
     return date.toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function adherenceBadge(value: number | null) {
-  if (value === null) return { variant: "secondary" as const, label: "—" };
+  if (value === null) return { variant: "secondary" as const, label: "-" };
   const label = `${value}%`;
   if (value >= 80) return { variant: "default" as const, label };
   if (value >= 50) return { variant: "secondary" as const, label };
@@ -45,7 +45,7 @@ function adherenceBadge(value: number | null) {
 }
 
 function scoreBadge(value: number | null) {
-  if (value === null) return { variant: "secondary" as const, label: "—" };
+  if (value === null) return { variant: "secondary" as const, label: "-" };
   const label = `${value}/10`;
   if (value >= 7) return { variant: "default" as const, label };
   if (value >= 4) return { variant: "secondary" as const, label };
@@ -53,7 +53,7 @@ function scoreBadge(value: number | null) {
 }
 
 function stressBadge(value: number | null) {
-  if (value === null) return { variant: "secondary" as const, label: "—" };
+  if (value === null) return { variant: "secondary" as const, label: "-" };
   const label = `${value}/10`;
   if (value <= 3) return { variant: "default" as const, label };
   if (value <= 6) return { variant: "secondary" as const, label };
@@ -122,7 +122,7 @@ function buildAlertEntries(data: AlertRow[]): AlertEntry[] {
     }
     if (types.length > 0) {
       entries.push({
-        clientName: checkin.clients?.name ?? "—",
+        clientName: checkin.clients?.name ?? "-",
         date: checkin.date,
         types,
       });
@@ -316,7 +316,7 @@ export default async function DashboardPage() {
               <TableBody>
                 {checkins.map((checkin) => (
                   <TableRow key={checkin.id}>
-                    <TableCell className="font-medium">{checkin.clients?.name ?? "—"}</TableCell>
+                    <TableCell className="font-medium">{checkin.clients?.name ?? "-"}</TableCell>
                     <TableCell>{formatDate(checkin.date)}</TableCell>
                     <TableCell>
                       <Badge variant={checkin.wellbeingBadge.variant}>{checkin.wellbeingBadge.label}</Badge>
@@ -331,7 +331,7 @@ export default async function DashboardPage() {
                       <Badge variant={checkin.adherenceBadge.variant}>{checkin.adherenceBadge.label}</Badge>
                     </TableCell>
                     <TableCell className="max-w-40 truncate">
-                      {checkin.complaints || "—"}
+                      {checkin.complaints || "-"}
                     </TableCell>
                   </TableRow>
                 ))}

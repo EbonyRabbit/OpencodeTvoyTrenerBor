@@ -74,20 +74,20 @@ const PURCHASE_SUB_TYPE_LABELS: Record<string, string> = {
 };
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     return new Date(date).toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function formatTime(time: string | null): string {
-  if (!time) return "—";
+  if (!time) return "-";
   const parts = time.split(":");
   const h = parts[0];
   const m = parts[1];
-  if (!h || isNaN(Number(h)) || (m !== undefined && isNaN(Number(m)))) return "—";
+  if (!h || isNaN(Number(h)) || (m !== undefined && isNaN(Number(m)))) return "-";
   return `${h.padStart(2, "0")}:${(m ?? "00").padStart(2, "0")}`;
 }
 
@@ -120,7 +120,7 @@ function daysSince(date: string | null): number | null {
 }
 
 function formatAmount(amount: number | null): string {
-  if (amount == null) return "—";
+  if (amount == null) return "-";
   return `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`;
 }
 
@@ -199,7 +199,7 @@ function CheckinScore({ label, value }: { label: string; value: number | null })
     <div className="flex items-center justify-between py-0.5 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className={`font-medium ${color}`}>
-        {value !== null ? `${value}/10` : "—"}
+        {value !== null ? `${value}/10` : "-"}
       </span>
     </div>
   );
@@ -295,7 +295,7 @@ export function ClientProfile({
         <Alert role="alert" variant="destructive">
           <AlertTitle>Оплата не получена</AlertTitle>
           <AlertDescription>
-            Статус оплаты — «Ожидает». Напомните клиенту об оплате.
+            Статус оплаты - «Ожидает». Напомните клиенту об оплате.
           </AlertDescription>
         </Alert>
       )}
@@ -311,16 +311,16 @@ export function ClientProfile({
 
       <div className="grid gap-6 sm:grid-cols-2">
         <SectionCard title="Информация">
-          <InfoRow label="Telegram ID" value={client.telegram_id ? String(client.telegram_id) : "—"} />
+          <InfoRow label="Telegram ID" value={client.telegram_id ? String(client.telegram_id) : "-"} />
           <InfoRow label="Язык" value={LANGUAGE_LABELS[client.language] ?? client.language} />
-          <InfoRow label="Часовой пояс" value={client.timezone ?? "—"} />
+          <InfoRow label="Часовой пояс" value={client.timezone ?? "-"} />
           <InfoRow label="Утро (напоминание)" value={formatTime(client.morning_time)} />
-          <InfoRow label="Замеры — день" value={client.measurement_day != null ? (MEASUREMENT_DAY_LABELS[client.measurement_day] ?? String(client.measurement_day)) : "—"} />
-          <InfoRow label="Замеры — время" value={formatTime(client.measurement_time)} />
-          <InfoRow label="Чек-ин — день" value={client.checkin_day != null ? WEEKDAY_LABELS[client.checkin_day] ?? String(client.checkin_day) : "—"} />
-          <InfoRow label="Чек-ин — время" value={formatTime(client.checkin_time)} />
-          <InfoRow label="Код подключения" value={client.connect_code ?? "—"} />
-          <InfoRow label="ID в Google Sheets" value={client.spreadsheet_id ?? "—"} />
+          <InfoRow label="Замеры - день" value={client.measurement_day != null ? (MEASUREMENT_DAY_LABELS[client.measurement_day] ?? String(client.measurement_day)) : "-"} />
+          <InfoRow label="Замеры - время" value={formatTime(client.measurement_time)} />
+          <InfoRow label="Чек-ин - день" value={client.checkin_day != null ? WEEKDAY_LABELS[client.checkin_day] ?? String(client.checkin_day) : "-"} />
+          <InfoRow label="Чек-ин - время" value={formatTime(client.checkin_time)} />
+          <InfoRow label="Код подключения" value={client.connect_code ?? "-"} />
+          <InfoRow label="ID в Google Sheets" value={client.spreadsheet_id ?? "-"} />
         </SectionCard>
 
         <SectionCard title="Доступ и программа">
@@ -337,7 +337,7 @@ export function ClientProfile({
           </div>
           <InfoRow
             label="Дней с начала"
-            value={accessDays !== null ? `${accessDays} дн.` : "—"}
+            value={accessDays !== null ? `${accessDays} дн.` : "-"}
           />
           <div className="flex justify-between py-1.5 text-sm">
             <span className="text-muted-foreground">Программа</span>
@@ -350,7 +350,7 @@ export function ClientProfile({
                   {client.program.title}
                 </Link>
               ) : (
-                "—"
+                "-"
               )}
             </span>
           </div>
@@ -478,7 +478,7 @@ export function ClientProfile({
         <SectionCard title="Статистика">
           <InfoRow
             label="Тренировок"
-            value={workoutCount == null ? "—" : String(workoutCount)}
+            value={workoutCount == null ? "-" : String(workoutCount)}
           />
           <InfoRow label="Чек-инов" value={String(checkinCount)} />
           <InfoRow label="Сообщений" value={String(messageCount)} />
@@ -497,7 +497,7 @@ export function ClientProfile({
                 value={
                   latestCheckin.nutrition_adherence != null
                     ? `${latestCheckin.nutrition_adherence}%`
-                    : "—"
+                    : "-"
                 }
               />
               <InfoRow
@@ -505,7 +505,7 @@ export function ClientProfile({
                 value={
                   latestCheckin.missed_workouts != null
                     ? String(latestCheckin.missed_workouts)
-                    : "—"
+                    : "-"
                 }
               />
               {latestCheckin.complaints && (
@@ -563,7 +563,7 @@ export function ClientProfile({
         </SectionCard>
       </div>
 
-      {/* DISABLED: photo storage removed — clients save photos on their own devices
+      {/* DISABLED: photo storage removed - clients save photos on their own devices
       <SectionCard title="Последние фото">
         {latestPhotos.length > 0 ? (
           <>
@@ -586,7 +586,7 @@ export function ClientProfile({
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">-</span>
                     </div>
                   )}
                   <Badge
@@ -702,7 +702,7 @@ export function ClientProfile({
                   {week.start_date && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatDate(week.start_date)}
-                      {week.end_date ? ` — ${formatDate(week.end_date)}` : ""}
+                      {week.end_date ? ` - ${formatDate(week.end_date)}` : ""}
                     </p>
                   )}
                 </div>

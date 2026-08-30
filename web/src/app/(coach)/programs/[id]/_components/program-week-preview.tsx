@@ -94,7 +94,7 @@ function ExerciseCards({ exercise, letter, isChild = false }: { exercise: Parsed
       {(exercise.rest || exercise.notes) && (
         <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-muted-foreground">
           {exercise.rest && <span>Отдых {exercise.rest}</span>}
-          {exercise.notes && <span className="italic">— {exercise.notes}</span>}
+          {exercise.notes && <span className="italic">- {exercise.notes}</span>}
         </div>
       )}
     </div>
@@ -129,7 +129,7 @@ function ExerciseRows({ exercise, columns, letter, isChild = false }: { exercise
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-muted px-1 text-[11px] font-bold">{letter ?? "A"}</span>
               <span className="font-semibold">{exercise.name}</span>
               {typeBadge(exercise.type)}
-              {exercise.block && <span className="text-xs text-muted-foreground">— {exercise.block}</span>}
+              {exercise.block && <span className="text-xs text-muted-foreground">- {exercise.block}</span>}
             </span>
           </TableCell>
         </TableRow>
@@ -161,10 +161,10 @@ function ExerciseRows({ exercise, columns, letter, isChild = false }: { exercise
             {col === EXERCISE_COLUMN
               ? nameCell
               : hideRest && col === "Отдых"
-                ? <span className="text-muted-foreground/40">—</span>
+                ? <span className="text-muted-foreground/40">-</span>
                 : isCircuit && col === "Время"
-                  ? <span className="text-muted-foreground/40">—</span>
-                  : (() => { const v = getCellValue(exercise, col); return v === "—" ? <span className="text-muted-foreground/40">—</span> : v; })()}
+                  ? <span className="text-muted-foreground/40">-</span>
+                  : (() => { const v = getCellValue(exercise, col); return v === "-" ? <span className="text-muted-foreground/40">-</span> : v; })()}
           </TableCell>
         ))}
       </TableRow>
@@ -197,7 +197,7 @@ function WeekItem({ week, columns, defaultOpen }: { week: ParsedWeek; columns: s
         >
           <span className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="font-semibold">Неделя {week.week_number}</span>
-            {week.week_label && <span className="truncate text-sm text-muted-foreground">— {week.week_label}</span>}
+            {week.week_label && <span className="truncate text-sm text-muted-foreground">- {week.week_label}</span>}
             {week.is_deload && <Badge variant="secondary" className="shrink-0">РАЗГРУЗКА</Badge>}
           </span>
           <ChevronDown open={open} />
@@ -217,7 +217,7 @@ function WeekItem({ week, columns, defaultOpen }: { week: ParsedWeek; columns: s
                 <div key={dayKey}>
                   <h4 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold">
                     <span className="inline-flex h-6 items-center rounded-md bg-primary px-2.5 text-xs font-bold text-primary-foreground">{day.day_name}</span>
-                    {day.focus && <span className="text-muted-foreground font-normal">— {day.focus}</span>}
+                    {day.focus && <span className="text-muted-foreground font-normal">- {day.focus}</span>}
                     <span className="text-xs font-normal text-muted-foreground">{exercises.length} упр.</span>
                   </h4>
                   {exercises.length === 0 ? (

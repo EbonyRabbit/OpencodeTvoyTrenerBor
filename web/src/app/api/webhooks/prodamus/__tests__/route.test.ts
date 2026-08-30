@@ -106,7 +106,7 @@ describe("prodamus webhook", () => {
     });
   });
 
-  it("регрессия e2e: наш UUID приходит в order_num, order_id — внутренний ID Продамуса", async () => {
+  it("регрессия e2e: наш UUID приходит в order_num, order_id - внутренний ID Продамуса", async () => {
     activationMock.mockResolvedValueOnce({});
     const res = await POST(
       signedRequest({
@@ -188,7 +188,7 @@ describe("prodamus webhook", () => {
     expect(activationMock).not.toHaveBeenCalled();
   });
 
-  it("регрессия: cancel с нашим UUID в order_num находит заявку (order_id — числовой)", async () => {
+  it("регрессия: cancel с нашим UUID в order_num находит заявку (order_id - числовой)", async () => {
     vi.stubEnv("COACH_CHAT_ID", "42");
     const sent = vi.mocked(sendTelegramMessage).mockResolvedValueOnce(true);
     const fromSpy = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };

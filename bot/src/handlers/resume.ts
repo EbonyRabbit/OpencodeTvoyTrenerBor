@@ -16,7 +16,7 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 function getReasonLabel(reason: string | null, lang: Language): string {
-  if (!reason) return "—";
+  if (!reason) return "-";
   const key = REASON_LABELS[reason];
   return key ? t(key, lang) : reason;
 }

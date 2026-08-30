@@ -146,7 +146,7 @@ export function CheckinForm({ existing }: { existing: CheckinRow | null }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Чек-ин — сегодня</CardTitle>
+          <CardTitle className="text-sm">Чек-ин - сегодня</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">

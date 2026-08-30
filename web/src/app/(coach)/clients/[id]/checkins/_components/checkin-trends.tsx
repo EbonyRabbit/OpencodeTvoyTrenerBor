@@ -22,7 +22,7 @@ export function CheckinTrends({ data }: { data: DataPoint[] }) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <h3 className="mb-1 text-xs font-medium text-muted-foreground">
-              Самочувствие (1–10)
+              Самочувствие (1-10)
             </h3>
             <MiniLineChart
               data={chartData("wellbeing")}
@@ -32,7 +32,7 @@ export function CheckinTrends({ data }: { data: DataPoint[] }) {
           </div>
           <div>
             <h3 className="mb-1 text-xs font-medium text-muted-foreground">
-              Сон (1–10)
+              Сон (1-10)
             </h3>
             <MiniLineChart
               data={chartData("sleep")}
@@ -42,7 +42,7 @@ export function CheckinTrends({ data }: { data: DataPoint[] }) {
           </div>
           <div>
             <h3 className="mb-1 text-xs font-medium text-muted-foreground">
-              Стресс (1–10)
+              Стресс (1-10)
             </h3>
             <MiniLineChart
               data={chartData("stress")}
@@ -52,7 +52,7 @@ export function CheckinTrends({ data }: { data: DataPoint[] }) {
           </div>
           <div>
             <h3 className="mb-1 text-xs font-medium text-muted-foreground">
-              Питание (0–100%)
+              Питание (0-100%)
             </h3>
             <MiniLineChart
               data={chartData("nutrition_adherence")}

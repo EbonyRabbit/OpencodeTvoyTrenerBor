@@ -670,7 +670,7 @@ async function bindRequestToClient(
     .select("id");
   if (error) return { error: error.message };
   if (!data || data.length === 0) {
-    return { error: "Заявка уже обработана — обновите страницу" };
+    return { error: "Заявка уже обработана - обновите страницу" };
   }
   return {};
 }
@@ -707,7 +707,7 @@ export async function createPaymentLink(
     if (!client.client_consent_given) {
       return {
         error:
-          "Клиент не принял политику конфиденциальности — отправьте согласие через портал или бота",
+          "Клиент не принял политику конфиденциальности - отправьте согласие через портал или бота",
       };
     }
 
@@ -729,13 +729,13 @@ export async function createPaymentLink(
     const ensureBound = async (): Promise<{ error?: string }> => {
       if (!request || request.client_id === clientId) return {};
       if (request.client_id !== null) {
-        // Заявка принадлежит другому клиенту панели — не перехватываем её.
+        // Заявка принадлежит другому клиенту панели - не перехватываем её.
         return {
           error:
             "Найдена незавершённая заявка на эту программу от другого профиля клиента. Отмените её в блоке «Оплаты» и попробуйте снова",
         };
       }
-      // Заявка бота без привязки — привязываем к текущему клиенту панели,
+      // Заявка бота без привязки - привязываем к текущему клиенту панели,
       // чтобы вебхук/отправка работали по client_id.
       const bind = await bindRequestToClient(request.id, clientId, client.name);
       if (bind.error) return bind;
@@ -757,7 +757,7 @@ export async function createPaymentLink(
           telegram_id: client.telegram_id,
           sub_type: "program",
           // Согласие: панельная ссылка создаётся тренером для клиента,
-          // который УЖЕ принял политику (проверено выше — client_consent_given).
+          // который УЖЕ принял политику (проверено выше - client_consent_given).
           // Без consent_given=true вебхук отклонил бы активацию уже
           // оплаченной заявки (fail-closed). Фиксируем версию политики клиента.
           consent_given: true,
@@ -767,15 +767,15 @@ export async function createPaymentLink(
       const { error: insertError } = await insert();
       if (insertError?.code === "23505") {
         // Гонка с параллельным созданием/ботом: побеждает существующая
-        // pending-заявка — переиспользуем её (bind ниже).
+        // pending-заявка - переиспользуем её (bind ниже).
         request = await findPendingProgramRequest(clientId, client.telegram_id, programId);
         if (!request) {
-          return { error: "Не удалось создать заявку — обновите страницу" };
+          return { error: "Не удалось создать заявку - обновите страницу" };
         }
       } else if (insertError) {
         return { error: insertError.message };
       } else {
-        // insert без .select() данных не возвращает — конструируем из известных полей.
+        // insert без .select() данных не возвращает - конструируем из известных полей.
         request = { id: requestId, client_id: clientId, amount: price };
       }
     }
@@ -785,7 +785,7 @@ export async function createPaymentLink(
 
     const amount = toFiniteNumber(request.amount) ?? price;
     if (amount == null || amount <= 0) {
-      return { error: "У заявки некорректная сумма — обновите страницу" };
+      return { error: "У заявки некорректная сумма - обновите страницу" };
     }
     const linkOpts = {
       payformUrl,
@@ -842,7 +842,7 @@ export async function sendPaymentLinkToClient(
       .eq("client_id", clientId)
       .maybeSingle();
     if (!request || request.status !== "pending") {
-      return { error: "Активная заявка не найдена — создайте ссылку заново" };
+      return { error: "Активная заявка не найдена - создайте ссылку заново" };
     }
 
     const programTitle =
@@ -851,7 +851,7 @@ export async function sendPaymentLinkToClient(
         : "Программа";
     const amount = toFiniteNumber(request.amount);
     if (amount == null || amount <= 0) {
-      return { error: "У заявки некорректная сумма — создайте ссылку заново" };
+      return { error: "У заявки некорректная сумма - создайте ссылку заново" };
     }
 
     // Троттлинг повторных отправок (защита от спама клиенту): одна отправка
@@ -872,7 +872,7 @@ export async function sendPaymentLinkToClient(
         expires_at: new Date(Date.now() + 60_000).toISOString(),
       });
     if (sendDedupError?.code === "23505") {
-      return { error: "Ссылка только что была отправлена — подождите минуту" };
+      return { error: "Ссылка только что была отправлена - подождите минуту" };
     }
     if (sendDedupError) {
       console.error("sendPaymentLinkToClient: dedup write failed:", sendDedupError.message);

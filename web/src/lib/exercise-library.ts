@@ -2,9 +2,9 @@ import { flattenLoggableExercises, type ParsedExercise } from "@/lib/program-uti
 
 // ⚠️ MUST stay in sync with bot/src/lib/exercise-library.ts
 // Единственный источник истины для normalize: эта функция. SQL-бэкфилл в
-// supabase/migrations/20260815000000_exercise_library.sql — упрощённый аналог
+// supabase/migrations/20260815000000_exercise_library.sql - упрощённый аналог
 // (lower + strip [^a-z0-9а-я] + ё→е); для реальных названий результаты совпадают.
-// При изменении normalize — правь ВСЕ копии: web/src/lib/exercise-library.ts,
+// При изменении normalize - правь ВСЕ копии: web/src/lib/exercise-library.ts,
 // bot/src/lib/exercise-library.ts и SQL в миграции.
 
 export interface ExerciseLibraryRow {
@@ -118,7 +118,7 @@ export function formatExerciseInfo(
       : (lang === "en" ? entry.featuresRu : entry.featuresEn) ?? [];
 
   const parts: string[] = [];
-  parts.push(`${labels.technique}:\n${technique || "—"}`);
+  parts.push(`${labels.technique}:\n${technique || "-"}`);
   if (features.length > 0) {
     parts.push(`${labels.features}:\n${features.map((f) => `• ${f}`).join("\n")}`);
   }

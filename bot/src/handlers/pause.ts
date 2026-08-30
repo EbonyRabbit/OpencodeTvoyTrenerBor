@@ -40,7 +40,7 @@ function getReasonLabel(reason: string, lang: Language): string {
 }
 
 function buildSummary(data: PauseData, lang: Language): string {
-  const reason = data.reason ? getReasonLabel(data.reason, lang) : "—";
+  const reason = data.reason ? getReasonLabel(data.reason, lang) : "-";
   if (data.resume_date) {
     return t("pause.summary", lang, { reason, resume_date: data.resume_date });
   }

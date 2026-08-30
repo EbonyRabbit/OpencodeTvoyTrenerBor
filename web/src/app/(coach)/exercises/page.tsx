@@ -41,7 +41,7 @@ export default async function ExercisesPage() {
         <div>
           <h1 className="text-2xl font-bold">Библиотека упражнений</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Упражнения с техникой и видео — показываются в боте и на портале клиента
+            Упражнения с техникой и видео - показываются в боте и на портале клиента
           </p>
         </div>
         <AddExerciseDialog />
@@ -68,7 +68,7 @@ export default async function ExercisesPage() {
 
       {truncated && (
         <div className="mb-4 text-sm text-amber-600">
-          Показаны первые {LIBRARY_PAGE_LIMIT} упражнений — библиотека может содержать больше записей.
+          Показаны первые {LIBRARY_PAGE_LIMIT} упражнений - библиотека может содержать больше записей.
         </div>
       )}
 

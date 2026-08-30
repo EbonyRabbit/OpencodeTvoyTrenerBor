@@ -26,10 +26,10 @@ const REASON_LABELS: Record<PauseReason, string> = {
 };
 
 const STRATEGY_LABELS: Record<ResumeStrategy, string> = {
-  skip: "Пропустить — просто продолжаем",
-  shift: "Сдвиг — все даты сдвигаются вперёд",
-  deload: "Разгрузка — неделя облегчённого режима",
-  rollback: "Откат — повтор последней завершённой недели",
+  skip: "Пропустить - просто продолжаем",
+  shift: "Сдвиг - все даты сдвигаются вперёд",
+  deload: "Разгрузка - неделя облегчённого режима",
+  rollback: "Откат - повтор последней завершённой недели",
 };
 
 const STRATEGY_DESCRIPTIONS: Record<ResumeStrategy, string> = {
@@ -40,11 +40,11 @@ const STRATEGY_DESCRIPTIONS: Record<ResumeStrategy, string> = {
 };
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     return new Date(date).toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
@@ -351,7 +351,7 @@ export function PauseSection({ clientId }: { clientId: string }) {
                 >
                   <span>
                     {formatDate(p.pause_start)}
-                    {p.pause_end ? ` — ${formatDate(p.pause_end)}` : " — ..."}
+                    {p.pause_end ? ` - ${formatDate(p.pause_end)}` : " - ..."}
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {REASON_LABELS[p.reason as PauseReason] ?? p.reason}

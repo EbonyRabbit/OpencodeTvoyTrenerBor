@@ -63,17 +63,17 @@ describe("formatMetrics", () => {
 describe("formatPlannedChild", () => {
   it("formats circuit child with letter, sets and weight", () => {
     const result = formatPlannedChild({ name: "Берпи", sets: "3", reps: "15", weight: "20" }, "A", 0);
-    expect(result).toBe("A1. Берпи — 3×15 · 20 кг");
+    expect(result).toBe("A1. Берпи - 3×15 · 20 кг");
   });
 
   it("formats bodyweight child without kg", () => {
     const result = formatPlannedChild({ name: "Отжимания", sets: "3", reps: "15", weight: "0" }, "B", 1);
-    expect(result).toBe("B2. Отжимания — 3×15 · вес тела");
+    expect(result).toBe("B2. Отжимания - 3×15 · вес тела");
   });
 
   it("formats sets-only child with подх fallback", () => {
     const result = formatPlannedChild({ name: "Планка", sets: "4" }, null, 2);
-    expect(result).toBe("Планка — 4 подх.");
+    expect(result).toBe("Планка - 4 подх.");
   });
 
   it("renders bare name when no metrics", () => {

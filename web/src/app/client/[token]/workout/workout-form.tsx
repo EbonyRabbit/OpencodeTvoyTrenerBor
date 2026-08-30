@@ -41,7 +41,7 @@ function amrapRoundsToInt(v: string): number | null {
 function heartRateToInt(v: string): number | null {
   const trimmed = v.trim();
   if (!trimmed) return null;
-  const range = trimmed.match(/^(\d{2,3})\s*[-–]\s*(\d{2,3})$/);
+  const range = trimmed.match(/^(\d{2,3})\s*[--]\s*(\d{2,3})$/);
   if (range) {
     const a = Number(range[1]);
     const b = Number(range[2]);
@@ -396,8 +396,8 @@ export function WorkoutForm({
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Field label="Подходы" value={inputs[i].sets} onChange={(v) => updateField(i, "sets", v)} placeholder={ex.sets ?? "—"} />
-                  <Field label="Повторы" value={inputs[i].reps} onChange={(v) => updateField(i, "reps", v)} placeholder={ex.reps ?? "—"} />
+                  <Field label="Подходы" value={inputs[i].sets} onChange={(v) => updateField(i, "sets", v)} placeholder={ex.sets ?? "-"} />
+                  <Field label="Повторы" value={inputs[i].reps} onChange={(v) => updateField(i, "reps", v)} placeholder={ex.reps ?? "-"} />
                   <Field label="Вес" value={inputs[i].weight} onChange={(v) => updateField(i, "weight", v)} placeholder="кг" />
                   <Field label="RPE" value={inputs[i].rpe} onChange={(v) => updateField(i, "rpe", v)} placeholder="1-10" />
                 </div>

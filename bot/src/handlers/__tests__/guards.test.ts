@@ -110,7 +110,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("guardActiveClient — ленивое автоистечение доступа (21.10)", () => {
+describe("guardActiveClient - ленивое автоистечение доступа (21.10)", () => {
   it("пропускает активного клиента с будущей датой доступа", async () => {
     mockFrom({});
     vi.mocked(findClientByTelegramId).mockResolvedValue(
@@ -156,7 +156,7 @@ describe("guardActiveClient — ленивое автоистечение дос
     expect(lts.length).toBe(1);
     const [ltCol, ltVal] = lts[0]?.args as [string, string];
     expect(ltCol).toBe("access_end_date");
-    // nowIso в момент запроса — валидный ISO, не позже текущего момента + 1с
+    // nowIso в момент запроса - валидный ISO, не позже текущего момента + 1с
     expect(new Date(ltVal).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
@@ -197,7 +197,7 @@ describe("guardActiveClient — ленивое автоистечение дос
     expect(fromSpy).not.toHaveBeenCalledWith("clients");
   });
 
-  it("NULL access_end_date — бессрочный доступ, без запросов пауз", async () => {
+  it("NULL access_end_date - бессрочный доступ, без запросов пауз", async () => {
     const fromSpy = mockFrom({});
     vi.mocked(findClientByTelegramId).mockResolvedValue(makeClient());
 

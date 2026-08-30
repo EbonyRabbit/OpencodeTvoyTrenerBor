@@ -23,11 +23,11 @@ import { getAdherenceColor } from "@/lib/adherence";
 import type { WeekAdherence } from "@/lib/adherence";
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     return new Date(date).toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
@@ -78,7 +78,7 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Дисциплина — {clientName}</CardTitle>
+            <CardTitle>Дисциплина - {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
@@ -104,7 +104,7 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Дисциплина — {clientName}</CardTitle>
+            <CardTitle>Дисциплина - {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
@@ -131,7 +131,7 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Дисциплина — {clientName}</CardTitle>
+            <CardTitle>Дисциплина - {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
@@ -158,7 +158,7 @@ export function WorkoutView({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Дисциплина — {clientName}</CardTitle>
+            <CardTitle>Дисциплина - {clientName}</CardTitle>
             <CardDescription>
               {programName ?? "Нет программы"}
             </CardDescription>
@@ -194,7 +194,7 @@ export function WorkoutView({
             <p
               className={`text-3xl font-bold ${getAdherenceColor(overallAdherence)}`}
             >
-              {overallAdherence !== null ? `${overallAdherence}%` : "—"}
+              {overallAdherence !== null ? `${overallAdherence}%` : "-"}
             </p>
           </CardContent>
         </Card>
@@ -292,18 +292,18 @@ export function WorkoutView({
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {isPaused ? "—" : week.focus ?? "—"}
+                      {isPaused ? "-" : week.focus ?? "-"}
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {formatDate(week.startDate)}
-                      {" — "}
+                      {" - "}
                       {formatDate(week.endDate)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {isPaused ? "—" : week.expected}
+                      {isPaused ? "-" : week.expected}
                     </TableCell>
                     <TableCell className="text-center">
-                      {isPaused ? "—" : week.completed}
+                      {isPaused ? "-" : week.completed}
                     </TableCell>
                     <TableCell className="text-center">
                       {isPaused ? (

@@ -42,7 +42,7 @@ function formatDate(date: string): string {
   try {
     return new Date(date).toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
@@ -239,7 +239,7 @@ export function ProgramDetail({
         <Alert role="alert" variant={status === "active" ? "destructive" : "default"}>
           <AlertTitle>Содержимое не загружено</AlertTitle>
           <AlertDescription>
-            Назначить программу клиенту нельзя — добавьте содержимое программы
+            Назначить программу клиенту нельзя - добавьте содержимое программы
           </AlertDescription>
         </Alert>
       )}
@@ -386,7 +386,7 @@ export function ProgramDetail({
                   clients.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
-                      {c.program_id ? " —есть программа" : ""}
+                      {c.program_id ? " -есть программа" : ""}
                     </SelectItem>
                   ))
                 )}
@@ -434,7 +434,7 @@ export function ProgramDetail({
           <DialogHeader>
             <DialogTitle>Изменить цену</DialogTitle>
             <DialogDescription>
-              Укажите стоимость программы. Пустое поле — «по запросу».
+              Укажите стоимость программы. Пустое поле - «по запросу».
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

@@ -1,9 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-// Prodamus (Продамус) — онлайн-оплата (Фаза 21).
+// Prodamus (Продамус) - онлайн-оплата (Фаза 21).
 // Ссылка на платёжную страницу и проверка подписи webhook'ов.
 //
-// Алгоритм подписи (https://help.prodamus.ru — «Webhook об оплате» →
+// Алгоритм подписи (https://help.prodamus.ru - «Webhook об оплате» →
 // «Проверка подписи Sign»): параметры body → вложенная структура →
 // все значения приводятся к строкам (false/null → "", true → "1") →
 // ключи сортируются рекурсивно по алфавиту (массивы сохраняют порядок) →
@@ -20,7 +20,7 @@ export type ProdamusFormEntries =
   | FormData // multipart/form-data (официальный формат доставки webhook)
   | Iterable<readonly [string, string]>;
 
-const MAX_ARRAY_INDEX = 1000; // реальный платёж — 1-3 продукта; cap защищает от OOM
+const MAX_ARRAY_INDEX = 1000; // реальный платёж - 1-3 продукта; cap защищает от OOM
 const MAX_SEGMENTS = 32; // глубина вложенности ключей (защита от stack overflow)
 const BLOCKED_HEADS = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -47,7 +47,7 @@ function entriesToPairs(entries: ProdamusFormEntries): Iterable<readonly [string
 
 // Разворачивает параметры формы во вложенную структуру:
 // "products[0][name]=Жим" → { products: [{ name: "Жим" }] },
-// "products[]=..." → массив с добавлением; дубликаты — последнее значение.
+// "products[]=..." → массив с добавлением; дубликаты - последнее значение.
 export function parseBracketForm(raw: string): Record<string, unknown> {
   return parseFormEntries(new URLSearchParams(raw));
 }
@@ -172,7 +172,7 @@ export function buildProdamusSignature(rawBody: string, secretKey: string): stri
 }
 
 // Верификация подписи. Никогда не бросает: при любых ошибках разбора,
-// неверном заголовке или не-шестнадцатеричной подписи — false.
+// неверном заголовке или не-шестнадцатеричной подписи - false.
 export function verifyProdamusSignature(
   entries: ProdamusFormEntries,
   signHeader: unknown,
@@ -231,7 +231,7 @@ export function parseProdamusOrder(entries: ProdamusFormEntries): ProdamusOrder 
     // Продамус возвращает наш идентификатор заказа (то, что мы отправляли
     // в order_id платёжной ссылки) в поле order_num, а в order_id кладёт
     // свой внутренний числовой ID. Активация ищет заявку по нашему UUID,
-    // поэтому приоритет — order_num.
+    // поэтому приоритет - order_num.
     orderId: orderNum || toStr(payload.order_id),
     sum: sum === null || !Number.isFinite(sum) ? null : sum,
     paymentStatus: toStr(payload.payment_status),
@@ -244,7 +244,7 @@ export function parseProdamusOrder(entries: ProdamusFormEntries): ProdamusOrder 
 // dingbats и т.п.): × ✕ ✖, тире, типографские кавычки, emoji.
 export function sanitizeProductName(name: string): string {
   // Fallback: если после санитизации пусто (название целиком из emoji),
-  // оставляем нейтральное наименование — пустой товар Продамус не примет.
+  // оставляем нейтральное наименование - пустой товар Продамус не примет.
   const sanitized = sanitizeInner(name);
   return sanitized || "Программа";
 }
@@ -301,15 +301,15 @@ export function buildPaymentUrl(opts: PaymentUrlOptions): string {
 const SHORT_LINK_TIMEOUT_MS = 8000;
 
 /**
- * Короткая ссылка вида https://payform.ru/u8zDE/ — Продамус регистрирует
+ * Короткая ссылка вида https://payform.ru/u8zDE/ - Продамус регистрирует
  * заказ и возвращает компактный URL без скобок и параметров. Использовать
  * вместо buildPaymentUrl в сообщениях клиентам: длинная ссылка с
  * products[0][...] ломается при копировании текстом (`[` вырезается),
- * и клиент видит пустую сумму. Fallback на buildPaymentUrl — у вызывающих.
+ * и клиент видит пустую сумму. Fallback на buildPaymentUrl - у вызывающих.
  */
 /**
  * Короткая ссылка с автоматическим fallback на прямую: если API коротких
- * ссылок недоступен/ответил мусором — клиент получает длинную ссылку
+ * ссылок недоступен/ответил мусором - клиент получает длинную ссылку
  * (менее устойчивую к копированию, но рабочую).
  */
 export async function resolvePaymentUrl(opts: PaymentUrlOptions): Promise<string> {
@@ -335,7 +335,7 @@ export async function createShortPaymentUrl(opts: PaymentUrlOptions): Promise<st
     throw new Error(`Prodamus link API responded ${res.status}`);
   }
   const text = (await res.text()).trim();
-  // Ответ — просто URL; что-либо иное означает ошибку на стороне Продамуса.
+  // Ответ - просто URL; что-либо иное означает ошибку на стороне Продамуса.
   if (!/^https:\/\/\S+$/.test(text)) {
     throw new Error(`Prodamus link API returned unexpected response: ${text.slice(0, 100)}`);
   }

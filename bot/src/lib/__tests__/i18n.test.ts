@@ -41,13 +41,13 @@ describe("t", () => {
 
 describe("progress menu i18n", () => {
   it("has Russian menu and button translations", () => {
-    expect(t("menu.progress", "ru")).toBe("/progress — замеры тела и динамика");
+    expect(t("menu.progress", "ru")).toBe("/progress - замеры тела и динамика");
     expect(t("progress.title", "ru")).toBe("Прогресс и замеры:");
     expect(t("progress.dynamics_button", "ru")).toBe("📊 Динамика");
   });
 
   it("has English menu and button translations", () => {
-    expect(t("menu.progress", "en")).toBe("/progress — measurements and dynamics");
+    expect(t("menu.progress", "en")).toBe("/progress - measurements and dynamics");
     expect(t("progress.title", "en")).toBe("Progress and measurements:");
     expect(t("progress.dynamics_button", "en")).toBe("📊 Dynamics");
   });

@@ -68,7 +68,7 @@ export function buildProgramInstructions(input: ProgramInstructionsInput): strin
 
     lines.push(...steps.map((step, i) => `${i + 1}. ${step}`));
     lines.push("");
-    lines.push("If you have any questions — message your coach.");
+    lines.push("If you have any questions - message your coach.");
   } else {
     lines.push(`Привет, ${displayName}!`);
     lines.push("");
@@ -97,7 +97,7 @@ export function buildProgramInstructions(input: ProgramInstructionsInput): strin
 
     lines.push(...steps.map((step, i) => `${i + 1}. ${step}`));
     lines.push("");
-    lines.push("Если возникнут вопросы — напиши тренеру.");
+    lines.push("Если возникнут вопросы - напиши тренеру.");
   }
 
   return lines.join("\n");

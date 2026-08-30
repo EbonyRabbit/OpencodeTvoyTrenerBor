@@ -31,17 +31,17 @@ import type { Database } from "@/types/supabase";
 type CheckinRow = Database["public"]["Tables"]["checkins"]["Row"];
 
 function formatDate(date: string | null): string {
-  if (!date) return "—";
+  if (!date) return "-";
   try {
     return new Date(date).toLocaleDateString("ru-RU");
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function ScoreValue({ value }: { value: number | null }) {
   if (value === null)
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">-</span>;
   const color =
     value >= 7
       ? "text-green-600"
@@ -77,7 +77,7 @@ export function CheckinsTable({
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle>Чек-ины — {clientName}</CardTitle>
+            <CardTitle>Чек-ины - {clientName}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -102,7 +102,7 @@ export function CheckinsTable({
 
       <Card>
         <CardHeader>
-          <CardTitle>Чек-ины — {clientName}</CardTitle>
+          <CardTitle>Чек-ины - {clientName}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table aria-label="Чек-ины клиента">
@@ -156,7 +156,7 @@ export function CheckinsTable({
                   >
                     <TableCell>{formatDate(checkin.date)}</TableCell>
                     <TableCell>
-                      {checkin.week != null ? String(checkin.week) : "—"}
+                      {checkin.week != null ? String(checkin.week) : "-"}
                     </TableCell>
                     <TableCell>
                       <ScoreValue value={checkin.wellbeing} />
@@ -173,24 +173,24 @@ export function CheckinsTable({
                           {checkin.nutrition_adherence}%
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell>
                       {checkin.missed_workouts != null ? (
                         String(checkin.missed_workouts)
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="max-w-[150px] truncate">
                       {checkin.complaints || (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate">
                       {checkin.comment || (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   </TableRow>,

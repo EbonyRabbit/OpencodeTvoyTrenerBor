@@ -543,7 +543,7 @@ function formatChildLine(
 ): string {
   const lines: string[] = [];
   const detail = formatPlannedDetail(child, lang, " · ");
-  lines.push(`${letter}. ${escapeHtml(child.name)}${detail ? ` — ${detail}` : ""}`);
+  lines.push(`${letter}. ${escapeHtml(child.name)}${detail ? ` - ${detail}` : ""}`);
   const lastDetail = last ? formatPreviousLog(last, lang) : "";
   if (lastDetail) {
     lines.push(`<i>${t("workout.exercise_last", lang, { detail: lastDetail })}</i>`);

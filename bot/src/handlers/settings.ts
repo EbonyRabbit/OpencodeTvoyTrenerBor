@@ -378,7 +378,7 @@ export async function handleSettingsCallback(
     };
     await editOrSend(
       ctx,
-      t(editorTexts[prefix], lang) + `\n\n${hour}:00 — ${hour}:45`,
+      t(editorTexts[prefix], lang) + `\n\n${hour}:00 - ${hour}:45`,
       timeMinuteKeyboard(lang, `settings_${prefix}`, hour),
     );
     return;

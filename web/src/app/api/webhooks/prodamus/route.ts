@@ -2,10 +2,10 @@
 //
 // Продамус POST'ит application/x-www-form-urlencoded (или multipart) c подписью
 // в заголовке "Sign". До проверки подписи запрос не аутентифицирован, поэтому:
-//   1) секрет читаем до любых действий, при его отсутствии — fail closed;
+//   1) секрет читаем до любых действий, при его отсутствии - fail closed;
 //   2) подпись проверяем через verifyProdamusSignature (тотальный парсер,
 //      HMAC-SHA256, timingSafeEqual);
-//   3) логируем минимум данных и никогда — секрет или неподписанный body.
+//   3) логируем минимум данных и никогда - секрет или неподписанный body.
 //
 // Диспетчеризация по payment_status:
 //   success                      → активация покупки (21.6), идемпотентно
@@ -29,7 +29,7 @@ function jsonResponse(body: Record<string, unknown>, status: number): Response {
 }
 
 function formatAmount(amount: number | null): string {
-  if (amount === null || !Number.isFinite(amount)) return "—";
+  if (amount === null || !Number.isFinite(amount)) return "-";
   return `${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`;
 }
 
@@ -81,7 +81,7 @@ async function notifyCoachCancellation(
 }
 
 async function handleCancellation(orderId: string): Promise<Response> {
-  // CAS pending -> cancelled: платную заявку не трогаем (возвраты — вне скоупа),
+  // CAS pending -> cancelled: платную заявку не трогаем (возвраты - вне скоупа),
   // повторные отмены идемпотентны.
   const { data: cancelled, error } = await supabaseAdmin
     .from("purchase_requests")
@@ -116,7 +116,7 @@ async function handleCancellation(orderId: string): Promise<Response> {
     console.warn("[PRODAMUS WEBHOOK] Cancel for unknown order");
     return jsonResponse({ ok: true }, 200);
   }
-  // paid/cancelled — идемпотентный ack; повторная отмена paid не выполняется.
+  // paid/cancelled - идемпотентный ack; повторная отмена paid не выполняется.
   return jsonResponse({ ok: true, status: current.status }, 200);
 }
 
@@ -157,7 +157,7 @@ export async function POST(req: Request): Promise<Response> {
     if (result.alreadyActivated || !result.error) {
       return jsonResponse({ ok: true }, 200);
     }
-    // Незавершённая параллельная активация — нужно повторить позже.
+    // Незавершённая параллельная активация - нужно повторить позже.
     if (result.error.includes("уже выполняется")) {
       return jsonResponse({ ok: false, error: "in_progress" }, 503);
     }
@@ -174,6 +174,6 @@ export async function POST(req: Request): Promise<Response> {
     return handleCancellation(order.orderId);
   }
 
-  // Прочие статусы (fail и т.п.) — подтверждаем получение без действий.
+  // Прочие статусы (fail и т.п.) - подтверждаем получение без действий.
   return jsonResponse({ ok: true, ignored: paymentStatus }, 200);
 }

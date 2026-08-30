@@ -82,7 +82,7 @@ export function HistoryGrid({
                     <div key={day.day_order} className="px-3 py-3">
                       <div className="mb-2 flex items-center gap-2">
                         <span className="text-sm font-semibold">День {day.day_order}</span>
-                        {day.focus && <span className="text-xs text-muted-foreground">— {day.focus}</span>}
+                        {day.focus && <span className="text-xs text-muted-foreground">- {day.focus}</span>}
                       </div>
                       {skip ? (
                         <div className="rounded-lg border border-dashed bg-amber-50/50 px-3 py-2 text-xs text-muted-foreground dark:bg-amber-950/10">⏭ Пропуск{typeof skip === "string" && skip !== "без причины" ? `: ${skip}` : ""}</div>
@@ -103,7 +103,7 @@ export function HistoryGrid({
                                 )}
                                 <div className="mt-1.5">
                                   {empty ? (
-                                    <span className="text-xs text-muted-foreground/50">— нет данных</span>
+                                    <span className="text-xs text-muted-foreground/50">- нет данных</span>
                                   ) : (
                                     <ul className="space-y-1">
                                       {cell.entries.map((entry, j) => (
@@ -143,7 +143,7 @@ function DayGroup({ day, weekCount, currentWeek }: { day: HistoryDay; weekCount:
           if (!reason) {
             return (
               <td key={week} className={`border-b border-r px-2 py-2 text-center ${isCurrent ? "bg-primary/[0.04]" : ""}`}>
-                <span className="text-muted-foreground/30">—</span>
+                <span className="text-muted-foreground/30">-</span>
               </td>
             );
           }
@@ -172,7 +172,7 @@ function DayGroup({ day, weekCount, currentWeek }: { day: HistoryDay; weekCount:
             if (!cell || cell.entries.length === 0) {
               return (
                 <td key={week} className={`border-b border-r px-2 py-2 text-center align-middle ${isCurrent ? "bg-primary/[0.04]" : ""}`}>
-                  <span className="text-muted-foreground/30">—</span>
+                  <span className="text-muted-foreground/30">-</span>
                 </td>
               );
             }
@@ -200,7 +200,7 @@ function EntryLine({ entry, compact = false }: { entry: HistoryEntry; compact?: 
   return (
     <div className={`flex flex-col ${compact ? "gap-0.5" : "gap-0.5"}`}>
       {date && <div className="text-[11px] leading-none text-muted-foreground">{date}</div>}
-      <div className="text-sm font-medium leading-tight">{metrics.length > 0 ? metrics.join(" · ") : [weight, setsReps].filter(Boolean).join(" ") || "—"}</div>
+      <div className="text-sm font-medium leading-tight">{metrics.length > 0 ? metrics.join(" · ") : [weight, setsReps].filter(Boolean).join(" ") || "-"}</div>
       {entry.rpe != null && <div className="text-xs leading-none text-muted-foreground">RPE {entry.rpe}</div>}
       {entry.comment?.trim() && <div className="line-clamp-2 text-xs leading-tight text-muted-foreground">{entry.comment.trim()}</div>}
     </div>

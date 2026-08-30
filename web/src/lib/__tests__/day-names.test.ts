@@ -15,7 +15,7 @@ describe("weekdayIsoFromName", () => {
 
   it("returns 0 for unrecognized names", () => {
     expect(weekdayIsoFromName("День 1: Жимовые")).toBe(0);
-    expect(weekdayIsoFromName("Бег 1 — Интервалы")).toBe(0);
+    expect(weekdayIsoFromName("Бег 1 - Интервалы")).toBe(0);
     expect(weekdayIsoFromName("")).toBe(0);
     expect(weekdayIsoFromName(null as unknown as string)).toBe(0);
   });

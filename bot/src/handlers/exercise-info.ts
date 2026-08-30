@@ -16,8 +16,8 @@ import type { ParsedExercise } from "../lib/program-utils.js";
 // имеет одну клавиатуру на всё сообщение.
 //
 // callback_data (лимит Telegram 64 байта):
-//   exercise_info:e:<hash>               — одно упражнение
-//   exercise_info:s:<hash>[,<hash>...]   — композит (суперсет/круг):
+//   exercise_info:e:<hash>               - одно упражнение
+//   exercise_info:s:<hash>[,<hash>...]   - композит (суперсет/круг):
 //     хэши детей, присутствующих в библиотеке (до 5, сообщение собирается
 //     из техники каждого найденного ребёнка)
 // hash = первые 8 hex SHA-1 от normalize(name) конкретного упражнения.
@@ -47,7 +47,7 @@ export async function loadExerciseLibraryRows(): Promise<ExerciseLibraryRow[]> {
     .then(({ data, error }): ExerciseLibraryRow[] => {
       if (error) {
         console.error(`[EXERCISE_INFO] Library query error:`, error.message);
-        // Транзитная ошибка БД — отдаём прошлый снимок вместо «не найдено».
+        // Транзитная ошибка БД - отдаём прошлый снимок вместо «не найдено».
         return cache?.rows ?? [];
       }
       const rows = (data ?? []) as unknown as ExerciseLibraryRow[];
@@ -57,7 +57,7 @@ export async function loadExerciseLibraryRows(): Promise<ExerciseLibraryRow[]> {
 
   inFlight = Promise.resolve(task)
     .catch(() => {
-      // Транспортный reject (сеть, таймаут) — stale-снимок вместо пустоты.
+      // Транспортный reject (сеть, таймаут) - stale-снимок вместо пустоты.
       console.error(`[EXERCISE_INFO] Library fetch rejected`);
       return cache?.rows ?? [];
     })
@@ -128,7 +128,7 @@ export function buildInfoHtml(
   parts.forEach((part, i) => {
     if (i > 0) lines.push("");
     if (!part.entry) {
-      lines.push(`<i>${escapeHtml(part.name)} — ${escapeHtml(t("exercise_lib.not_found", lang))}</i>`);
+      lines.push(`<i>${escapeHtml(part.name)} - ${escapeHtml(t("exercise_lib.not_found", lang))}</i>`);
       return;
     }
     const numbered = parts.length > 1 ? `${i + 1}. ` : "";

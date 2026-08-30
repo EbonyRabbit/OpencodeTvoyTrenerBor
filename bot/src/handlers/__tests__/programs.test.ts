@@ -147,7 +147,7 @@ describe("programsHandler catalog query", () => {
     mockProgramsQuery([
       {
         id: "tpl-buy",
-        title: "HYROX 5×12 — подготовка к гонке",
+        title: "HYROX 5×12 - подготовка к гонке",
         type: "template",
         description: null,
         duration_weeks: 12,
@@ -159,7 +159,7 @@ describe("programsHandler catalog query", () => {
     await programsHandler(ctx);
 
     const text = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(text).toContain("HYROX 5×12 — подготовка к гонке"); // название целиком
+    expect(text).toContain("HYROX 5×12 - подготовка к гонке"); // название целиком
     const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
       reply_markup?: unknown;
     };
@@ -170,7 +170,7 @@ describe("programsHandler catalog query", () => {
     expect(keyboard).toContain("💳 Купить");
     expect(keyboard).not.toContain("📩 Запросить");
     expect(keyboard).not.toContain("program_request:");
-    expect(keyboard).not.toContain("— HYROX");
+    expect(keyboard).not.toContain("- HYROX");
     expect(keyboard).not.toContain("ℹ️ Подробнее 1");
   });
 
@@ -305,7 +305,7 @@ describe("handleProgramDetailsCallback", () => {
   it("показывает полное название и полное описание (без обрезки до 100 симв.)", async () => {
     mockDetailsQuery({
       id: DETAILS_ID,
-      title: "HYROX 5×12 — подготовка к гонке",
+      title: "HYROX 5×12 - подготовка к гонке",
       type: "template",
       description: fullDescription,
       duration_weeks: 12,
@@ -316,7 +316,7 @@ describe("handleProgramDetailsCallback", () => {
     await handleProgramDetailsCallback(ctx, DETAILS_ID);
 
     const text = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(text).toContain("HYROX 5×12 — подготовка к гонке");
+    expect(text).toContain("HYROX 5×12 - подготовка к гонке");
     expect(text).toContain(fullDescription.slice(0, 120));
     expect(text.length).toBeGreaterThan(300);
     const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {

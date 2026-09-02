@@ -1,0 +1,11 @@
+{
+  "name": "opencode-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate:fribi": "node scripts/generate-fribi.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.15.0"
+  }
+}

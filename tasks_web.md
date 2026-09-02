@@ -1210,3 +1210,91 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/app/(coach)/clients/[id]/actions.ts` | Изменение (markPurchased → activate-purchase) |
 | `web/src/app/client/[token]/layout.tsx` | Изменение (guard по дате) |
 | `web/env.example` | Изменение (PRODAMUS_*) |
+
+---
+
+## Фаза 22: Воронка роста аудитории `инста → канал → бот` (приоритет — рост канала)
+
+### Цель
+
+Растить аудиторию `t.me/YuriyShoshin` через `инста Reels/Story → директ → канал → бот`. Канал греет, бот закрывает. Мерим `ЖИР триггер → канал join → бот старт → покупка`. Второй вариант по твоему выбору — `инста → канал → бот` (не `инста → бот` напрямую). Канал = актив на будущее.
+
+### Архитектура воронки (3 клика)
+
+```
+Инста Reels/Story ("пиши ЖИР в директ") → ManyChat (триггер ЖИР) → DM "лови t.me/YuriyShoshin"
+→ Канал (закреп-пост + кнопка "Забрать в боте → t.me/tvoyTrekerBot?start=channel_grow")
+→ Бот (@tvoyTrekerBot ?start=channel_grow) → фриби + цепочка 3 сообщения
+→ (опц.) инвайт-линк inst_ZIR + ChatMemberUpdated для точного трекинга join из инсты
+```
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **22.1** | Welcome-фриби PDF `7 мин + табличка веса` | Генерация `docs/welcome-fribi/checklist-7min.pdf` 1 стр A4. Источник: `few-shot` из `.opencode/voice/yuriy-shoshin.md` (приседания 15/отжимания 10/скручивания 20 ×3 + таблица среднего веса 7 дней). Верстка `docs/welcome-fribi/template.html` → `scripts/generate-fribi.js` (Puppeteer `page.pdf({format:'A4'})`) 1080×1920 превью. Хранение `supabase storage welcome-fribi` или `docs/` + `R2_PUBLIC_URL`. Проверка: PDF открывается, русский без кракозябр | ✅ |
+| **22.2** | Закреп-пост канала `t.me/YuriyShoshin` | Текст универсальный 800 зн поток 10-16 слов без списков (ветка `channel_grow`): `привет это Юра тут фитнес в кайф держи чек-лист 7 мин и табличку веса жми в бота`. Кнопка: `InlineKeyboard [[{text:'Забрать в боте', url:'https://t.me/tvoyTrekerBot?start=channel_grow'}]]`. Файл: `docs/content-plan.md` вкладка `Закреп` (текст + кнопка). Публикация вручную (бот не пинит без прав админа) — инструкция в `docs/content-plan.md` | pending |
+| **22.3** | Бот приветка — ветки `channel_grow` / `ZIR_inst` | `bot/src/handlers/welcome.ts` — `export async function handleWelcome(ctx, startParam: string)` : `if ZIR_inst` → персональный `ты с инсты по ЖИР держи чек-лист`, else `channel_grow` → общий `рад что нашёл канал держи чек-лист`. Сразу: шлёт `docs/welcome-fribi/checklist-7min.pdf` + кнопки `[Хочу план] [Просто смотрю]` → `supabase.from('bot_logs').insert({action:'welcome_sent', telegram_id, details:startParam})`. Интеграция: `bot/src/handlers/start.ts` вызывает `handleWelcome` если `ctx.match` in `['ZIR_inst','channel_grow']` иначе обычный старт. Регистрация в `bot/src/bot.ts` | pending |
+| **22.4** | Бот цепочка +1д / +3д (cron) | `bot/src/cron/welcome-followup.ts` — `node-cron '*/15 * * * *'` : выборка `bot_logs welcome_sent 24ч назад без welcome_followup1` → `bot.api.sendMessage(telegram_id, followup1: 'расскажи что мешает больше — время желание или не знаешь что делать')` + `bot_logs` ; через 72ч `followup2: мягкий питч кураторство 3 мес / бот напомнит / онлайн план` только если `purchase_requests.status != paid`. Dedup `bot_dedup key=welcome_followup:{telegram_id}:{n}` TTL 7д | pending |
+| **22.5** | Тесты welcome-цепочки | `bot/src/handlers/__tests__/welcome.test.ts` — моки `ctx.startParam` 3 ветки (ZIR_inst/channel_grow/чистый), не шлёт дубликаты (dedup), фриби отправлен, followup выборка. `bot/src/cron/__tests__/welcome-followup.test.ts` — 24ч/72ч окна, пропуск если уже paid | pending |
+| **22.6** | ManyChat триггер `ЖИР → канал` | ManyChat Flow: `Trigger DM Keyword = ЖИР (регистронезависимо, с/без пробела)` + `Trigger Comment Keyword = ЖИР` → `Action Send DM: лови доступ → https://t.me/YuriyShoshin` + кнопка `Перейти в Телеграм`. Второй флоу: комментарий → `Reply: кинул в директ` + тот же DM. Экспорт `docs/manychat/flow-ZIR-to-channel.json` + `docs/manychat/README.md` (инструкция подключения, UTM `?utm_source=inst&utm_campaign=ZIR`, скрины). Бэкап вне кода | pending |
+| **22.7** | Инвайт-линк `inst_ZIR` + точный трекинг join (опц.) | `bot/src/lib/telegram-invite.ts` — `createChatInviteLink({chat_id: TG_CHANNEL_ID, name:'inst_ZIR', creates_join_request:false})` via `bot.api.createChatInviteLink`. `.env: TG_CHANNEL_ID` → `bot/src/config.ts`. Сделать бота админом канала → `bot/src/handlers/channel-join.ts` слушает `bot.on('chat_member')` → `if update.invite_link?.name=='inst_ZIR'` → `supabase.from('bot_logs').insert({action:'channel_join_inst', telegram_id, details: name})`. Фолбэк: без инвайта — только ManyChat-метка. Файлы: `bot/src/lib/telegram-invite.ts`, `bot/src/handlers/channel-join.ts`, `bot/src/bot.ts`, `bot/.env.example` | pending |
+| **22.8** | Логи и дашборд роста | Supabase `bot_logs` уже есть — использовать `action: channel_join_inst / welcome_sent / welcome_followup1 / welcome_followup2 / fribi_click`. Дашборд `web/src/app/(coach)/analytics/page.tsx` виджет `Воронка: ЖИР → канал join → бот старт → покупка` — `select count(*) where action=... last 7d`. `web/src/lib/analytics.ts` + тест | pending |
+| **22.9** | Верификация + gate | `bot tsc` + `vitest` (welcome + channel-join) + `web tsc` + `next build` ; ручной тест: инста `ЖИР` → DM → клик канал → закреп кнопка → бот `?start=channel_grow` → фриби PDF + followup через 24ч приходит 1 раз ; `invite link` (если 22.7) → join → `bot_logs channel_join_inst` появляется ; ревью `@code-reviewer` ≥9.5 | pending |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `docs/welcome-fribi/template.html` | Новый (верстка фриби) |
+| `docs/welcome-fribi/checklist-7min.pdf` | Новый (генерация Puppeteer) |
+| `scripts/generate-fribi.js` | Новый (HTML→PDF) |
+| `docs/content-plan.md` | Изменение (вкладка Закреп + текст) |
+| `bot/src/handlers/welcome.ts` | Новый (ветки ZIR_inst/channel_grow) |
+| `bot/src/cron/welcome-followup.ts` | Новый ( +1д/+3д) |
+| `bot/src/handlers/__tests__/welcome.test.ts` | Новый |
+| `bot/src/cron/__tests__/welcome-followup.test.ts` | Новый |
+| `bot/src/handlers/start.ts` | Изменение (вызов handleWelcome) |
+| `bot/src/bot.ts` | Изменение (регистрация welcome + chat_member) |
+| `bot/src/lib/telegram-invite.ts` | Новый (createChatInviteLink) |
+| `bot/src/handlers/channel-join.ts` | Новый (ChatMemberUpdated) |
+| `bot/src/handlers/__tests__/channel-join.test.ts` | Новый |
+| `bot/src/config.ts` | Изменение (TG_CHANNEL_ID) |
+| `bot/.env.example` | Изменение (TG_CHANNEL_ID) |
+| `docs/manychat/flow-ZIR-to-channel.json` | Новый (экспорт ManyChat) |
+| `docs/manychat/README.md` | Новый (инструкция) |
+| `web/src/app/(coach)/analytics/page.tsx` | Изменение (виджет воронки) |
+| `web/src/lib/analytics.ts` | Новый/изменение |
+
+---
+
+## Фаза 23: Контент-система `5+3` + Repurposing `TG → Reels/Shorts/Story` + PubMed
+
+### Цель
+
+5 постов/нед в телеге минимум + 1-3 докидки в сторис (мем-картинка 1080×1920 / короткое видео упражнения) + упаковка каждого TG-поста в Reels/Shorts (хук 2с озвучка) и карусель. Кодовое слово `ЖИР` → ManyChat → канал. Исследование PubMed 1/2нед без продажи. Всё только после апрува Юрия.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **23.1** | Voice v1.6 — докидки + Repurposing | `.opencode/voice/yuriy-shoshin.md` — добавить блок 5.2 `Adapt: Reels хук 2с, вертикаль 9:16, CTA в телегу через код ЖИР, докидки 1-3/нед вне плана (сторис-мем/видео)`, блок 5.1 `PubMed выжимка: что делали/кто участвовал/что нашли/что значит в 40 лет/1 действие + ссылка`. `AGENTS.md` — `repurposing agent: TG текст → Reels сценарий (7/15/30с) + карусель 5 слайдов + Story 1080×1920` | pending |
+| **23.2** | Content-plan 5+3 с колонками под инсту/ютуб | `docs/content-plan.md` уже есть — расширить колонки `Reels/Shorts (да/нет) | Story 1080×1920 (мем/видео/опрос) | Код ЖИР | ManyChat → канал | CTA → бот | Статус апрува`. Залить сентябрь 20 строк (если пусто — дополнить), бэклог 20 хуков уже есть, добавить вкладку `Сторис-докидки 1-3/нед` | pending |
+| **23.3** | Repurposing — `TG → Reels/Shorts/Story` скрипт | `scripts/repurpose.js` — читает `docs/content-plan.md` строку по `date` → генерит `reels-script.md` (хук 2с + озвучка потоком 10-16 слов без тире) + `story.html 1080×1920` → `Puppeteer screenshot PNG 1080×1920`. Шаблоны `docs/memes/story-template.html` (верх хук, центр картинка, низ `t.me/YuriyShoshin`). Тест: 1 TG пост → 1 Reels скрипт + 1 Story PNG без ручного набора | pending |
+| **23.4** | Шаблоны Story 1080×1920 для докидок | `docs/memes/story-template.html` — вертикаль, `docs/memes/story-soft.html/hard.html/det.html` — 3 градации мемов (мягкий/жёсткий/детский) + `docs/memes/illustrated/` — иллюстрации `Pollinations → Puppeteer overlay` (как `гамак над костром`). Генерация `scripts/generate-story-memes.js`. Проверка: PNG 1080×1920 открывается в инсте без обрезки | pending |
+| **23.5** | PubMed-мониторинг 1/2нед | `bot/scripts/pubmed-monitor.ts` — `fetch https://eutils.ncbi.nlm.nih.gov/entrez/esearch.fcgi?db=pubmed&term=fitness+creatine+steps+sleep+protein&retmax=10 + efetch` → парс `title/abstract` → запись `docs/research/pending.md` 3 темы (заголовок + 1 строка суть + ссылка) → Юра выбирает 1 → выжимка по блоку 5.1 `что делали/кто участвовал/что нашли/что значит в 40 лет/1 действие + ссылка PubMed` → пост в `docs/content-plan.md` без продажи (пометка `исследование`). `cron: '0 9 * * 1'` каждые 2 нед | pending |
+| **23.6** | Верификация + gate | `web tsc` + `next build` + `bot tsc` + `vitest` (repurpose/pubmed) ; ручной тест: TG пост 01.09 → Reels скрипт хук 2с есть → Story PNG 1080×1920 рендерится → PubMed 3 темы в `pending.md` → выбор 1 → пост без продажи в `content-plan.md` помечен `апрyвнуто` ; ревью `@code-reviewer` ≥9.5 | pending |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `.opencode/voice/yuriy-shoshin.md` | Изменение (блок 5.2 Repurposing + PubMed выжимка) |
+| `AGENTS.md` | Изменение (repurposing agent) |
+| `docs/content-plan.md` | Изменение (колонки Reels/Shorts/Story/Код/Апрув + вкладка Сторис-докидки) |
+| `scripts/repurpose.js` | Новый (TG→Reels/Story) |
+| `docs/memes/story-template.html` | Новый (вертикаль 1080×1920) |
+| `scripts/generate-story-memes.js` | Новый (мемы в сторис) |
+| `bot/scripts/pubmed-monitor.ts` | Новый (esearch+efetch) |
+| `docs/research/pending.md` | Новый (3 темы/2нед) |
+| `bot/src/lib/research.ts` | Новый (форматтер выжимки) |

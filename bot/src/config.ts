@@ -45,6 +45,7 @@ export const config = {
   coachChatId: BigInt(requireEnv("COACH_CHAT_ID")),
   prodamusPayformBaseUrl: optionalEnv("PRODAMUS_PAYFORM_BASE_URL", "").trim().replace(/\/+$/, ""),
   clientPortalUrl: optionalEnv("CLIENT_PORTAL_URL", "").trim().replace(/\/+$/, ""),
+  channelId: optionalEnv("TG_CHANNEL_ID", "").trim(),
   nodeEnv: optionalEnv("NODE_ENV", "development"),
   port: optionalPort("PORT", 3001),
   webhookPath: optionalEnv("WEBHOOK_PATH", "/webhook"),

@@ -28,6 +28,7 @@ import { progressHandler } from "./handlers/progress.js";
 import { handleConsentAccept } from "./handlers/consent.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { handleWelcomeCallback } from "./handlers/welcome.js";
+import { handleChannelJoin } from "./handlers/channel-join.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
@@ -283,6 +284,8 @@ bot.on("callback_query:data", async (ctx, next) => {
   }
   await next();
 });
+
+bot.on("chat_member", handleChannelJoin);
 
 bot.on("callback_query:data", callbackRouter);
 

@@ -142,6 +142,7 @@ export default async function DashboardPage() {
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
   const dateThreshold = twoWeeksAgo.toISOString().split("T")[0];
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
 
   const [
     totalResult,
@@ -150,6 +151,7 @@ export default async function DashboardPage() {
     expiredResult,
     checkinsResult,
     alertsResult,
+    funnelResult,
   ] = await Promise.all([
     supabase.from("clients").select("*", { count: "exact", head: true }),
     supabase.from("clients").select("*", { count: "exact", head: true }).eq("status", "active"),
@@ -166,6 +168,10 @@ export default async function DashboardPage() {
       .gte("date", dateThreshold)
       .order("date", { ascending: false })
       .limit(500),
+    (async () => {
+      const { getFunnelCounts } = await import("@/lib/analytics");
+      return getFunnelCounts(supabase as any, sevenDaysAgoIso);
+    })(),
   ]);
 
   if (totalResult.error || activeResult.error || paidResult.error || expiredResult.error || checkinsResult.error || alertsResult.error) {
@@ -249,6 +255,30 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Воронка: ЖИР → канал → бот (7д)</CardTitle>
+          <p className="text-sm text-muted-foreground">channel_join_inst → welcome_sent → followup1/2 за последние 7 дней</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {(
+              [
+                ["channel_join_inst", "Вступили"],
+                ["welcome_sent", "Старт бота"],
+                ["welcome_followup1", "Followup 1д"],
+                ["welcome_followup2", "Followup 3д"],
+              ] as const
+            ).map(([key, label]) => (
+              <div key={key} className="rounded-lg border p-3 text-center">
+                <div className="text-2xl font-bold">{(funnelResult as any)[key] ?? 0}</div>
+                <div className="text-xs text-muted-foreground">{label}</div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {alertEntries.length > 0 && (
         <Card className="mt-6 border-destructive/30">

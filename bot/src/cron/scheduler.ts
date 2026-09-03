@@ -7,6 +7,7 @@ import { runMorningNotification } from "./morning.js";
 import { runMeasurementReminder } from "./measurement-reminder.js";
 import { runCheckinReminder } from "./checkin-reminder.js";
 import { runAccessExpiryReminder } from "./access-expiry.js";
+import { runWelcomeFollowup } from "./welcome-followup.js";
 import { runAutoResume, runResumeReminder } from "./resume.js";
 import { logBotEvent } from "./logger.js";
 
@@ -78,6 +79,10 @@ export function startScheduler(bot: Bot<MyContext>): void {
 
   tasks.push(
     cron.schedule(POLL_CRON, wrapWithGuard("resume_reminder", () => runResumeReminder(bot))),
+  );
+
+  tasks.push(
+    cron.schedule(POLL_CRON, wrapWithGuard("welcome_followup", () => runWelcomeFollowup(bot))),
   );
 
   console.log(`[SCHEDULER] ${tasks.length} cron tasks started`);

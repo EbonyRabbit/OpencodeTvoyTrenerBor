@@ -440,6 +440,9 @@ const resources = {
         btn_browse: "Просто смотрю",
         plan_hint: "Кайф! Смотри каталог через /programs — выбери программу и жми Купить. Или напиши тренеру через кнопку Связаться.",
         browse_hint: "Кайф, смотри канал! Если захочешь план — жми /programs или кнопку Хочу план в закрепе.",
+        followup1: "Слушай а что мешает больше всего. Время, желание или не знаешь что делать. Расскажи как у тебя, интересно.",
+        followup2:
+          "Короче если одному тяжело держать ритм давай три месяца за руку. Я рядом как трекер который не даст слиться. Бот напомнит и посчитает, план соберу под тебя, кураторство доведёт. Хочешь — жми Хочу план в боте.",
       },
       schedule: {
         setup_title: "📅 Настрой расписание тренировок",
@@ -919,6 +922,9 @@ const resources = {
         btn_browse: "Just browsing",
         plan_hint: "Awesome! Browse /programs — pick a program and tap Buy. Or contact the coach.",
         browse_hint: "Enjoy the channel! When you want a plan, hit /programs or tap I want a plan.",
+        followup1: "What's getting in the way most — time, motivation, or not knowing what to do? Tell me how it is for you.",
+        followup2:
+          "If it's hard to stay consistent alone, let's do 3 months hand-in-hand. I'll be there like a tracker that won't let you slip. Bot reminds and counts, I'll build your plan. Tap I want a plan in the bot if you want it.",
       },
       schedule: {
         setup_title: "📅 Set your training schedule",

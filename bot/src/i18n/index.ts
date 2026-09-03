@@ -431,6 +431,16 @@ const resources = {
         save_error: "❌ Не удалось сохранить настройку. Попробуй ещё раз.",
         measure_day_value: "{{day}}-е число",
       },
+      welcome: {
+        zir_inst:
+          "Ты с инсты по ЖИР держи чек-лист. Семь минут когда приседаешь 15 раз отжимаешься 10 и делаешь скручивания 20 раз и так три круга. Тут же табличка веса на 7 дней считай среднее и смотри на тренд. Забирай файл ниже 👇",
+        channel_grow:
+          "Рад что нашёл канал держи чек-лист. Семь минут когда приседаешь 15 раз отжимаешься 10 и делаешь скручивания 20 раз и так три круга. Плюс табличка веса на 7 дней считай среднее за неделю. Забирай файл ниже 👇",
+        btn_plan: "Хочу план",
+        btn_browse: "Просто смотрю",
+        plan_hint: "Кайф! Смотри каталог через /programs — выбери программу и жми Купить. Или напиши тренеру через кнопку Связаться.",
+        browse_hint: "Кайф, смотри канал! Если захочешь план — жми /programs или кнопку Хочу план в закрепе.",
+      },
       schedule: {
         setup_title: "📅 Настрой расписание тренировок",
         setup_description_one: "Твоя программа состоит из 1 тренировки в неделю. Выбери 1 день недели.",
@@ -899,6 +909,16 @@ const resources = {
         close: "❌ Close",
         closed: "⚙️ Settings closed",
         save_error: "❌ Failed to save the setting. Try again.",
+      },
+      welcome: {
+        zir_inst:
+          "You came from Insta via ZIR — here's your checklist! 7 minutes: 15 squats, 10 push-ups, 20 crunches ×3 rounds. Plus a 7-day weight tracker — log daily and watch the average. Grab the file below 👇",
+        channel_grow:
+          "Glad you found the channel — here's your checklist! 7 minutes: 15 squats, 10 push-ups, 20 crunches ×3 rounds. Plus a 7-day weight tracker — average matters. Grab the file below 👇",
+        btn_plan: "I want a plan",
+        btn_browse: "Just browsing",
+        plan_hint: "Awesome! Browse /programs — pick a program and tap Buy. Or contact the coach.",
+        browse_hint: "Enjoy the channel! When you want a plan, hit /programs or tap I want a plan.",
       },
       schedule: {
         setup_title: "📅 Set your training schedule",

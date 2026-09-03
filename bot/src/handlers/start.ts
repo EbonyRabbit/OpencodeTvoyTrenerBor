@@ -8,6 +8,7 @@ import { t, applyClientLanguage } from "../i18n/index.js";
 import { InlineKeyboard } from "grammy";
 import { runAfterConnect } from "./connect-flow.js";
 import { sendConsentPrompt } from "./consent.js";
+import { handleWelcome, WELCOME_PARAMS } from "./welcome.js";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
@@ -24,6 +25,11 @@ export async function startHandler(ctx: MyContext): Promise<void> {
   const code = rawPayload?.trim().toUpperCase() ?? "";
 
   if (rawPayload) {
+    const welcomeParam = rawPayload.trim().toLowerCase();
+    if (WELCOME_PARAMS.has(welcomeParam)) {
+      await handleWelcome(ctx, rawPayload.trim());
+      return;
+    }
     if (!CODE_REGEX.test(code)) {
       await ctx.reply(t("error.user_not_identified", ctx.language));
       return;

@@ -27,6 +27,7 @@ import { scheduleHandler } from "./handlers/training-days.js";
 import { progressHandler } from "./handlers/progress.js";
 import { handleConsentAccept } from "./handlers/consent.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
+import { handleWelcomeCallback } from "./handlers/welcome.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
 import { getState, type BotState } from "./state/machine.js";
@@ -274,6 +275,10 @@ bot.on("callback_query:data", async (ctx, next) => {
   if (data?.startsWith("chat_select:")) {
     const clientId = data.slice("chat_select:".length);
     await handleChatSelectCallback(ctx, clientId);
+    return;
+  }
+  if (data?.startsWith("welcome:")) {
+    await handleWelcomeCallback(ctx, data);
     return;
   }
   await next();

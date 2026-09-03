@@ -1,0 +1,73 @@
+{
+  "_comment": "ManyChat Flow: ЖИР -> канал t.me/YuriyShoshin. Импорт: ManyChat -> Automations -> Import. 2 автоматизации: A) DM keyword, B) Comment keyword. См. README.md",
+  "version": "1.0",
+  "created": "2026-09-03",
+  "flows": [
+    {
+      "id": "flow_dm_ZIR_to_channel",
+      "name": "DM: ЖИР -> канал",
+      "trigger": {
+        "type": "instagram_dm_keyword",
+        "keywords": ["жир", "жир ", " жир", "ЖИР", "Жир"],
+        "match": "contains_word_жир",
+        "case_sensitive": false,
+        "trim": true
+      },
+      "steps": [
+        {
+          "type": "condition",
+          "description": "Smart filter: не триггерить если уже триггерили <1ч",
+          "field": "last_triggered_at",
+          "operator": "older_than",
+          "value": "1h"
+        },
+        {
+          "type": "action_send_dm",
+          "text": "Кайф, лови доступ 👇 Тут фитнес который в кайф а не из под палки. Забирай чек-лист на 7 минут и табличку веса. Жми и пиши боту.",
+          "buttons": [
+            {
+              "type": "url",
+              "text": "Перейти в Телеграм",
+              "url": "https://t.me/YuriyShoshin"
+            }
+          ],
+          "delay_ms": 5000
+        }
+      ]
+    },
+    {
+      "id": "flow_comment_ZIR_to_channel",
+      "name": "Comment: ЖИР -> reply + DM",
+      "trigger": {
+        "type": "instagram_comment_keyword",
+        "keywords": ["жир"],
+        "match": "contains_word_жир",
+        "apply_to": "all_posts_reels",
+        "case_sensitive": false
+      },
+      "steps": [
+        {
+          "type": "action_public_reply",
+          "text": "кинул в директ 👇"
+        },
+        {
+          "type": "action_send_dm",
+          "text": "Кайф, лови доступ 👇 Тут фитнес который в кайф а не из под палки. Забирай чек-лист на 7 минут и табличку веса. Жми и пиши боту.",
+          "buttons": [
+            {
+              "type": "url",
+              "text": "Перейти в Телеграм",
+              "url": "https://t.me/YuriyShoshin"
+            }
+          ],
+          "delay_ms": 5000
+        },
+        {
+          "type": "fallback_if_dm_failed",
+          "text": "Не получилось написать в директ — подпишись и напиши ЖИР мне в личку, скину доступ."
+        }
+      ]
+    }
+  ],
+  "utm_note": "t.me игнорирует UTM. Трекинг инсты -> канал через этот флоу (ManyChat Stats), канал -> бот через ?start=channel_grow, точный инста->join через invite link inst_ZIR (задача 22.7)."
+}

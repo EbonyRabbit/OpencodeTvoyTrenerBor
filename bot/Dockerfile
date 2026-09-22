@@ -29,6 +29,7 @@ RUN npm ci --omit=dev && \
     rm -rf /usr/local/bin/npm /usr/local/bin/npx /usr/local/lib/node_modules/npm
 
 COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --chown=node:node ./assets ./assets
 
 RUN find /app/dist -name "*.map" -delete
 

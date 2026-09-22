@@ -1,6 +1,7 @@
 import type { MyContext } from "../bot.js";
 import type { Client } from "../lib/clients.js";
 import { t, type Language } from "../i18n/index.js";
+import { InlineKeyboard } from "grammy";
 import { startTrainingDaysSetup } from "./training-days.js";
 
 export function buildConnectedMessage(client: Client, lang: Language): string {
@@ -25,7 +26,12 @@ export async function runAfterConnect(ctx: MyContext): Promise<void> {
   const client = ctx.client;
   if (!client) return;
 
-  await ctx.reply(buildConnectedMessage(client, ctx.language));
+  await ctx.reply(buildConnectedMessage(client, ctx.language), {
+    reply_markup: new InlineKeyboard()
+      .text(t("guide.btn_open", ctx.language), "guide:start")
+      .row()
+      .text(t("programs.view_button", ctx.language), "programs_open"),
+  });
   if (needsScheduleSetup(client)) {
     await startTrainingDaysSetup(ctx);
   }

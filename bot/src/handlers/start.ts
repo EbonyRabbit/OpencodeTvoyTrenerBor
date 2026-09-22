@@ -71,6 +71,8 @@ export async function startHandler(ctx: MyContext): Promise<void> {
       const keyboard = new InlineKeyboard()
         .text(t("programs.view_button", ctx.language), "programs_open")
         .row()
+        .text(t("guide.btn_open", ctx.language), "guide:start")
+        .row()
         .text(t("coach_request.button", ctx.language), "coach_request");
       await ctx.reply(t("greeting.welcome_new", ctx.language), { reply_markup: keyboard });
       return;

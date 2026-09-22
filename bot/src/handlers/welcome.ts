@@ -6,7 +6,9 @@ import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { t } from "../i18n/index.js";
 
-export const WELCOME_PARAMS = new Set(["channel_grow", "zir_inst"]);
+import { handleGuideStart } from "./guide-calories.js";
+
+export const WELCOME_PARAMS = new Set(["channel_grow", "zir_inst", "guide_calories"]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,15 +28,21 @@ function resolvePdfPath(): string | null {
 }
 
 export async function handleWelcome(ctx: MyContext, rawParam: string): Promise<void> {
-  const telegramId = ctx.from?.id;
   const param = rawParam.trim().toLowerCase();
+  if (param === "guide_calories") {
+    await handleGuideStart(ctx);
+    return;
+  }
+  const telegramId = ctx.from?.id;
   const isZir = param === "zir_inst";
 
   const text = isZir ? t("welcome.zir_inst", ctx.language) : t("welcome.channel_grow", ctx.language);
 
   const keyboard = new InlineKeyboard()
     .text(t("welcome.btn_plan", ctx.language), "welcome:plan")
-    .text(t("welcome.btn_browse", ctx.language), "welcome:browse");
+    .text(t("welcome.btn_browse", ctx.language), "welcome:browse")
+    .row()
+    .text(t("guide.btn_open", ctx.language), "guide:start");
 
   const pdfPath = resolvePdfPath();
   if (pdfPath) {

@@ -55,7 +55,7 @@ describe("runWelcomeFollowup", () => {
 
     await runWelcomeFollowup(bot);
     expect(bot.api.sendMessage).toHaveBeenCalledTimes(1);
-    expect(markAsSent).toHaveBeenCalledWith("welcome_followup:111:1", 7 * 24);
+    expect(markAsSent).toHaveBeenCalledWith("welcome_followup:base:111:1", 7 * 24);
   });
 
   it("does not send followup1 before 24h", async () => {
@@ -95,7 +95,7 @@ describe("runWelcomeFollowup", () => {
 
     await runWelcomeFollowup(bot);
     expect(bot.api.sendMessage).toHaveBeenCalledTimes(1);
-    expect(markAsSent).toHaveBeenCalledWith("welcome_followup:444:2", 7 * 24);
+    expect(markAsSent).toHaveBeenCalledWith("welcome_followup:base:444:2", 7 * 24);
   });
 
   it("skips followup2 if paid", async () => {
@@ -144,6 +144,6 @@ describe("runWelcomeFollowup", () => {
 
     await runWelcomeFollowup(bot);
     expect(bot.api.sendMessage).not.toHaveBeenCalled();
-    expect(markAsSent).toHaveBeenCalledWith("welcome_followup:333:1", 7 * 24);
+    expect(markAsSent).toHaveBeenCalledWith("welcome_followup:base:333:1", 7 * 24);
   });
 });

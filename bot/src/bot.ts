@@ -28,6 +28,7 @@ import { progressHandler } from "./handlers/progress.js";
 import { handleConsentAccept } from "./handlers/consent.js";
 import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
 import { handleWelcomeCallback } from "./handlers/welcome.js";
+import { handleGuideCallback, handleGuideInput, handleGuideStart } from "./handlers/guide-calories.js";
 import { handleChannelJoin } from "./handlers/channel-join.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
@@ -160,6 +161,8 @@ bot.command("resume", async (ctx) => {
 
 bot.command("programs", (ctx) => programsHandler(ctx));
 
+bot.command("guide", (ctx) => handleGuideStart(ctx));
+
 bot.command("myweb", async (ctx) => {
   const guard = await guardAuthenticatedClient(ctx);
   if (typeof guard === "string") {
@@ -282,6 +285,10 @@ bot.on("callback_query:data", async (ctx, next) => {
     await handleWelcomeCallback(ctx, data);
     return;
   }
+  if (data?.startsWith("guide:")) {
+    await handleGuideCallback(ctx, data);
+    return;
+  }
   await next();
 });
 
@@ -332,6 +339,11 @@ bot.on("message:text", async (ctx) => {
   if (ctx.state?.action === "pause") {
     await handlePauseInput(ctx);
     return;
+  }
+
+  if (ctx.state?.action === "guide_calories") {
+    const handled = await handleGuideInput(ctx);
+    if (handled) return;
   }
 
   const text = ctx.message?.text ?? "";

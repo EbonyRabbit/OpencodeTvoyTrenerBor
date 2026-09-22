@@ -50,17 +50,21 @@ export async function runWelcomeFollowup(bot: Bot<MyContext>): Promise<void> {
   const dedupWelcomes = new Map<string, (typeof welcomes)[number]>();
   for (const w of welcomes) {
     if (typeof w.telegram_id !== "number") continue;
+    const ts = new Date(w.created_at).getTime();
+    if (!Number.isFinite(ts)) continue;
     const k = String(w.telegram_id);
     const prev = dedupWelcomes.get(k);
-    if (!prev || new Date(w.created_at).getTime() < new Date(prev.created_at).getTime()) dedupWelcomes.set(k, w);
+    if (!prev || ts > new Date(prev.created_at).getTime()) dedupWelcomes.set(k, w);
   }
   const welcomesDeduped = [...dedupWelcomes.values()];
+  if (!welcomesDeduped.length) return;
 
-  const telegramIds = welcomesDeduped.map((w) => w.telegram_id as number);
+  const telegramIds = [...new Set(welcomesDeduped.map((w) => w.telegram_id as number))];
+  if (!telegramIds.length) return;
 
   const { data: followups, error: followupErr } = await supabaseAdmin
     .from("bot_logs")
-    .select("telegram_id, action, created_at")
+    .select("telegram_id, action, created_at, details")
     .in("telegram_id", telegramIds)
     .in("action", ["welcome_followup1", "welcome_followup2"]);
 
@@ -74,8 +78,16 @@ export async function runWelcomeFollowup(bot: Bot<MyContext>): Promise<void> {
   const followupSet2 = new Set<string>();
   for (const f of followups ?? []) {
     if (f.telegram_id == null) continue;
-    if (f.action === "welcome_followup1") followupSet1.add(String(f.telegram_id));
-    if (f.action === "welcome_followup2") followupSet2.add(String(f.telegram_id));
+    const ff = String((f as { details?: unknown }).details ?? "").toLowerCase() === "guide_calories" ? "guide" : "base";
+    // legacy rows without details count for both funnels to avoid double-send
+    if (f.action === "welcome_followup1") {
+      followupSet1.add(`${String(f.telegram_id)}:${ff}`);
+      if (!((f as { details?: unknown }).details)) followupSet1.add(`${String(f.telegram_id)}:guide`);
+    }
+    if (f.action === "welcome_followup2") {
+      followupSet2.add(`${String(f.telegram_id)}:${ff}`);
+      if (!((f as { details?: unknown }).details)) followupSet2.add(`${String(f.telegram_id)}:guide`);
+    }
   }
 
   const { data: paidRows, error: paidErr } = await supabaseAdmin
@@ -109,16 +121,21 @@ export async function runWelcomeFollowup(bot: Bot<MyContext>): Promise<void> {
     const welcomeTime = new Date(w.created_at).getTime();
     const age = now - welcomeTime;
     const lang = langByTid.get(tidStr) ?? "ru";
+    const isGuide = String(w.details ?? "").toLowerCase() === "guide_calories";
+    const funnel = isGuide ? "guide" : "base";
+    const fkey1 = `${tidStr}:${funnel}`;
+    const msgKey1 = isGuide ? "welcome.guide_followup1" : "welcome.followup1";
+    const msgKey2 = isGuide ? "welcome.guide_followup2" : "welcome.followup2";
 
-    if (age >= FOLLOWUP1_DELAY_MS && !followupSet1.has(tidStr)) {
-      const key = `welcome_followup:${tid}:1`;
+    if (age >= FOLLOWUP1_DELAY_MS && !followupSet1.has(fkey1)) {
+      const key = `welcome_followup:${funnel}:${tid}:1`;
       const dedup = await markAsSent(key, DEDUP_TTL_HOURS);
       if (dedup !== "sent") {
         if (dedup === "error") await logBotEvent("cron:welcome_followup", { telegramId: tid, status: "error", details: "dedup 1 failed" });
         continue;
       }
       try {
-        await bot.api.sendMessage(tid, t("welcome.followup1", lang));
+        await bot.api.sendMessage(tid, t(msgKey1, lang));
         const { error: insErr } = await supabaseAdmin.from("bot_logs").insert({ action: "welcome_followup1", telegram_id: tid, status: "ok", details: stringifyDetails(w.details) });
         if (insErr) {
           console.warn("[WELCOME_FOLLOWUP] insert followup1 failed:", insErr.code);
@@ -127,7 +144,7 @@ export async function runWelcomeFollowup(bot: Bot<MyContext>): Promise<void> {
         } else {
           await logBotEvent("cron:welcome_followup", { telegramId: tid, status: "ok", details: "followup1 sent" });
           sent1++;
-          followupSet1.add(tidStr);
+          followupSet1.add(fkey1);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -137,20 +154,20 @@ export async function runWelcomeFollowup(bot: Bot<MyContext>): Promise<void> {
       continue;
     }
 
-    if (age >= FOLLOWUP2_DELAY_MS && !followupSet2.has(tidStr) && followupSet1.has(tidStr)) {
+    if (age >= FOLLOWUP2_DELAY_MS && !followupSet2.has(fkey1) && followupSet1.has(fkey1)) {
       if (paidSet === null) {
         await logBotEvent("cron:welcome_followup", { telegramId: tid, status: "error", details: "skip followup2: paid check unavailable" });
         continue;
       }
       if (paidSet.has(tidStr)) continue;
-      const key = `welcome_followup:${tid}:2`;
+      const key = `welcome_followup:${funnel}:${tid}:2`;
       const dedup = await markAsSent(key, DEDUP_TTL_HOURS);
       if (dedup !== "sent") {
         if (dedup === "error") await logBotEvent("cron:welcome_followup", { telegramId: tid, status: "error", details: "dedup 2 failed" });
         continue;
       }
       try {
-        await bot.api.sendMessage(tid, t("welcome.followup2", lang));
+        await bot.api.sendMessage(tid, t(msgKey2, lang));
         const { error: insErr } = await supabaseAdmin.from("bot_logs").insert({ action: "welcome_followup2", telegram_id: tid, status: "ok", details: stringifyDetails(w.details) });
         if (insErr) {
           console.warn("[WELCOME_FOLLOWUP] insert followup2 failed:", insErr.code);
@@ -159,7 +176,7 @@ export async function runWelcomeFollowup(bot: Bot<MyContext>): Promise<void> {
         } else {
           await logBotEvent("cron:welcome_followup", { telegramId: tid, status: "ok", details: "followup2 sent" });
           sent2++;
-          followupSet2.add(tidStr);
+          followupSet2.add(fkey1);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

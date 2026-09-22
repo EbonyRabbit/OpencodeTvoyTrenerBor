@@ -36,6 +36,7 @@ export async function menuHandler(ctx: MyContext): Promise<void> {
       t("menu.myweb", ctx.language),
       t("menu.schedule", ctx.language),
       t("menu.exercise", ctx.language),
+      t("menu.guide", ctx.language),
       t("menu.settings", ctx.language),
     ];
 
@@ -55,10 +56,10 @@ export async function menuHandler(ctx: MyContext): Promise<void> {
     }
 
     await ctx.reply(lines.join("\n"), {
-      reply_markup: new InlineKeyboard().text(
-        t("coach_request.button", ctx.language),
-        "coach_request",
-      ),
+      reply_markup: new InlineKeyboard()
+        .text(t("guide.btn_open", ctx.language), "guide:start")
+        .row()
+        .text(t("coach_request.button", ctx.language), "coach_request"),
     });
   } catch (err) {
     console.error(`[MENU] Error for ${ctx.from?.id}:`, err);

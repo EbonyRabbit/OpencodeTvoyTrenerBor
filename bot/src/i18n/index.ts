@@ -44,6 +44,7 @@ const resources = {
         myweb: "/myweb - мой веб-портал",
         schedule: "/schedule - расписание тренировок",
         exercise: "/exercise - техника упражнений",
+        guide: "/guide - посчитать калории",
       },
       progress: {
         title: "Прогресс и замеры:",
@@ -443,6 +444,39 @@ const resources = {
         followup1: "Слушай а что мешает больше всего. Время, желание или не знаешь что делать. Расскажи как у тебя, интересно.",
         followup2:
           "Короче если одному тяжело держать ритм давай три месяца за руку. Я рядом как трекер который не даст слиться. Бот напомнит и посчитает, план соберу под тебя, кураторство доведёт. Хочешь — жми Хочу план в боте.",
+        guide_followup1:
+          "Слушай ну вот посчитали калории а дальше решает среднее. Взвешивайся утром и считай среднее за 7 дней. Колебания в килограмм это вода. Расскажи считал сегодня честно.",
+        guide_followup2:
+          "Короче если тяжело держать подсчет одному давай три месяца за руку. Бот посчитает и напомнит а я соберу план под тебя. Жми Посчитать калории https://t.me/tvoyTrekerBot?start=guide_calories или смотри /programs.",
+      },
+      guide: {
+        intro:
+          "Давай посчитаем твои калории за минуту. Никакой высшей математики только формула 31 и 35. Ответь на три вопроса и заберешь цифры плюс гайд. Ты девушка или мужчина.",
+        btn_open: "🔢 Посчитать калории",
+        ask_sex: "Ты девушка или мужчина. Жми кнопку ниже.",
+        btn_female: "Девушка",
+        btn_male: "Мужчина",
+        btn_cancel: "Отмена",
+        btn_restart: "Посчитать еще раз",
+        cancelled: "Понял отменил. Когда захочешь жми Посчитать калории в закрепе канала.",
+        ask_weight: "Напиши свой вес в кг цифрой. Например 82 или 68,5.",
+        bad_weight: "Не понял вес. Напиши цифрой от 35 до 250. Например 82.",
+        ask_goal: "Какая цель сейчас. Похудение это минус 20 процентов а набор плюс 10.",
+        btn_cut: "Худею",
+        btn_maintain: "Держу форму",
+        btn_bulk: "Набираю",
+        goal_cut: "похудение",
+        goal_bulk: "набор",
+        goal_maintain: "поддержание",
+        result:
+          "Готово. Вес {{weight}} цель {{goal}}. Поддержание около {{maintenance}} ккал. Твоя норма {{target}} ккал белки {{protein}} жиры {{fat}} угли {{carbs}}. Белки держишь. Жиры не режешь ниже единицы на кг. Угли добираешь по остатку. Среднее смотри за 7 дней а не за день.",
+        after_result: "Забирай полный гайд с примерами блюд и заменами. Там же метод тарелки если лень считать каждый грамм.",
+        btn_pdf: "Забрать гайд",
+        btn_plate: "Метод тарелки",
+        plate_hint:
+          "Метод тарелки простой. Четверть белок четверть гарнир половина овощи. Или ладонью одна ладонь белок один кулак гарнир две ладони овощи. Когда надоест на глаз переходи на подсчет.",
+        pdf_caption:
+          "Держи гайд по калориям. Внутри формула 31 и 35 примеры для 60 68 80 92 кг конструктор блюд и разбор плато. Взвешивайся утром считай среднее за неделю. А расскажи считал сегодня.",
       },
       schedule: {
         setup_title: "📅 Настрой расписание тренировок",
@@ -527,6 +561,7 @@ const resources = {
         myweb: "/myweb - my web portal",
         schedule: "/schedule - training schedule",
         exercise: "/exercise - exercise technique",
+        guide: "/guide - count calories",
       },
       progress: {
         title: "Progress and measurements:",
@@ -925,6 +960,36 @@ const resources = {
         followup1: "What's getting in the way most — time, motivation, or not knowing what to do? Tell me how it is for you.",
         followup2:
           "If it's hard to stay consistent alone, let's do 3 months hand-in-hand. I'll be there like a tracker that won't let you slip. Bot reminds and counts, I'll build your plan. Tap I want a plan in the bot if you want it.",
+        guide_followup1:
+          "You got your numbers — now watch the 7-day average. Weigh in mornings and compare weeks not days. Tell me did you log today.",
+        guide_followup2:
+          "If counting alone is hard let's do 3 months hand-in-hand. Bot counts and reminds and I'll build your plan. Tap Count calories https://t.me/tvoyTrekerBot?start=guide_calories or check /programs.",
+      },
+      guide: {
+        intro: "Let's count your calories in a minute. Just formula 31 and 35. Answer 3 questions and get numbers plus guide. Are you female or male.",
+        btn_open: "🔢 Count calories",
+        ask_sex: "Are you female or male. Tap below.",
+        btn_female: "Female",
+        btn_male: "Male",
+        btn_cancel: "Cancel",
+        btn_restart: "Count again",
+        cancelled: "Got it cancelled. Tap Count calories in channel pin when ready.",
+        ask_weight: "Send your weight in kg as a number. Like 82 or 68.5.",
+        bad_weight: "Did not get weight. Send a number 35 to 250. Like 82.",
+        ask_goal: "What is the goal now. Cut is minus 20 percent bulk is plus 10.",
+        btn_cut: "Cut",
+        btn_maintain: "Maintain",
+        btn_bulk: "Bulk",
+        goal_cut: "cut",
+        goal_bulk: "bulk",
+        goal_maintain: "maintain",
+        result:
+          "Done. Weight {{weight}} goal {{goal}}. Maintenance about {{maintenance}} kcal. Your target {{target}} kcal protein {{protein}} fat {{fat}} carbs {{carbs}}. Keep protein hold fat above 1g per kg fill carbs by rest. Watch 7-day average not single day.",
+        after_result: "Grab the full guide with meal examples and swaps. Plate method inside if you hate counting.",
+        btn_pdf: "Get guide",
+        btn_plate: "Plate method",
+        plate_hint: "Plate method simple. Quarter protein quarter side half veggies. Or palm one palm protein one fist side two palms veggies.",
+        pdf_caption: "Here is your calorie guide. Formula 31 and 35 examples meal builder and plateau fix inside. Weigh mornings average 7 days.",
       },
       schedule: {
         setup_title: "📅 Set your training schedule",

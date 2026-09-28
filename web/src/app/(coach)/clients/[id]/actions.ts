@@ -551,6 +551,33 @@ export async function togglePayment(
   }
 }
 
+export async function resetExerciseSwap(
+  clientId: string,
+  swapId: string,
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+    if (!UUID_RE.test(clientId) || !UUID_RE.test(swapId)) {
+      return { error: "Некорректный идентификатор" };
+    }
+
+    const { error } = await supabaseAdmin
+      .from("client_exercise_swaps")
+      .delete()
+      .eq("id", swapId)
+      .eq("client_id", clientId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/clients/${clientId}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
 export async function markPurchased(
   clientId: string,
   programId: string,

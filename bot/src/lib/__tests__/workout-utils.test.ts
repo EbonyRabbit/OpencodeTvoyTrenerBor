@@ -407,6 +407,44 @@ describe("formatExercise", () => {
 });
 
 describe("formatSingleExercise", () => {
+  it("shows swapped_from marker for replaced exercise", () => {
+    const exercise = {
+      name: "Жим ногами",
+      swapped_from: "Приседания со штангой",
+      sets: "4",
+      reps: "8",
+    };
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", new Map());
+    expect(result).toContain("Жим ногами");
+    expect(result).toContain("Вместо: Приседания со штангой");
+  });
+
+  it("withSwappedHistoryFallback uses original history when replacement has none", async () => {
+    const { withSwappedHistoryFallback } = await import("../workout-utils.js");
+    const prev = { weight: 80 } as never;
+    const map = new Map([["приседания со штангой", prev]]);
+    const out = withSwappedHistoryFallback(
+      [{ name: "Жим ногами", swapped_from: "Приседания со штангой" }] as never,
+      map,
+    );
+    expect(out.get("жим ногами")).toBe(prev);
+  });
+
+  it("withSwappedHistoryFallback keeps replacement history when present", async () => {
+    const { withSwappedHistoryFallback } = await import("../workout-utils.js");
+    const own = { weight: 100 } as never;
+    const orig = { weight: 80 } as never;
+    const map = new Map([
+      ["жим ногами", own],
+      ["приседания со штангой", orig],
+    ]);
+    const out = withSwappedHistoryFallback(
+      [{ name: "Жим ногами", swapped_from: "Приседания со штангой" }] as never,
+      map,
+    );
+    expect(out.get("жим ногами")).toBe(own);
+  });
+
   it("hides child rest in single superset view but keeps parent rest", () => {
     const exercise = {
       name: "Грудь+спина",

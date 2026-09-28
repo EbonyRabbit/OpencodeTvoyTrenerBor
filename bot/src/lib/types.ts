@@ -150,6 +150,22 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["workout_logs"]["Row"]>;
         Relationships: [];
       };
+      client_exercise_swaps: {
+        Row: {
+          id: string;
+          client_id: string;
+          exercise_key: string;
+          original_name: string;
+          replacement_name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["client_exercise_swaps"]["Row"], "id" | "created_at" | "updated_at"> & {
+          id?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["client_exercise_swaps"]["Row"]>;
+        Relationships: [];
+      };
       measurements: {
         Row: {
           id: string;

@@ -5,6 +5,7 @@ import { getEffectiveTrainingDays, weekdayDateInWeek } from "./postpone-utils.js
 import { t, type Language } from "../i18n/index.js";
 import { DEFAULT_TIMEZONE } from "./constants.js";
 import { isPseudoExercise } from "./log-markers.js";
+import { getClientSwaps, applySwapsToExercises } from "./exercise-swaps.js";
 
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
@@ -300,12 +301,15 @@ export async function getTodayWorkout(client: Client, lang: Language = "ru"): Pr
 
   const scheduledIsoDay = (trainingDays?.length ?? 0) > 0 ? getTodayISODay(tz) : null;
 
+  // Фаза 24: персональные замены поверх канона, шаблон не меняется.
+  const swaps = await getClientSwaps(client.id);
+
   return {
     ...plan,
     day_name: scheduledIsoDay ? weekdayFullName(scheduledIsoDay, lang) : matchedDay.day_name,
     day_order: matchedDay.day_order ?? null,
     goal: matchedDay.focus ?? null,
-    exercises: matchedDay.exercises,
+    exercises: applySwapsToExercises(matchedDay.exercises, swaps),
   };
 }
 
@@ -543,7 +547,10 @@ function formatChildLine(
 ): string {
   const lines: string[] = [];
   const detail = formatPlannedDetail(child, lang, " · ");
-  lines.push(`${letter}. ${escapeHtml(child.name)}${detail ? ` - ${detail}` : ""}`);
+  const swapped = child.swapped_from
+    ? ` ${t("workout.exercise_swapped_from", lang, { name: escapeHtml(child.swapped_from) })}`
+    : "";
+  lines.push(`${letter}. ${escapeHtml(child.name)}${detail ? ` - ${detail}` : ""}${swapped}`);
   const lastDetail = last ? formatPreviousLog(last, lang) : "";
   if (lastDetail) {
     lines.push(`<i>${t("workout.exercise_last", lang, { detail: lastDetail })}</i>`);
@@ -604,6 +611,9 @@ export function formatExercise(
   }
 
   lines.push(`<b>${t("workout.exercise_item", lang, { index, name: escapeHtml(ex.name) })}</b>`);
+  if (ex.swapped_from) {
+    lines.push(t("workout.exercise_swapped_from", lang, { name: escapeHtml(ex.swapped_from) }));
+  }
 
   const detail = formatPlannedDetail(ex, lang);
   if (detail) lines.push(detail);
@@ -624,8 +634,7 @@ export function formatExercise(
   return lines.join("\n");
 }
 
-export function collectLoggableNames(exercises: ParsedExercise[]): string[] {
-  const names: string[] = [];
+export function collectLoggableNames(exercises: ParsedExercise[]): string[] {  const names: string[] = [];
   for (const ex of exercises) {
     if (ex.type === "superset" && ex.children?.length) {
       for (const child of ex.children) names.push(child.name);
@@ -639,14 +648,46 @@ export function collectLoggableNames(exercises: ParsedExercise[]): string[] {
   return names;
 }
 
-export async function formatWorkoutMessage(
-  workout: TodayWorkout,
+/** Имена для истории: рабочие + оригиналы замен (фолбэк «Прошлый раз»). */
+export function collectHistoryNames(exercises: ParsedExercise[]): string[] {
+  const names = collectLoggableNames(exercises);
+  const walk = (list: ParsedExercise[]) => {
+    for (const ex of list) {
+      if (ex.swapped_from) names.push(ex.swapped_from);
+      if (ex.children) walk(ex.children);
+    }
+  };
+  walk(exercises);
+  return names;
+}
+
+/** Если у замены своей истории нет, подставляем историю оригинала. */
+export function withSwappedHistoryFallback(
+  exercises: ParsedExercise[],
+  lastLogs: Map<string, PreviousLog>,
+): Map<string, PreviousLog> {
+  const out = new Map(lastLogs);
+  const walk = (list: ParsedExercise[]) => {
+    for (const ex of list) {
+      if (ex.swapped_from) {
+        const repKey = ex.name.trim().toLowerCase();
+        const origKey = ex.swapped_from.trim().toLowerCase();
+        if (!out.has(repKey) && out.has(origKey)) out.set(repKey, out.get(origKey)!);
+      }
+      if (ex.children) walk(ex.children);
+    }
+  };
+  walk(exercises);
+  return out;
+}
+
+export async function formatWorkoutMessage(  workout: TodayWorkout,
   lang: Language,
   client: Client,
 ): Promise<string> {
-  const lastLogs = await getPreviousWorkoutLogs(
-    client,
-    collectLoggableNames(workout.exercises),
+  const lastLogs = withSwappedHistoryFallback(
+    workout.exercises,
+    await getPreviousWorkoutLogs(client, collectHistoryNames(workout.exercises)),
   );
   const compositeLetters = getCompositeLetters(workout.exercises);
 
@@ -719,6 +760,9 @@ export function formatSingleExercise(
       ? `<b>${ex.name ? t("workout.circuit_label", lang, { name: escapeHtml(ex.name) }) : t("workout.circuit_bare", lang)}</b>`
       : `<b>${escapeHtml(ex.name)}</b>`,
   );
+  if (ex.swapped_from) {
+    lines.push(t("workout.exercise_swapped_from", lang, { name: escapeHtml(ex.swapped_from) }));
+  }
 
   if (ex.block) {
     lines.push("");

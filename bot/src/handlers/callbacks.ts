@@ -6,6 +6,8 @@ import {
   formatSingleExercise,
   getPreviousWorkoutLogs,
   collectLoggableNames,
+  collectHistoryNames,
+  withSwappedHistoryFallback,
   truncateMessage,
   type TodayWorkout,
 } from "../lib/workout-utils.js";
@@ -27,6 +29,13 @@ import { computeNextDayOfMonthDate, DEFERRED_MONTH_TTL_HOURS } from "../cron/mea
 import { handleScheduleStart, handleScheduleToggle, handleScheduleDone, handleScheduleCancel } from "./training-days.js";
 import { handleResumeCallback } from "./resume.js";
 import { buildExerciseInfoButton, handleExerciseInfoCallback, loadExerciseLibraryRows } from "./exercise-info.js";
+import {
+  handleSwapOpen,
+  handleSwapChild,
+  handleSwapPick,
+  handleSwapRevert,
+  handleSwapBack,
+} from "./exercise-swap.js";
 import { buildExerciseLibraryMap } from "../lib/exercise-library.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
 import { supabaseAdmin } from "../lib/supabase-admin.js";
@@ -111,6 +120,11 @@ registerCallback("exercise_log", handleExerciseLog);
 registerCallback("exercise_skip", handleExerciseSkip);
 registerCallback("exercise_prev", handleExercisePrev);
 registerCallback("exercise_next", handleExerciseNext);
+registerCallback("exercise_swap", handleSwapOpen);
+registerCallback("exercise_swap_child", handleSwapChild);
+registerCallback("swap_pick", handleSwapPick);
+registerCallback("swap_revert", handleSwapRevert);
+registerCallback("swap_back", handleSwapBack);
 registerCallback("skip_workout", handleSkipWorkout);
 registerCallback("wizard_skip", handleWizardSkip);
 registerCallback("evening_yes", async (ctx) => { await handleEveningYes(ctx); });
@@ -192,6 +206,8 @@ function buildExerciseKeyboard(
     { text: t("workout.btn_skip_exercise", lang), callback_data: `exercise_skip:${index}` },
   ]);
 
+  rows.push([{ text: t("workout.btn_swap", lang), callback_data: `exercise_swap:${index}` }]);
+
   const navRow: { text: string; callback_data: string }[] = [];
   if (index > 0) navRow.push({ text: t("workout.btn_prev", lang), callback_data: `exercise_prev:${index}` });
   if (index < total - 1) navRow.push({ text: t("workout.btn_next", lang), callback_data: `exercise_next:${index}` });
@@ -244,9 +260,9 @@ export async function showExercise(
 
   const compositeLetters = getCompositeLetters(effectiveWorkout.exercises);
   const currentExercise = effectiveWorkout.exercises[index];
-  const lastLogs = await getPreviousWorkoutLogs(
-    ctx.client,
-    collectLoggableNames([currentExercise]),
+  const lastLogs = withSwappedHistoryFallback(
+    [currentExercise],
+    await getPreviousWorkoutLogs(ctx.client, collectHistoryNames([currentExercise])),
   );
   const text = truncateMessage(
     formatSingleExercise(

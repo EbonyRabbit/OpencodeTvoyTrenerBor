@@ -43,6 +43,8 @@ export type ParsedExercise = {
   distance?: string;
   pace?: string;
   heart_rate?: string;
+  /** Фаза 24: runtime-метка персональной замены, канон не меняет. */
+  swapped_from?: string;
 };
 
 function isValidParsedContent(value: unknown): value is ParsedContent {
@@ -119,6 +121,7 @@ function isValidExercise(value: unknown, isChild = false): value is ParsedExerci
   if (e.distance !== undefined && typeof e.distance !== "string") return false;
   if (e.pace !== undefined && typeof e.pace !== "string") return false;
   if (e.heart_rate !== undefined && typeof e.heart_rate !== "string") return false;
+  if (e.swapped_from !== undefined && typeof e.swapped_from !== "string") return false;
   if (e.children !== undefined) {
     if (!Array.isArray(e.children)) return false;
     for (const child of e.children) {

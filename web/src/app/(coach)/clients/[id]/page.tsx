@@ -12,6 +12,7 @@ import { DEFAULT_TIMEZONE } from "@/lib/constants";
 // import { resolvePhotoUrls } from "@/lib/photos"; // DISABLED: photo storage removed
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
+import { ExerciseSwapsSection } from "./_components/exercise-swaps-section";
 import { getClientActivity, loadMoreActivity } from "./actions";
 
 export async function generateMetadata({
@@ -180,6 +181,9 @@ export default async function ClientProfilePage({
         purchasedProgramName={purchasedProgramName}
         purchaseRequests={purchaseRequestsResult.data ?? []}
       />
+      <div className="mx-auto mt-6 max-w-4xl">
+        <ExerciseSwapsSection clientId={id} />
+      </div>
     </div>
   );
 }

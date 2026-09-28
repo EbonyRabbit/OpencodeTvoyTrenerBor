@@ -1278,12 +1278,12 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **23.1** | Voice v1.6 — докидки + Repurposing | `.opencode/voice/yuriy-shoshin.md` — добавить блок 5.2 `Adapt: Reels хук 2с, вертикаль 9:16, CTA в телегу через код ЖИР, докидки 1-3/нед вне плана (сторис-мем/видео)`, блок 5.1 `PubMed выжимка: что делали/кто участвовал/что нашли/что значит в 40 лет/1 действие + ссылка`. `AGENTS.md` — `repurposing agent: TG текст → Reels сценарий (7/15/30с) + карусель 5 слайдов + Story 1080×1920` | pending |
-| **23.2** | Content-plan 5+3 с колонками под инсту/ютуб | `docs/content-plan.md` уже есть — расширить колонки `Reels/Shorts (да/нет) | Story 1080×1920 (мем/видео/опрос) | Код ЖИР | ManyChat → канал | CTA → бот | Статус апрува`. Залить сентябрь 20 строк (если пусто — дополнить), бэклог 20 хуков уже есть, добавить вкладку `Сторис-докидки 1-3/нед` | pending |
-| **23.3** | Repurposing — `TG → Reels/Shorts/Story` скрипт | `scripts/repurpose.js` — читает `docs/content-plan.md` строку по `date` → генерит `reels-script.md` (хук 2с + озвучка потоком 10-16 слов без тире) + `story.html 1080×1920` → `Puppeteer screenshot PNG 1080×1920`. Шаблоны `docs/memes/story-template.html` (верх хук, центр картинка, низ `t.me/YuriyShoshin`). Тест: 1 TG пост → 1 Reels скрипт + 1 Story PNG без ручного набора | pending |
-| **23.4** | Шаблоны Story 1080×1920 для докидок | `docs/memes/story-template.html` — вертикаль, `docs/memes/story-soft.html/hard.html/det.html` — 3 градации мемов (мягкий/жёсткий/детский) + `docs/memes/illustrated/` — иллюстрации `Pollinations → Puppeteer overlay` (как `гамак над костром`). Генерация `scripts/generate-story-memes.js`. Проверка: PNG 1080×1920 открывается в инсте без обрезки | pending |
-| **23.5** | PubMed-мониторинг 1/2нед | `bot/scripts/pubmed-monitor.ts` — `fetch https://eutils.ncbi.nlm.nih.gov/entrez/esearch.fcgi?db=pubmed&term=fitness+creatine+steps+sleep+protein&retmax=10 + efetch` → парс `title/abstract` → запись `docs/research/pending.md` 3 темы (заголовок + 1 строка суть + ссылка) → Юра выбирает 1 → выжимка по блоку 5.1 `что делали/кто участвовал/что нашли/что значит в 40 лет/1 действие + ссылка PubMed` → пост в `docs/content-plan.md` без продажи (пометка `исследование`). `cron: '0 9 * * 1'` каждые 2 нед | pending |
-| **23.6** | Верификация + gate | `web tsc` + `next build` + `bot tsc` + `vitest` (repurpose/pubmed) ; ручной тест: TG пост 01.09 → Reels скрипт хук 2с есть → Story PNG 1080×1920 рендерится → PubMed 3 темы в `pending.md` → выбор 1 → пост без продажи в `content-plan.md` помечен `апрyвнуто` ; ревью `@code-reviewer` ≥9.5 | pending |
+| **23.1** | Voice v1.6 — докидки + Repurposing | `.opencode/voice/yuriy-shoshin.md` — добавить блок 5.2 `Adapt: Reels хук 2с, вертикаль 9:16, CTA в телегу через код ЖИР, докидки 1-3/нед вне плана (сторис-мем/видео)`, блок 5.1 `PubMed выжимка: что делали/кто участвовал/что нашли/что значит в 40 лет/1 действие + ссылка`. `AGENTS.md` — `repurposing agent: TG текст → Reels сценарий (7/15/30с) + карусель 5 слайдов + Story 1080×1920` | ✅ done 21.09 (v1.6: блок 5.2, воронка, бот только тренировки; AGENTS repurposing 7/15/30с + карусель) |
+| **23.2** | Content-plan 5+3 с колонками под инсту/ютуб | `docs/content-plan.md` уже есть — расширить колонки `Reels/Shorts (да/нет) | Story 1080×1920 (мем/видео/опрос) | Код ЖИР | ManyChat → канал | CTA → бот | Статус апрува`. Залить сентябрь 20 строк (если пусто — дополнить), бэклог 20 хуков уже есть, добавить вкладку `Сторис-докидки 1-3/нед` | ✅ done 21.09 (колонки Reels/Story/ЖИР, 23 строки, вкладка докидок) |
+| **23.3** | Repurposing — `TG → Reels/Shorts/Story` скрипт | `scripts/repurpose.js` — читает `docs/content-plan.md` строку по `date` → генерит `reels-script.md` (хук 2с + озвучка потоком 10-16 слов без тире) + `story.html 1080×1920` → `Puppeteer screenshot PNG 1080×1920`. Шаблоны `docs/memes/story-template.html` (верх хук, центр картинка, низ `t.me/YuriyShoshin`). Тест: 1 TG пост → 1 Reels скрипт + 1 Story PNG без ручного набора | ✅ done 21.09 (scripts/repurpose.js, тест на 22-23.09) |
+| **23.4** | Шаблоны Story 1080×1920 для докидок | `docs/memes/story-template.html` — вертикаль, `docs/memes/story-soft.html/hard.html/det.html` — 3 градации мемов (мягкий/жёсткий/детский) + `docs/memes/illustrated/` — иллюстрации `Pollinations → Puppeteer overlay` (как `гамак над костром`). Генерация `scripts/generate-story-memes.js`. Проверка: PNG 1080×1920 открывается в инсте без обрезки | ✅ done 21.09 (story-soft/hard/det 1080x1920 PNG + генератор) |
+| **23.5** | PubMed-мониторинг 1/2нед | `bot/scripts/pubmed-monitor.ts` — `fetch https://eutils.ncbi.nlm.nih.gov/entrez/esearch.fcgi?db=pubmed&term=fitness+creatine+steps+sleep+protein&retmax=10 + efetch` → парс `title/abstract` → запись `docs/research/pending.md` 3 темы (заголовок + 1 строка суть + ссылка) → Юра выбирает 1 → выжимка по блоку 5.1 `что делали/кто участвовал/что нашли/что значит в 40 лет/1 действие + ссылка PubMed` → пост в `docs/content-plan.md` без продажи (пометка `исследование`). `cron: '0 9 * * 1'` каждые 2 нед | ✅ done 21.09 (esearch+esummary+efetch, pending с сутью, cron пн 9:00 чётные нед, тест ISO) |
+| **23.6** | Верификация + gate | `web tsc` + `next build` + `bot tsc` + `vitest` (repurpose/pubmed) ; ручной тест: TG пост 01.09 → Reels скрипт хук 2с есть → Story PNG 1080×1920 рендерится → PubMed 3 темы в `pending.md` → выбор 1 → пост без продажи в `content-plan.md` помечен `апрyвнуто` ; ревью `@code-reviewer` ≥9.5 | ✅ done 21.09 (tsc чисто, vitest 476/476, ревью 8 -> фиксы -> 10/10 gate пройден) |
 
 ### Файлы для создания/изменения
 
@@ -1298,3 +1298,37 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `bot/scripts/pubmed-monitor.ts` | Новый (esearch+efetch) |
 | `docs/research/pending.md` | Новый (3 темы/2нед) |
 | `bot/src/lib/research.ts` | Новый (форматтер выжимки) |
+
+---
+
+## Фаза 24: Замена упражнения клиентом (персонально, навсегда)
+
+### Цель
+
+Клиент после покупки программы меняет упражнение под себя прямо в боте (например приседания со штангой → жим ногами). Замена сохраняется навсегда во всех неделях. Шаблон программы в `programs.parsed_content` не меняется никогда — замены живут в отдельной таблице `client_exercise_swaps` и накладываются поверх при показе. Кандидаты подбираются из библиотеки `exercises` по той же группе мышц.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **24.1** | Миграция `client_exercise_swaps` + типы | Supabase миграция: `client_exercise_swaps (id UUID, client_id FK → clients.id ON DELETE CASCADE, exercise_key TEXT, replacement_name TEXT, created_at)` + UNIQUE `(client_id, exercise_key)` + индекс по `client_id` + RLS (клиент читает/пишет только свои, сервис-ключ всё). Типы в `bot/src/lib/types.ts`. Нормализация ключа: lowercase + trim + ё→е | ✅ done 27.09 (миграция + WITH CHECK + original_name, типы bot+web; накат на прод-БД вручную) |
+| **24.2** | Ключ + `applySwaps` + юниты | `bot/src/lib/exercise-swaps.ts`: `normalizeExerciseKey(name)`, `getClientSwaps(clientId)`, `applySwaps(workout, swaps)` (подмена имени в упражнениях дня и в детях суперсетов/кругов, подходы/повторы от оригинала). Юниты `bot/src/lib/__tests__/exercise-swaps.test.ts`: замена/откат/суперсет-ребёнок/нет совпадения | ✅ done 27.09 (12 тестов + swapped_from-метка, ревью 9/10) |
+| **24.3** | Подбор кандидатов из библиотеки | `findSwapCandidates(exerciseName, limit 5)`: резолв оригинала в `exercises` (по `name_key/aliases`), фильтр по тому же `muscle_group`, сортировка по совпадению `equipment` с инвентарём клиента (совпавшие первыми, остальные ниже, не скрывать). Оригинал не найден → вернуть пусто + флаг `no_match`. Юниты на подбор и сортировку | ✅ done 27.09 (в том же exercise-swaps.ts, ранний return на пустом ключе) |
+| **24.4** | Кнопки в боте: замена/выбор/откат | `bot/src/handlers/callbacks.ts` — кнопка `↔️ Замена` в `buildExerciseKeyboard` (`exercise_swap:{index}`), список кандидатов кнопками `swap_pick:{index}:{exerciseId}`, `Вернуть как было` (`swap_revert:{index}`). `bot/src/bot.ts` — роут `swap_*` в `handleSwapCallback` (`bot/src/handlers/exercise-swap.ts`): upsert/delete в `client_exercise_swaps` → обновлённый `showExercise`. Внутри визарда (`state=exercise_log`) кнопку не показывать | ✅ done 27.09 (exercise-swap.ts: open/child/pick/revert/back, ветка ошибки, тесты хендлера) |
+| **24.5** | Проводка в показ и журнал | `getTodayWorkout`/`formatWorkoutMessage` (`/today`) и `showExercise` (карточка) идут через `applySwaps`. Визард пишет в `workout_logs.exercise` уже название замены. Проверка полноты `isTodayWorkoutCompleted` не ломается (ключи `flattenLoggableExercises` после подмены) | ✅ done 27.09 (единая точка getTodayWorkout + строка «вместо X» + фолбэк истории оригинала) |
+| **24.6** | Вебке тренера видно замены | Страница клиента в `web` — строка персональных замен (оригинал → замена + дата) с кнопкой сброса тренером. Файлы по факту структуры `web/src/app/(coach)/clients/[id]/` | ✅ done 27.09 (секция + resetExerciseSwap, web tsc чисто) |
+| **24.7** | Верификация + gate | `bot tsc` + `vitest` (swaps + кандидаты + колбэк) ; ручной тест: купить/назначить программу → `/today` → открыть присед → Замена → выбрать жим ногами → карточка и журнал с новым названием → следующая неделя тоже замена → Вернуть как было → оригинал ; ревью `@code-reviewer` ≥9.5 | ✅ код done 27.09 (tsc оба, vitest 511, web build, ревью 9/10; остались ручные: накат миграции на прод-БД, ручной тест в телеге, деплой) |
+
+### Файлы для создания/изменения
+
+| Файл | Действие |
+|------|----------|
+| `supabase/migrations/*_client_exercise_swaps.sql` | Новый (таблица + RLS) |
+| `bot/src/lib/types.ts` | Изменение (тип строки замен) |
+| `bot/src/lib/exercise-swaps.ts` | Новый (ключ + applySwaps + кандидаты) |
+| `bot/src/lib/__tests__/exercise-swaps.test.ts` | Новый |
+| `bot/src/handlers/exercise-swap.ts` | Новый (колбэки swap_*) |
+| `bot/src/handlers/callbacks.ts` | Изменение (кнопка Замена) |
+| `bot/src/bot.ts` | Изменение (роут swap_*) |
+| `bot/src/lib/workout-utils.ts` | Изменение (applySwaps в today/show) |
+| `web/src/app/(coach)/clients/[id]/` | Изменение (строка замен) |

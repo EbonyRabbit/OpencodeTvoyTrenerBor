@@ -287,6 +287,41 @@ export type Database = {
           },
         ]
       }
+      client_exercise_swaps: {
+        Row: {
+          client_id: string
+          created_at: string
+          exercise_key: string
+          id: string
+          replacement_name: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          exercise_key: string
+          id?: string
+          replacement_name: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          exercise_key?: string
+          id?: string
+          replacement_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_exercise_swaps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           access_end_date: string | null

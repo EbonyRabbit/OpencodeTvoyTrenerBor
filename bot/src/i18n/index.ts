@@ -453,7 +453,7 @@ const resources = {
       },
       guide: {
         intro:
-          "Давай посчитаем твои калории за минуту. Никакой высшей математики только формула 31 и 35. Ответь на три вопроса и заберешь цифры плюс гайд. Ты девушка или мужчина.",
+          "Давай посчитаем твои калории за минуту. Никакой высшей математики, только три вопроса. Ответишь и заберешь цифры плюс гайд. Ты девушка или мужчина.",
         btn_open: "🔢 Посчитать калории",
         ask_sex: "Ты девушка или мужчина. Жми кнопку ниже.",
         btn_female: "Девушка",
@@ -471,7 +471,7 @@ const resources = {
         goal_bulk: "набор",
         goal_maintain: "поддержание",
         result:
-          "Готово. Вес {{weight}} цель {{goal}}. Поддержание около {{maintenance}} ккал. Твоя норма {{target}} ккал белки {{protein}} жиры {{fat}} угли {{carbs}}. Белки держишь. Жиры не режешь ниже единицы на кг. Угли добираешь по остатку. Среднее смотри за 7 дней а не за день.",
+          "Готово. Вес {{weight}} цель {{goal}}. Поддержание около {{maintenance}} ккал. Твоя норма {{target}} ккал белки {{protein}} жиры {{fat}} угли {{carbs}}. Белки держишь. Жиры не режешь ниже единицы на кг. Угли добираешь по остатку.",
         after_result: "Забирай полный гайд с примерами блюд и заменами. Там же метод тарелки если лень считать каждый грамм.",
         btn_pdf: "Забрать гайд",
         btn_plate: "Метод тарелки",
@@ -986,7 +986,7 @@ const resources = {
           "If counting alone is hard let's do 3 months hand-in-hand. Bot counts and reminds and I'll build your plan. Tap Count calories https://t.me/tvoyTrekerBot?start=guide_calories or check /programs.",
       },
       guide: {
-        intro: "Let's count your calories in a minute. Just formula 31 and 35. Answer 3 questions and get numbers plus guide. Are you female or male.",
+        intro: "Let's count your calories in a minute. No hard math, just three questions. Answer and get numbers plus guide. Are you female or male.",
         btn_open: "🔢 Count calories",
         ask_sex: "Are you female or male. Tap below.",
         btn_female: "Female",
@@ -1004,7 +1004,7 @@ const resources = {
         goal_bulk: "bulk",
         goal_maintain: "maintain",
         result:
-          "Done. Weight {{weight}} goal {{goal}}. Maintenance about {{maintenance}} kcal. Your target {{target}} kcal protein {{protein}} fat {{fat}} carbs {{carbs}}. Keep protein hold fat above 1g per kg fill carbs by rest. Watch 7-day average not single day.",
+          "Done. Weight {{weight}} goal {{goal}}. Maintenance about {{maintenance}} kcal. Your target {{target}} kcal protein {{protein}} fat {{fat}} carbs {{carbs}}. Keep protein hold fat above 1g per kg fill carbs by rest.",
         after_result: "Grab the full guide with meal examples and swaps. Plate method inside if you hate counting.",
         btn_pdf: "Get guide",
         btn_plate: "Plate method",

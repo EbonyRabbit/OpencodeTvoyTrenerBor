@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Check, ChevronDown, PlayCircle } from "lucide-react";
 import { logWorkoutFromWeb } from "../actions";
-import { flattenLoggableExercises, getCompositeLetters, type ParsedExercise } from "@/lib/program-utils";
+import { flattenLoggableExercises, getCompositeLetters, isWarmCool, exerciseKind, type ParsedExercise } from "@/lib/program-utils";
 import { buildExerciseLibraryMap, findLibraryEntry, type ExerciseLibraryEntry, type ExerciseLibraryRow } from "@/lib/exercise-library";
 import { extractYouTubeVideoId } from "@/lib/youtube";
 
@@ -292,6 +292,22 @@ export function WorkoutForm({
       const payload = leaves.map((ex, i) => {
         const inp = inputs[i];
         const type = ex.type ?? "strength";
+        if (isWarmCool(ex)) {
+          return {
+            type: "strength" as const,
+            exercise: ex.name,
+            sets: 1,
+            reps: null,
+            weight: null,
+            rpe: null,
+            rounds: null,
+            distance_km: null,
+            duration_sec: null,
+            heart_rate: null,
+            pace: null,
+            comment: inp.comment || null,
+          };
+        }
         if (type === "cardio") {
           return {
             type: "cardio" as const,
@@ -379,11 +395,14 @@ export function WorkoutForm({
                 {badge && <Badge variant="secondary" className="text-[10px]">СУПЕРСЕТ</Badge>}
                 {type === "cardio" && <Badge variant="secondary" className="text-[10px]">КАРДИО</Badge>}
                 {type === "circuit" && <Badge variant="secondary" className="text-[10px]">КРУГ</Badge>}
+                {isWarmCool(ex) && <Badge variant="secondary" className="text-[10px]">{exerciseKind(ex) === "warmup" ? "РАЗМИНКА" : "ЗАМИНКА"} · ОДИН ТАП</Badge>}
               </div>
               {ex.block && (
                 <p className="mb-2 text-xs text-muted-foreground">{ex.block}</p>
               )}
-              {type === "cardio" ? (
+              {isWarmCool(ex) ? (
+                <p className="text-xs text-muted-foreground">Отмечается автоматически как выполненная, подходы вводить не нужно.</p>
+              ) : type === "cardio" ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Field label="Время" value={inputs[i].duration} onChange={(v) => updateField(i, "duration", v)} placeholder={ex.duration ?? "мин"} />
                   <Field label="Дистанция, км" value={inputs[i].distance} onChange={(v) => updateField(i, "distance", v)} placeholder={ex.distance ?? "км"} />

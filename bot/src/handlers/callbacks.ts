@@ -40,7 +40,7 @@ import { buildExerciseLibraryMap } from "../lib/exercise-library.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
-import { getCompositeLetters, type ParsedExercise } from "../lib/program-utils.js";
+import { getCompositeLetters, isWarmCool, type ParsedExercise } from "../lib/program-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { markAsSent } from "../cron/dedup.js";
 import { SKIP_MARKER } from "../lib/log-markers.js";
@@ -118,6 +118,7 @@ export async function callbackRouter(ctx: MyContext): Promise<void> {
 registerCallback("today_open", handleTodayOpen);
 registerCallback("exercise_log", handleExerciseLog);
 registerCallback("exercise_skip", handleExerciseSkip);
+registerCallback("exercise_done_simple", handleExerciseDoneSimple);
 registerCallback("exercise_prev", handleExercisePrev);
 registerCallback("exercise_next", handleExerciseNext);
 registerCallback("exercise_swap", handleSwapOpen);
@@ -198,15 +199,21 @@ function buildExerciseKeyboard(
   index: number,
   total: number,
   lang: Language,
+  ex?: ParsedExercise,
 ): { text: string; callback_data: string }[][] {
   const rows: { text: string; callback_data: string }[][] = [];
 
-  rows.push([
-    { text: t("workout.btn_done", lang), callback_data: `exercise_log:${index}` },
-    { text: t("workout.btn_skip_exercise", lang), callback_data: `exercise_skip:${index}` },
-  ]);
+  // Фаза 25: разминка/заминка — один тап без визарда.
+  if (ex && isWarmCool(ex)) {
+    rows.push([{ text: t("workout.btn_done_simple", lang), callback_data: `exercise_done_simple:${index}` }]);
+  } else {
+    rows.push([
+      { text: t("workout.btn_done", lang), callback_data: `exercise_log:${index}` },
+      { text: t("workout.btn_skip_exercise", lang), callback_data: `exercise_skip:${index}` },
+    ]);
 
-  rows.push([{ text: t("workout.btn_swap", lang), callback_data: `exercise_swap:${index}` }]);
+    rows.push([{ text: t("workout.btn_swap", lang), callback_data: `exercise_swap:${index}` }]);
+  }
 
   const navRow: { text: string; callback_data: string }[] = [];
   if (index > 0) navRow.push({ text: t("workout.btn_prev", lang), callback_data: `exercise_prev:${index}` });
@@ -277,7 +284,7 @@ export async function showExercise(
     { html: true },
   );
   const keyboard = await withLibraryButton(
-    buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language),
+    buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language, currentExercise),
     currentExercise,
     ctx.language,
   );
@@ -371,6 +378,55 @@ async function handleExerciseSkip(ctx: MyContext, params: string): Promise<void>
   }
 
   await ctx.answerCallbackQuery({ text: t("callback.exercise_skipped", ctx.language, { index: index + 1 }) }).catch(() => {});
+  await showExercise(ctx, index + 1);
+}
+
+/** Фаза 25: разминка/заминка одним тапом — визард не стартует. */
+export async function handleExerciseDoneSimple(ctx: MyContext, params: string): Promise<void> {
+  const index = Number(params);
+  if (!Number.isInteger(index) || index < 0 || !params) {
+    await ctx.answerCallbackQuery({ text: t("error.invalid_exercise_index", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
+  if (!ctx.client || !ctx.from?.id) {
+    await ctx.answerCallbackQuery({ text: t("error.user_not_identified", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
+  const workout = await getTodayWorkout(ctx.client);
+  const target = workout?.exercises[index];
+  if (!target || !isWarmCool(target)) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    await showExercise(ctx, index, workout);
+    return;
+  }
+
+  const tz = ctx.client.timezone || DEFAULT_TIMEZONE;
+  const { error } = await supabaseAdmin.from("workout_logs").insert({
+    client_id: ctx.client.id,
+    date: getTodayDateStr(tz),
+    week: workout?.week_number ?? null,
+    day_order: workout?.day_order ?? null,
+    exercise: target.name,
+    sets: 1,
+    reps: null,
+    weight: null,
+    rpe: null,
+    rounds: null,
+    distance_km: null,
+    duration_sec: null,
+    heart_rate: null,
+    pace: null,
+    comment: null,
+  });
+  if (error) {
+    console.warn(`[CALLBACK] done_simple insert failed for ${ctx.client.id}:`, error.message);
+    await ctx.answerCallbackQuery({ text: t("error.service_unavailable", ctx.language), show_alert: true }).catch(() => {});
+    return;
+  }
+
+  await ctx.answerCallbackQuery({ text: t("workout.done_simple_toast", ctx.language) }).catch(() => {});
   await showExercise(ctx, index + 1);
 }
 

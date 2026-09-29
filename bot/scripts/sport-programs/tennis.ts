@@ -91,6 +91,7 @@ function explosive(
 
 function warmup(): ParsedExercise {
   return {
+    kind: "warmup",
     block: "Разминка",
     name: "Разминка: динамика + мобильность ТБС/плеча + активация ягодиц",
   };

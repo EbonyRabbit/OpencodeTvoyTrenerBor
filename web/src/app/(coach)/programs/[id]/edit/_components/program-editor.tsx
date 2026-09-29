@@ -30,7 +30,9 @@ import {
 import {
   isCompositeExercise,
   getCompositeLetters,
+  isWarmCool,
   type ExerciseType,
+  type ExerciseKind,
 } from "@/lib/program-utils";
 import { updateProgramContent, updateProgramType, updateProgramSport } from "../../actions";
 import { Plus, Trash2, Loader2 } from "lucide-react";
@@ -394,6 +396,31 @@ function TypeSelect({
   );
 }
 
+function KindSelect({
+  value,
+  onChange,
+}: {
+  value?: ExerciseKind;
+  onChange: (kind: ExerciseKind | undefined) => void;
+}) {
+  const current = value ?? "work";
+  return (
+    <Select
+      value={current}
+      onValueChange={(v) => onChange((v === "work" ? undefined : v) as ExerciseKind | undefined)}
+    >
+      <SelectTrigger className="h-7 w-24 text-xs" aria-label="Вид упражнения">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="work">Работа</SelectItem>
+        <SelectItem value="warmup">Разминка</SelectItem>
+        <SelectItem value="cooldown">Заминка</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
 function ExerciseRow({
   exercise,
   onUpdate,
@@ -408,7 +435,7 @@ function ExerciseRow({
   allowComposite: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(150px,1.1fr)_92px_86px_minmax(0,1.7fr)_100px_minmax(100px,1fr)_30px] items-start gap-2">
+    <div className="grid grid-cols-[minmax(150px,1.1fr)_92px_86px_86px_minmax(0,1.7fr)_100px_minmax(100px,1fr)_30px] items-start gap-2">
       <div className="flex items-center gap-1">
         {label && (
           <span className="w-6 shrink-0 text-right text-[10px] font-semibold text-muted-foreground">
@@ -437,15 +464,24 @@ function ExerciseRow({
         }}
         allowComposite={allowComposite}
       />
+      <KindSelect
+        value={exercise.kind}
+        onChange={(kind) => onUpdate({ kind })}
+      />
       <Input
         value={exercise.block ?? ""}
         onChange={(e) => onUpdate({ block: e.target.value || undefined })}
         placeholder="Блок"
         className="h-8 text-xs"
       />
-      <div className="flex flex-wrap items-start gap-1.5">
-        <MetricParams exercise={exercise} onUpdate={onUpdate} />
-      </div>
+      {!isWarmCool(exercise) && (
+        <div className="flex flex-wrap items-start gap-1.5">
+          <MetricParams exercise={exercise} onUpdate={onUpdate} />
+        </div>
+      )}
+      {isWarmCool(exercise) && (
+        <span className="self-center text-[10px] text-muted-foreground">один тап «Сделал»</span>
+      )}
       <Input
         value={exercise.rest ?? ""}
         onChange={(e) => onUpdate({ rest: e.target.value || undefined })}

@@ -81,6 +81,7 @@ function explosive(
 
 function warmup(): ParsedExercise {
   return {
+    kind: "warmup",
     block: "Разминка",
     name: "Разминка: мобильность плеча + грудного отдела + активация манжеты",
   };

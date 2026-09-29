@@ -27,6 +27,11 @@ export type ExerciseType = "strength" | "cardio" | "superset" | "circuit";
 
 export const EXERCISE_TYPES: ExerciseType[] = ["strength", "cardio", "superset", "circuit"];
 
+/** Фаза 25: вид упражнения. Разминка/заминка подтверждаются одним тапом без визарда. */
+export type ExerciseKind = "work" | "warmup" | "cooldown";
+
+export const EXERCISE_KINDS: ExerciseKind[] = ["work", "warmup", "cooldown"];
+
 export type ParsedExercise = {
   block?: string;
   name: string;
@@ -43,6 +48,8 @@ export type ParsedExercise = {
   distance?: string;
   pace?: string;
   heart_rate?: string;
+  /** Фаза 25: вид упражнения, дефолт работа. */
+  kind?: ExerciseKind;
   /** Фаза 24: runtime-метка персональной замены, канон не меняет. */
   swapped_from?: string;
 };
@@ -121,6 +128,7 @@ function isValidExercise(value: unknown, isChild = false): value is ParsedExerci
   if (e.distance !== undefined && typeof e.distance !== "string") return false;
   if (e.pace !== undefined && typeof e.pace !== "string") return false;
   if (e.heart_rate !== undefined && typeof e.heart_rate !== "string") return false;
+  if (e.kind !== undefined && !(EXERCISE_KINDS as string[]).includes(e.kind as string)) return false;
   if (e.swapped_from !== undefined && typeof e.swapped_from !== "string") return false;
   if (e.children !== undefined) {
     if (!Array.isArray(e.children)) return false;
@@ -133,6 +141,26 @@ function isValidExercise(value: unknown, isChild = false): value is ParsedExerci
 
 export function isCompositeExercise(exercise: ParsedExercise): boolean {
   return exercise.type === "superset" || exercise.type === "circuit";
+}
+
+/**
+ * Фаза 25: вид упражнения. Явное поле kind, иначе вывод из block/имени
+ * для старых программ (миграция 25.4 проставляет kind физически).
+ */
+export function exerciseKind(ex: Pick<ParsedExercise, "kind" | "block" | "name">): ExerciseKind {
+  if (ex.kind === "warmup" || ex.kind === "cooldown" || ex.kind === "work") return ex.kind;
+  const block = (ex.block ?? "").toLowerCase();
+  if (block.includes("разминка") || block === "активация") return "warmup";
+  if (block.includes("заминка") || block === "восстановление") return "cooldown";
+  const name = (ex.name ?? "").trim().toLowerCase();
+  if (name.startsWith("разминка:") || name === "мобилизация + активация") return "warmup";
+  if (name === "растяжка + восстановление" || name === "растяжка") return "cooldown";
+  return "work";
+}
+
+export function isWarmCool(ex: Pick<ParsedExercise, "kind" | "block" | "name">): boolean {
+  const kind = exerciseKind(ex);
+  return kind === "warmup" || kind === "cooldown";
 }
 
 const COMPOSITE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";

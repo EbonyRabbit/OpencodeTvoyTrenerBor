@@ -7,6 +7,8 @@ import {
   getWorkoutDaysCount,
   isCompositeExercise,
   flattenLoggableExercises,
+  exerciseKind,
+  isWarmCool,
   type ParsedExercise,
 } from "../program-utils.js";
 
@@ -296,5 +298,36 @@ describe("getParsedContent (composites)", () => {
       ],
     };
     expect(getParsedContent(input)).toBeNull();
+  });
+});
+
+describe("exerciseKind (phase 25)", () => {
+  it("prefers explicit kind", () => {
+    expect(exerciseKind({ kind: "warmup", block: "Сила", name: "Присед" })).toBe("warmup");
+    expect(exerciseKind({ kind: "cooldown", block: "Кор", name: "Планка" })).toBe("cooldown");
+    expect(exerciseKind({ kind: "work", block: "Разминка", name: "X" })).toBe("work");
+  });
+
+  it("derives from block for legacy programs", () => {
+    expect(exerciseKind({ block: "Разминка", name: "Мобилизация + активация" })).toBe("warmup");
+    expect(exerciseKind({ block: "Заминка", name: "Растяжка + восстановление" })).toBe("cooldown");
+    expect(exerciseKind({ block: "Сила", name: "Присед" })).toBe("work");
+  });
+
+  it("derives from legacy names", () => {
+    expect(exerciseKind({ name: "Разминка: динамика + мобильность" })).toBe("warmup");
+    expect(exerciseKind({ name: "Растяжка" })).toBe("cooldown");
+  });
+
+  it("isWarmCool matches warmup/cooldown only", () => {
+    expect(isWarmCool({ block: "Разминка", name: "X" })).toBe(true);
+    expect(isWarmCool({ block: "Сила", name: "Присед" })).toBe(false);
+  });
+
+  it("accepts kind in validation", () => {
+    const input = { weeks: [{ week_number: 1, days: [{ day_name: "День 1", day_order: 1, exercises: [{ name: "Моб", block: "Разминка", kind: "warmup" }] }] }] };
+    expect(getParsedContent(input as never)).not.toBeNull();
+    const bad = { weeks: [{ week_number: 1, days: [{ day_name: "День 1", day_order: 1, exercises: [{ name: "Моб", kind: "nope" }] }] }] };
+    expect(getParsedContent(bad as never)).toBeNull();
   });
 });

@@ -478,7 +478,13 @@ const resources = {
         plate_hint:
           "Метод тарелки простой. Четверть белок четверть гарнир половина овощи. Или ладонью одна ладонь белок один кулак гарнир две ладони овощи. Когда надоест на глаз переходи на подсчет.",
         pdf_caption:
-          "Держи гайд по калориям. Внутри формула 31 и 35 примеры для 60 68 80 92 кг конструктор блюд и разбор плато. Взвешивайся утром считай среднее за неделю. А расскажи считал сегодня.",
+          "Держи гайд по калориям. Внутри подробный разбор как правильно посчитать себе норму и что делать при наборе и дефиците. Плюс примерный набор блюд под твою ситуацию. А у тебя сейчас набор или похудение. Расскажи.",
+        done_cut:
+          "Понял, идём на похудение. Смотри среднее за неделю а не за день и режь не больше 10 процентов за раз. Одному держать дефицит скучно, давай три месяца за руку. Жми Связаться и приходи на кураторство. А что мешает больше всего. Время или срывы. Расскажи.",
+        done_bulk:
+          "Понял, идём на набор. Добавляй плюс 10 процентов и следи чтобы росло не больше 0.3 кг в неделю. Тут главное база и прогрессия, остальное приложится. Жми Смотреть программы и бери план под себя. А где тренируешься. Дома или в зале. Расскажи.",
+        done_other:
+          "Принял. Короче цифры у тебя уже есть, дальше решает регулярность. Хочешь готовый план под себя жми Смотреть программы. Хочешь чтобы я вёл за руку жми Связаться и приходи на кураторство. А с чего начнёшь. Расскажи.",
       },
       swap: {
         list_title: "Чем заменить «{{name}}». Та же группа мышц, действует навсегда во всех неделях.",
@@ -1003,7 +1009,13 @@ const resources = {
         btn_pdf: "Get guide",
         btn_plate: "Plate method",
         plate_hint: "Plate method simple. Quarter protein quarter side half veggies. Or palm one palm protein one fist side two palms veggies.",
-        pdf_caption: "Here is your calorie guide. Formula 31 and 35 examples meal builder and plateau fix inside. Weigh mornings average 7 days.",
+        pdf_caption: "Here is your calorie guide. Inside a detailed breakdown of your norm and what to adjust for bulk and cut. Plus a sample meal set for your case. Are you bulking or cutting now. Tell me.",
+        done_cut:
+          "Got it, cutting. Watch the weekly average not single days and cut no more than 10 percent at a time. Holding a deficit alone is boring, let's do 3 months hand-in-hand. Tap Contact and join mentoring. What gets in the way most. Time or slip-ups. Tell me.",
+        done_bulk:
+          "Got it, bulking. Add plus 10 percent and keep gains under 0.3 kg a week. Basics and progression matter most here. Tap Browse programs and grab your plan. Where do you train. Home or gym. Tell me.",
+        done_other:
+          "Got it. You have the numbers, consistency decides next. Want a ready plan tap Browse programs. Want me by your side tap Contact for mentoring. Where will you start. Tell me.",
       },
       swap: {
         list_title: "What to swap «{{name}}» for. Same muscle group, applies forever across all weeks.",

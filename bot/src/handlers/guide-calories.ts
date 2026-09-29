@@ -237,9 +237,35 @@ export async function handleGuideInput(ctx: MyContext): Promise<boolean> {
     return true;
   }
 
-  if (step === "done") return false;
+  if (step === "done") {
+    await handleDoneReply(ctx, text);
+    return true;
+  }
 
   return false;
+}
+
+function detectDoneTopic(text: string): GuideGoal | null {
+  const low = text.toLowerCase();
+  if (/похуд|худе|сброс|дефицит|стройн|похудеть|(?<![a-zа-яё])cut(?![a-zа-яё])/.test(low)) return "cut";
+  if (/набрать|набор|профицит|масс(?!аж)|(?<![a-zа-яё])bulk(?![a-zа-яё])/.test(low)) return "bulk";
+  return null;
+}
+
+async function handleDoneReply(ctx: MyContext, text: string): Promise<void> {
+  const topic = detectDoneTopic(text);
+  const key = topic === "cut" ? "guide.done_cut" : topic === "bulk" ? "guide.done_bulk" : "guide.done_other";
+  const keyboard = new InlineKeyboard()
+    .text(t("programs.view_button", ctx.language), "programs_open")
+    .row()
+    .text(t("coach_request.button", ctx.language), "coach_request");
+  await safeReply(ctx, t(key, ctx.language), { reply_markup: keyboard });
+  try {
+    const { handleFreeTextMessage } = await import("./chat.js");
+    await handleFreeTextMessage(ctx);
+  } catch (err) {
+    console.warn(`[GUIDE] done forward failed:`, err);
+  }
 }
 
 async function sendResult(ctx: MyContext, sex: GuideSex, weight: number, goal: GuideGoal): Promise<void> {

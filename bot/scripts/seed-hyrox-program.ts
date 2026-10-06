@@ -249,9 +249,9 @@ function buildDay1(phase: Phase): ParsedDay {
     focus: "Присед, жим лёжа, взрывная работа, подтягивания/брусья с весом, гребля",
     exercises: [
       warmup(),
+      ex("Power clean (толчок штанги)", p.sets, p.reps, p.weight, p.rpe, p.rest, "Взрывная работа", "Взрыв"),
       ex("Приседания со штангой", s.sets, s.reps, s.weight, s.rpe, s.rest),
       ex("Жим штанги лёжа", s.sets, s.reps, s.weight, s.rpe, s.rest),
-      ex("Power clean (толчок штанги)", p.sets, p.reps, p.weight, p.rpe, p.rest, "Взрывная работа", "Взрыв"),
       ex("Подтягивания с весом", w.sets, w.reps, w.weight, w.rpe, "90 с", "Добавочный вес на поясе"),
       ex("Брусья с весом", w.sets, w.reps, w.weight, w.rpe, "90 с", "Добавочный вес на поясе"),
       ex("Гребля 500 м", r.sets, r.reps, "", r.rpe, "", r.notes, "Выносливость"),
@@ -286,7 +286,7 @@ function buildDay2(week: number, phase: Phase): ParsedDay {
       warmup(),
       superset("Суперсет 1 · Ноги + вертикальная тяга", h.sets, [
         { name: "Болгарские выпады", sets: h.sets, reps: `${h.reps}/нога`, weight: "рабочий", rpe: h.rpe, notes: "Колено-доминантное" },
-        { name: "Подтягивания", sets: h.sets, reps: h.reps, weight: "свой вес", rpe: h.rpe },
+        { name: "Однуручная тяга вертикальная обратным хватом", sets: h.sets, reps: h.reps, weight: "рабочий", rpe: h.rpe, notes: "Одноручная тяга верт. обратным хватом" },
       ], ssNote),
       superset("Суперсет 2 · Тазо-дом + вертикальный жим", h.sets, ss2Children, rotate
         ? `${ssNote} Чередование недели: отведения + тяга к лицу вместо жима вверх.`
@@ -372,11 +372,11 @@ function buildDay4(week: number, phase: Phase): ParsedDay {
     focus: "Становая, силовой армейский жим, санки, запрыгивания, темповый бег/брик",
     exercises: [
       warmup(),
+      ex("Запрыгивания на тумбу", box.sets, box.reps, box.weight, "7-8", "60 с", "Плиометрика: мягкое приземление"),
       ex("Становая тяга", s.sets, s.reps, s.weight, s.rpe, s.rest),
       ex("Армейский жим (силовой)", s.sets, s.reps, s.weight, s.rpe, s.rest),
       ex("Санки толкать", sled.sets, sled.reps, sled.weight, "8-9", "90 с", sled.notes),
       ex("Санки тянуть", sled.sets, sled.reps, sled.weight, "8-9", "90 с", sled.notes),
-      ex("Запрыгивания на тумбу", box.sets, box.reps, box.weight, "7-8", "60 с", "Плиометрика: мягкое приземление"),
       tempo,
       cooldown(),
     ],
@@ -408,7 +408,7 @@ function buildDay5(week: number, phase: Phase): ParsedDay {
     exercises: [
       warmup(),
       superset("Суперсет 1 · Ноги + вертикальная тяга", h.sets, [
-        { name: "Приседания в ножницы с гантелями", sets: h.sets, reps: `${h.reps}/нога`, weight: "рабочий", rpe: h.rpe, notes: "Колено-доминантное" },
+        { name: "Шагающие выпады", sets: h.sets, reps: `${h.reps}/нога`, weight: "рабочий", rpe: h.rpe, notes: "Колено-доминантное" },
         { name: "Тяга верхнего блока", sets: h.sets, reps: h.reps, weight: "рабочий", rpe: h.rpe },
       ], ssNote),
       superset("Суперсет 2 · Тазо-дом + вертикальный жим", h.sets, ss2Children, rotate
@@ -416,10 +416,10 @@ function buildDay5(week: number, phase: Phase): ParsedDay {
         : ssNote),
       superset("Суперсет 3 · Горизонтальная тяга + трицепс", acc.sets, [
         { name: "Тяга штанги в наклоне", sets: acc.sets, reps: acc.reps, weight: "рабочий", rpe: acc.rpe, notes: "Горизонтальная тяга" },
-        { name: "Французский жим (EZ-штанга)", sets: acc.sets, reps: acc.reps, weight: "рабочий", rpe: acc.rpe },
+        { name: "Разгибание предплечья из-за головы в тренажере", sets: acc.sets, reps: acc.reps, weight: "рабочий", rpe: acc.rpe, notes: "Overhead tricep extension" },
       ], ssNote),
       superset("Суперсет 4 · Горизонтальный жим + бицепс", acc.sets, [
-        { name: "Жим гантелей лёжа", sets: acc.sets, reps: acc.reps, weight: "рабочий", rpe: acc.rpe, notes: "Горизонтальный жим" },
+        { name: "Жим в тренажере сидя от груди", sets: acc.sets, reps: acc.reps, weight: "рабочий", rpe: acc.rpe, notes: "Жим сидя от груди (тренажёр)" },
         { name: "Сгибания EZ-штангой на бицепс", sets: acc.sets, reps: acc.reps, weight: "рабочий", rpe: acc.rpe },
       ], ssNote),
     ],

@@ -217,7 +217,30 @@ function cardioRun(distance: string, pace = "разговорный темп", h
 }
 
 function machine(name: string, distance: string, notes: string): ParsedExercise {
-  return { block: "Станция", name, sets: "1", reps: distance, notes };
+  return { type: "cardio", block: "Станция", name, distance, pace: notes || undefined };
+}
+
+function station(name: string, reps: string, notes: string): ParsedExercise {
+  return { block: "Станция", name, sets: "1", reps, notes };
+}
+
+function rowRun(r: { sets: string; reps: string; rpe: string; notes: string }): ParsedExercise {
+  const distance = r.reps && r.reps !== "-" ? r.reps : "500 м";
+  const rounds = r.sets && r.sets !== "1" ? ` ${r.sets}×${distance}` : "";
+  const notes = [r.notes, r.rpe ? `RPE ${r.rpe}` : ""].filter(Boolean).join(" · ");
+  return { type: "cardio", block: "Выносливость", name: `Гребля${rounds}`, distance, notes };
+}
+
+function tempoRun(name: string, t: { sets: string; reps: string; rpe: string; notes: string }): ParsedExercise {
+  const rounds = t.sets && t.sets !== "1" ? ` ${t.sets}×${t.reps}` : "";
+  return {
+    type: "cardio",
+    block: "Бег",
+    name: `${name}${rounds}`,
+    duration: t.reps,
+    pace: t.notes,
+    notes: t.rpe ? `RPE ${t.rpe}` : "",
+  };
 }
 
 function legSupersetChildren(
@@ -254,7 +277,7 @@ function buildDay1(phase: Phase): ParsedDay {
       ex("Жим штанги лёжа", s.sets, s.reps, s.weight, s.rpe, s.rest),
       ex("Подтягивания с весом", w.sets, w.reps, w.weight, w.rpe, "90 с", "Добавочный вес на поясе"),
       ex("Брусья с весом", w.sets, w.reps, w.weight, w.rpe, "90 с", "Добавочный вес на поясе"),
-      ex("Гребля 500 м", r.sets, r.reps, "", r.rpe, "", r.notes, "Выносливость"),
+      rowRun(r),
       cooldown(),
     ],
   };
@@ -334,12 +357,12 @@ function buildDay4(week: number, phase: Phase): ParsedDay {
       machine("Бег", "1 км", "Гоночный темп"),
       machine("SkiErg", "1000 м", ""),
       machine("Бег", "1 км", "Гоночный темп"),
-      machine("Wall Ball", "100 (9 кг)", ""),
+      station("Wall Ball", "100 (9 кг)", ""),
     ]);
   } else if (week === 9) {
     tempo = circuit("Брик: четверть гонки", "Непрерывно, отдых = только переходы между станциями", [
       machine("Бег", "1 км", "Гоночный темп"),
-      machine("Санки толкать", "50 м", ""),
+      station("Санки толкать", "50 м", ""),
       machine("Бег", "1 км", "Гоночный темп"),
       machine("Гребля", "1000 м", ""),
     ]);
@@ -348,22 +371,22 @@ function buildDay4(week: number, phase: Phase): ParsedDay {
       machine("Бег", "1 км", "Гоночный темп"),
       machine("SkiErg", "1000 м", ""),
       machine("Бег", "1 км", "Гоночный темп"),
-      machine("Санки толкать", "50 м", ""),
+      station("Санки толкать", "50 м", ""),
       machine("Бег", "1 км", "Гоночный темп"),
       machine("Гребля", "1000 м", ""),
       machine("Бег", "1 км", "Гоночный темп"),
-      machine("Wall Ball", "100 (9 кг)", ""),
+      station("Wall Ball", "100 (9 кг)", ""),
     ]);
   } else if (phase === "base") {
-    tempo = ex("Темповый бег", TEMPO_REST.sets, TEMPO_REST.reps, "", TEMPO_REST.rpe, "", TEMPO_REST.notes, "Бег");
+    tempo = tempoRun("Темповый бег", TEMPO_REST);
   } else if (phase === "dev") {
-    tempo = ex("Темповый бег", TEMPO_DEV.sets, TEMPO_DEV.reps, "", TEMPO_DEV.rpe, "", TEMPO_DEV.notes, "Бег");
+    tempo = tempoRun("Темповый бег", TEMPO_DEV);
   } else if (phase === "taper") {
-    tempo = ex("Темповый бег", TEMPO_TAPER.sets, TEMPO_TAPER.reps, "", TEMPO_TAPER.rpe, "3 мин", TEMPO_TAPER.notes, "Бег");
+    tempo = tempoRun("Темповый бег", TEMPO_TAPER);
   } else if (phase === "deload") {
-    tempo = ex("Лёгкий бег", TEMPO_DELOAD.sets, TEMPO_DELOAD.reps, "", TEMPO_DELOAD.rpe, "", TEMPO_DELOAD.notes, "Бег");
+    tempo = tempoRun("Лёгкий бег", TEMPO_DELOAD);
   } else {
-    tempo = ex("Лёгкий бег", TEMPO_LIGHT.sets, TEMPO_LIGHT.reps, "", TEMPO_LIGHT.rpe, "", TEMPO_LIGHT.notes, "Бег");
+    tempo = tempoRun("Лёгкий бег", TEMPO_LIGHT);
   }
 
   return {
@@ -645,7 +668,7 @@ function buildRaceWeek(): ParsedDay[] {
         { block: "Активация", name: "Wall Ball (9 кг)", sets: "3", reps: "10", weight: "9 кг", rpe: "6" },
         { block: "Активация", name: "Гоблет-присед (16 кг)", sets: "3", reps: "10", weight: "16 кг", rpe: "6" },
         { block: "Активация", name: "Бёрпи", sets: "3", reps: "5", rpe: "6" },
-        { block: "Активация", name: "Лёгкий бег", sets: "1", reps: "1 км", rpe: "6" },
+        { type: "cardio", block: "Активация", name: "Лёгкий бег", distance: "1 км", pace: "лёгкий темп", notes: "RPE 6" },
         cooldown(),
       ],
     },

@@ -1364,3 +1364,29 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `bot/src/handlers/callbacks.ts` | Изменение (кнопка Сделал + роут) |
 | `supabase/migrations/*_exercise_kind_backfill.sql` или скрипт | Новый (миграция 7 программ + бэкап) |
 | `web/src/app/client/[token]/workout/` | Изменение (один тап) |
+
+---
+
+## Фаза 26: Кардио-тип для упражнений выносливости (HYROX)
+
+### Цель
+
+Бег, гребля, SkiErg и другие упражнения выносливости в HYROX-программе логируются как кардио: визард спрашивает дистанцию и продолжительность вместо подходов, повторов и веса. Темп и пульс стали необязательными с кнопкой «Пропустить».
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **26.1** | Визард кардио | `pace` и `heart_rate` в `getStepPrompt` (`bot/src/handlers/wizard.ts`) → `required: false`, появляется «Пропустить». Дистанция и время обязательны | ✅ done 16.10 |
+| **26.2** | Сид: `machine()` | Станции бриков и AMRAP (Бег/SkiErg/Гребля/Лыжи) → `type: "cardio"` с `distance`/`pace`. Новый `station()` оставил Wall Ball и Санки силовыми | ✅ done 16.10 |
+| **26.3** | Сид: Day 1 гребля | Helper `rowRun`: `Гребля 4-5×500 м`, distance 500 м, отдых/RPE в notes | ✅ done 16.10 |
+| **26.4** | Сид: Day 4 бег | Helper `tempoRun`: duration из reps, темп в pace, RPE в notes; тейпер 3×8 в имени | ✅ done 16.10 |
+| **26.5** | Сид: гоночная неделя | «Лёгкий бег» в блоке Активация → cardio (kind остаётся warmup, один тап) | ✅ done 16.10 |
+| **26.6** | Верификация + gate | tsc, vitest 523, пересид в прод (65 cardio, бег/гребля с sets+reps — 0), backfill kind dry-run 0. Ревью ≥9.5 | ✅ код done 16.10 (остался ручной тест в телеге) |
+
+### Файлы
+
+| Файл | Действие |
+|------|----------|
+| `bot/src/handlers/wizard.ts` | Изменение (pace/HR необязательны) |
+| `bot/scripts/seed-hyrox-program.ts` | Изменение (machine/station/rowRun/tempoRun + кардио-вызовы) |

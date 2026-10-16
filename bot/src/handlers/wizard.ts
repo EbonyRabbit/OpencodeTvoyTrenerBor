@@ -125,9 +125,9 @@ function getStepPrompt(step: WizardStep, lang: Language): { text: string; hint: 
     case "distance":
       return { text: t("wizard.step_distance", lang), hint: t("wizard.step_distance_hint", lang), required: true };
     case "pace":
-      return { text: t("wizard.step_pace", lang), hint: t("wizard.step_pace_hint", lang), required: true };
+      return { text: t("wizard.step_pace", lang), hint: t("wizard.step_pace_hint", lang), required: false };
     case "heart_rate":
-      return { text: t("wizard.step_heart_rate", lang), hint: t("wizard.step_heart_rate_hint", lang), required: true };
+      return { text: t("wizard.step_heart_rate", lang), hint: t("wizard.step_heart_rate_hint", lang), required: false };
     case "rounds":
       return { text: t("wizard.step_rounds", lang), hint: t("wizard.step_rounds_hint", lang), required: true };
   }

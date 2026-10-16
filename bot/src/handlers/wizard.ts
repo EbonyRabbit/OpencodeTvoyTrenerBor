@@ -108,7 +108,7 @@ function getNextStep(currentStep: string, data: WizardData): WizardStep | null {
   return steps[idx + 1];
 }
 
-function getStepPrompt(step: WizardStep, lang: Language): { text: string; hint: string; required: boolean } {
+export function getStepPrompt(step: WizardStep, lang: Language): { text: string; hint: string; required: boolean } {
   switch (step) {
     case "sets":
       return { text: t("wizard.step_sets", lang), hint: t("wizard.step_sets_hint", lang), required: true };

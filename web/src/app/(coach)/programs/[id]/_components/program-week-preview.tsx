@@ -285,6 +285,16 @@ export function ProgramWeekPreview({ parsed }: { parsed: ParsedContent | null })
   return (
     <div>
       <h2 className="mb-4 text-lg font-semibold">Содержание программы</h2>
+      {parsed.glossary && parsed.glossary.length > 0 && (
+        <div className="mb-4 rounded-xl border bg-sky-50/50 p-3 dark:bg-sky-950/10">
+          <h3 className="mb-1 text-sm font-medium">Справка</h3>
+          <ul className="list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
+            {parsed.glossary.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {parsed.notes && parsed.notes.length > 0 && (
         <div className="mb-4 rounded-xl border bg-amber-50/50 p-3 dark:bg-amber-950/10">
           <h3 className="mb-1 text-sm font-medium">Примечания</h3>

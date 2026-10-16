@@ -229,4 +229,17 @@ describe("getParsedContent (composites)", () => {
     };
     expect(getParsedContent(withContent(input))).toBeNull();
   });
+
+  it("accepts valid glossary", () => {
+    const input = { weeks: [], glossary: ["RPE — воспринимаемая нагрузка 1-10"] };
+    expect(getParsedContent(withContent(input))).toEqual(input);
+  });
+
+  it("rejects glossary with non-string items", () => {
+    expect(getParsedContent(withContent({ weeks: [], glossary: [1] }))).toBeNull();
+  });
+
+  it("rejects glossary that is not an array", () => {
+    expect(getParsedContent(withContent({ weeks: [], glossary: "RPE" }))).toBeNull();
+  });
 });

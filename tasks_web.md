@@ -1382,7 +1382,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **26.3** | Сид: Day 1 гребля | Helper `rowRun`: `Гребля 4-5×500 м`, distance 500 м, отдых/RPE в notes | ✅ done 16.10 |
 | **26.4** | Сид: Day 4 бег | Helper `tempoRun`: duration из reps, темп в pace, RPE в notes; тейпер 3×8 в имени | ✅ done 16.10 |
 | **26.5** | Сид: гоночная неделя | «Лёгкий бег» в блоке Активация → cardio (kind остаётся warmup, один тап) | ✅ done 16.10 |
-| **26.6** | Верификация + gate | tsc, vitest 523, пересид в прод (65 cardio, бег/гребля с sets+reps — 0), backfill kind dry-run 0. Ревью ≥9.5 | ✅ код done 16.10 (остался ручной тест в телеге) |
+| **26.6** | Верификация + gate | tsc, vitest 523, пересид в прод (65 cardio, бег/гребля с sets+reps — 0), backfill kind dry-run 0. Ревью ≥9.5 | ✅ done 16.10 (ревью 9.7; остались ручные тесты в телеге) |
 
 ### Файлы
 
@@ -1408,7 +1408,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | **27.3** | Сиды остальных программ | Гипертрофия: RPE, AMRAP, «рабочий ≈70% 1ПМ» (3). Домашка: RPE, «рабочий» (2). Теннис: RPE + зоны пульса (heart_rate Z2-Z3) (2). Swimming/Triathlon/Running: RPE (по 1, у всех есть rpe-поля визарда) | ✅ done 16.10 (все 7 программ пересозданы) |
 | **27.4** | Секция в боте | `my-program.ts`: после description выводить `parsed.glossary` с заголовком `program.glossary_header` (i18n ru/en), под учётом truncateMessage | ✅ done 16.10 |
 | **27.5** | Тест | Новый `my-program.test.ts`: секция видна при glossary, скрыта без него (3 теста) | ✅ done 16.10 |
-| **27.6** | Верификация + gate | tsc bot+web, vitest (526 bot + 288 web), пересид 7 программ, backfill kind (dry-run 0), коммит/пуш, ревью ≥9.5 | ✅ код done 16.10 (остался ручной тест в телеге + ревью) |
+| **27.6** | Верификация + gate | tsc bot+web, vitest (526 bot + 288 web), пересид 7 программ, backfill kind (dry-run 0), коммит/пуш, ревью ≥9.5 | ✅ done 16.10 (ревью 9.7 после fix 2439c8a: glossary-блок в веб-превью + тесты валидации/wizard; vitest 533 bot + 291 web) |
 
 ### Файлы
 

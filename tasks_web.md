@@ -1390,3 +1390,36 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 |------|----------|
 | `bot/src/handlers/wizard.ts` | Изменение (pace/HR необязательны) |
 | `bot/scripts/seed-hyrox-program.ts` | Изменение (machine/station/rowRun/tempoRun + кардио-вызовы) |
+
+---
+
+## Фаза 27: Справка по терминам для клиента в /program (глоссарий)
+
+### Цель
+
+Клиент видит в карточках профессиональные термины (Z1-Z5, RPE, AMRAP, HRmax, названия станций), но расшифровки нигде не находит. Глоссарий уже написан в `notes` программ — он показывается только коучу в веб-превью. Задача: отделить справочные пункты в отдельное поле `glossary` и показывать их клиенту в ответе /program. Названия и заметки упражнений не меняем.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **27.1** | Поле `glossary` | `glossary?: string[]` в `ParsedContent`: `bot/src/lib/program-utils.ts`, `web/src/lib/program-utils.ts` (тип + валидация, опционально, обратно совместимо) | ⬜ план |
+| **27.2** | Сид HYROX | В `glossary`: «Зоны пульса Z1-Z5», «AMRAP: 20 минут...», «Гоночные веса станций...», новое «RPE — воспринимаемая нагрузка 1-10». Операционное остаётся в `notes` | ⬜ план |
+| **27.3** | Сиды гипертрофии/домашки/тенниса | Гипертрофия: RPE, AMRAP, «рабочий ≈70% 1ПМ». Домашка: RPE, «рабочий». Теннис: зоны пульса (heart_rate Z2-Z3 без расшифровки), RPE. Бег — без справки (термины не использует) | ⬜ план |
+| **27.4** | Секция в боте | `my-program.ts`: после description выводить `parsed.glossary` с заголовком `program.glossary_header` (i18n ru/en), под учётом truncateMessage | ⬜ план |
+| **27.5** | Тест | Новый `my-program.test.ts`: секция видна при glossary, скрыта без него | ⬜ план |
+| **27.6** | Верификация + gate | tsc bot+web, vitest (523+), пересид 4 программ, backfill kind, коммит/пуш, ревью ≥9.5 | ⬜ план |
+
+### Файлы
+
+| Файл | Действие |
+|------|----------|
+| `bot/src/lib/program-utils.ts` | Изменение (тип + валидация glossary) |
+| `web/src/lib/program-utils.ts` | Изменение (зеркало) |
+| `bot/scripts/seed-hyrox-program.ts` | Изменение (перенос справки в glossary) |
+| `bot/scripts/seed-hypertrophy-fullbody.ts` | Изменение (glossary) |
+| `bot/scripts/seed-home-fullbody.ts` | Изменение (glossary) |
+| `bot/scripts/sport-programs/tennis.ts` | Изменение (glossary) |
+| `bot/src/handlers/my-program.ts` | Изменение (секция Справка) |
+| `bot/src/i18n/index.ts` | Изменение (program.glossary_header ru/en) |
+| `bot/src/handlers/__tests__/my-program.test.ts` | Новый |

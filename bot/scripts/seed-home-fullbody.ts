@@ -295,6 +295,11 @@ const PROGRAM_NOTES = [
   "Сон 7-8 часов, белок 1.6-2 г/кг веса. Техника важнее веса: при нарушении техники вес не добавляй.",
 ];
 
+const PROGRAM_GLOSSARY = [
+  "RPE - воспринимаемая нагрузка по шкале 1-10: 10 - максимум; до 7 можно разговаривать, 8-9 - тяжело, 10 - полный отказ.",
+  "«рабочий» - стартовый рабочий вес под клиента (≈70% от 1ПМ), дальше прогрессия по таблице недель.",
+];
+
 function buildContent(): ParsedContent {
   return {
     version: 1,
@@ -302,6 +307,7 @@ function buildContent(): ParsedContent {
     generated_at: new Date().toISOString(),
     columns: ["Блок", "Упражнение", "Подходы", "Повторы", "Вес", "RPE", "Отдых", "Заметки"],
     notes: PROGRAM_NOTES,
+    glossary: PROGRAM_GLOSSARY,
     weeks: buildWeeks(),
   };
 }

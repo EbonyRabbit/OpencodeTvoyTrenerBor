@@ -1403,12 +1403,12 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
-| **27.1** | Поле `glossary` | `glossary?: string[]` в `ParsedContent`: `bot/src/lib/program-utils.ts`, `web/src/lib/program-utils.ts` (тип + валидация, опционально, обратно совместимо) | ⬜ план |
-| **27.2** | Сид HYROX | В `glossary`: «Зоны пульса Z1-Z5», «AMRAP: 20 минут...», «Гоночные веса станций...», новое «RPE — воспринимаемая нагрузка 1-10». Операционное остаётся в `notes` | ⬜ план |
-| **27.3** | Сиды гипертрофии/домашки/тенниса | Гипертрофия: RPE, AMRAP, «рабочий ≈70% 1ПМ». Домашка: RPE, «рабочий». Теннис: зоны пульса (heart_rate Z2-Z3 без расшифровки), RPE. Бег — без справки (термины не использует) | ⬜ план |
-| **27.4** | Секция в боте | `my-program.ts`: после description выводить `parsed.glossary` с заголовком `program.glossary_header` (i18n ru/en), под учётом truncateMessage | ⬜ план |
-| **27.5** | Тест | Новый `my-program.test.ts`: секция видна при glossary, скрыта без него | ⬜ план |
-| **27.6** | Верификация + gate | tsc bot+web, vitest (523+), пересид 4 программ, backfill kind, коммит/пуш, ревью ≥9.5 | ⬜ план |
+| **27.1** | Поле `glossary` | `glossary?: string[]` в `ParsedContent`: `bot/src/lib/program-utils.ts`, `web/src/lib/program-utils.ts` (тип + валидация, опционально, обратно совместимо) | ✅ done 16.10 |
+| **27.2** | Сид HYROX | В `glossary`: «Зоны пульса Z1-Z5», «AMRAP: 20 минут...», «Гоночные веса станций...», новое «RPE — воспринимаемая нагрузка 1-10». Операционное остаётся в `notes` | ✅ done 16.10 (glossary 4, notes 6) |
+| **27.3** | Сиды остальных программ | Гипертрофия: RPE, AMRAP, «рабочий ≈70% 1ПМ» (3). Домашка: RPE, «рабочий» (2). Теннис: RPE + зоны пульса (heart_rate Z2-Z3) (2). Swimming/Triathlon/Running: RPE (по 1, у всех есть rpe-поля визарда) | ✅ done 16.10 (все 7 программ пересозданы) |
+| **27.4** | Секция в боте | `my-program.ts`: после description выводить `parsed.glossary` с заголовком `program.glossary_header` (i18n ru/en), под учётом truncateMessage | ✅ done 16.10 |
+| **27.5** | Тест | Новый `my-program.test.ts`: секция видна при glossary, скрыта без него (3 теста) | ✅ done 16.10 |
+| **27.6** | Верификация + gate | tsc bot+web, vitest (526 bot + 288 web), пересид 7 программ, backfill kind (dry-run 0), коммит/пуш, ревью ≥9.5 | ✅ код done 16.10 (остался ручной тест в телеге + ревью) |
 
 ### Файлы
 

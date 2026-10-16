@@ -141,6 +141,14 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
       lines.push(t("program.description", ctx.language, { text: program.description }));
     }
 
+    if (parsed?.glossary && parsed.glossary.length > 0) {
+      lines.push("");
+      lines.push(t("program.glossary_header", ctx.language));
+      for (const item of parsed.glossary) {
+        lines.push(`• ${item}`);
+      }
+    }
+
     const message = lines.join("\n");
     if (message.length > TELEGRAM_MAX_MESSAGE_LENGTH) {
       const limit = TELEGRAM_MAX_MESSAGE_LENGTH - truncationSuffix.length - 1;

@@ -9,6 +9,8 @@ export type ParsedContent = {
   columns?: string[];
   weeks?: ParsedWeek[];
   notes?: string[];
+  /** Фаза 27: справочные пункты (глоссарий терминов) для клиента. */
+  glossary?: string[];
 };
 
 export type ParsedWeek = {
@@ -64,6 +66,7 @@ function isValidParsedContent(value: unknown): value is ParsedContent {
   if (obj.generated_at !== undefined && typeof obj.generated_at !== "string") return false;
   if (obj.columns !== undefined && (!Array.isArray(obj.columns) || !obj.columns.every((c) => typeof c === "string"))) return false;
   if (obj.notes !== undefined && (!Array.isArray(obj.notes) || !obj.notes.every((n) => typeof n === "string"))) return false;
+  if (obj.glossary !== undefined && (!Array.isArray(obj.glossary) || !obj.glossary.every((n) => typeof n === "string"))) return false;
   if (obj.weeks !== undefined) {
     if (!Array.isArray(obj.weeks)) return false;
     for (const w of obj.weeks) {

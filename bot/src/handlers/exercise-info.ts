@@ -1,12 +1,15 @@
 import type { MyContext } from "../bot.js";
-import { supabaseAdmin } from "../lib/supabase-admin.js";
 import {
   buildExerciseLibraryMap,
   formatExerciseInfo,
   normalizeExerciseName,
   type ExerciseLibraryEntry,
-  type ExerciseLibraryRow,
 } from "../lib/exercise-library.js";
+import {
+  LIBRARY_SELECT,
+  clearExerciseLibraryCache,
+  loadExerciseLibraryRows,
+} from "../lib/exercise-library-cache.js";
 import { t, type Language } from "../i18n/index.js";
 import { escapeHtml, truncateMessage } from "../lib/workout-utils.js";
 import type { ParsedExercise } from "../lib/program-utils.js";
@@ -22,50 +25,7 @@ import type { ParsedExercise } from "../lib/program-utils.js";
 //     из техники каждого найденного ребёнка)
 // hash = первые 8 hex SHA-1 от normalize(name) конкретного упражнения.
 
-export const LIBRARY_SELECT =
-  "id, name, name_key, aliases, technique_ru, technique_en, features_ru, features_en, video_url";
-
-const LIBRARY_CACHE_TTL_MS = 5 * 60 * 1000;
-let cache: { rows: ExerciseLibraryRow[]; fetchedAt: number } | null = null;
-let inFlight: Promise<ExerciseLibraryRow[]> | null = null;
-
-export function clearExerciseLibraryCache(): void {
-  cache = null;
-  inFlight = null;
-}
-
-export async function loadExerciseLibraryRows(): Promise<ExerciseLibraryRow[]> {
-  if (inFlight) return inFlight;
-  const now = Date.now();
-  if (cache && now - cache.fetchedAt < LIBRARY_CACHE_TTL_MS) {
-    return cache.rows;
-  }
-
-  const task = supabaseAdmin
-    .from("exercises")
-    .select(LIBRARY_SELECT)
-    .then(({ data, error }): ExerciseLibraryRow[] => {
-      if (error) {
-        console.error(`[EXERCISE_INFO] Library query error:`, error.message);
-        // Транзитная ошибка БД - отдаём прошлый снимок вместо «не найдено».
-        return cache?.rows ?? [];
-      }
-      const rows = (data ?? []) as unknown as ExerciseLibraryRow[];
-      cache = { rows, fetchedAt: Date.now() };
-      return rows;
-    });
-
-  inFlight = Promise.resolve(task)
-    .catch(() => {
-      // Транспортный reject (сеть, таймаут) - stale-снимок вместо пустоты.
-      console.error(`[EXERCISE_INFO] Library fetch rejected`);
-      return cache?.rows ?? [];
-    })
-    .finally(() => {
-      inFlight = null;
-    });
-  return inFlight;
-}
+export { LIBRARY_SELECT, clearExerciseLibraryCache, loadExerciseLibraryRows };
 
 async function sha1Hex(text: string): Promise<string> {
   const buffer = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(text));

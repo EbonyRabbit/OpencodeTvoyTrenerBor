@@ -85,9 +85,14 @@ describe("handleSwapOpen", () => {
     const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     fromMock.from
       .mockReturnValueOnce(chain({ data: { equipment: "Штанга" }, error: null }))
-      .mockReturnValueOnce(chain({ data: [{ id: "o", name: "Приседания со штангой", name_key: "приседаниясоштангой", aliases: [], muscle_group: "Ноги" }], error: null }))
       .mockReturnValueOnce(
-        chain({ data: [{ id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" }], error: null }),
+        chain({
+          data: [
+            { id: "o", name: "Приседания со штангой", name_key: "приседаниясоштангой", aliases: [], muscle_group: "Ноги" },
+            { id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" },
+          ],
+          error: null,
+        }),
       )
       .mockReturnValue(chain({ data: [], error: null }));
     const ctx = makeCtx();
@@ -98,11 +103,28 @@ describe("handleSwapOpen", () => {
     expect(JSON.stringify(kb)).toContain("swap_pick:0:-1:b");
   });
 
+  it("shows a service error when the library is unavailable", async () => {
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from
+      .mockReturnValueOnce(chain({ data: { equipment: null }, error: null }))
+      .mockReturnValue(chain({ data: null, error: { message: "boom" } } as never));
+    const ctx = makeCtx();
+    await handleSwapOpen(ctx, "0");
+    expect(String((ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).toContain(
+      "Сервис временно недоступен",
+    );
+  });
+
   it("falls back to exercise view when no match", async () => {
     const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     fromMock.from
       .mockReturnValueOnce(chain({ data: { equipment: null }, error: null }))
-      .mockReturnValue(chain({ data: [], error: null }));
+      .mockReturnValue(
+        chain({
+          data: [{ id: "x", name: "Жим лёжа", name_key: "жимлежа", aliases: [], muscle_group: "Грудь" }],
+          error: null,
+        }),
+      );
     const ctx = makeCtx();
     await handleSwapOpen(ctx, "0");
     const calls = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls;

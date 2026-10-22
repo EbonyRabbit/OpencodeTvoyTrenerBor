@@ -1,0 +1,2 @@
+# Local seed backups (contain library snapshot)
+scripts/*backup-*.json

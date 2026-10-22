@@ -12,6 +12,8 @@ export interface ExerciseLibraryRow {
   name: string;
   name_key: string;
   aliases: string[];
+  muscle_group?: string | null;
+  equipment?: string | null;
   description_ru: string | null;
   description_en: string | null;
   technique_ru: string | null;

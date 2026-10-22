@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin.js";
 import { normalizeExerciseName } from "./exercise-library.js";
+import { loadExerciseLibraryRows } from "./exercise-library-cache.js";
 import { EXERCISE_GROUP_FALLBACKS, type ExerciseGroup } from "./exercise-groups.js";
 import type { ParsedExercise } from "./program-utils.js";
 
@@ -113,66 +114,54 @@ function equipmentMatches(equipment: string | null | undefined, tokens: string[]
 /**
  * Кандидаты на замену: та же группа мышц из библиотеки, кроме оригинала.
  * Совпавшие по инвентарю (подсказка из programs.equipment) — первыми,
- * остальные ниже, ничего не скрываем. Пусто + noMatch, если оригинал
- * в библиотеке не найден.
+ * остальные ниже, ничего не скрываем.
+ *
+ * Оригинал ищем в два прохода: сначала точное каноническое имя (name_key,
+ * затем name), и только потом алиасы - как buildExerciseLibraryMap.
+ * При пустой библиотеке возвращаем error, чтобы не путать с «нет замен».
  */
 export async function findSwapCandidates(
   originalName: string,
   equipmentHint: string | null | undefined,
   limit = 5,
-): Promise<{ candidates: SwapCandidate[]; noMatch: boolean }> {
+): Promise<{ candidates: SwapCandidate[]; noMatch: boolean; error: boolean }> {
   const key = normalizeExerciseKey(originalName);
-  if (!key) return { candidates: [], noMatch: true };
+  if (!key) return { candidates: [], noMatch: true, error: false };
 
-  // Ищем оригинал по name_key, имени и алиасам в нормализованном виде:
-  // алиасы в БД хранятся «как есть» (с пробелами/пунктуацией), поэтому
-  // PostgREST-фильтр по массиву тут не подходит.
-  const { data: libraryRows, error: origErr } = await supabaseAdmin
-    .from("exercises")
-    .select("id, name, name_key, aliases, muscle_group");
-  if (origErr) {
-    console.warn(`[SWAPS] findSwapCandidates lookup error:`, origErr.message);
-    return { candidates: [], noMatch: true };
+  const libraryRows = await loadExerciseLibraryRows();
+  if (libraryRows.length === 0) {
+    console.warn(`[SWAPS] library is empty or unavailable for "${originalName}"`);
+    return { candidates: [], noMatch: false, error: true };
   }
-  const orig = (libraryRows ?? []).find((row) => {
-    if (normalizeExerciseKey(row.name_key ?? "") === key) return true;
-    if (normalizeExerciseKey(row.name ?? "") === key) return true;
-    return (row.aliases ?? []).some((alias) => normalizeExerciseKey(alias) === key);
-  }) as { id: string; muscle_group: string | null } | undefined;
-  if (!orig?.muscle_group) return { candidates: [], noMatch: true };
 
-  const loadCandidates = async (groups: string[]) => {
-    const { data, error } = await supabaseAdmin
-      .from("exercises")
-      .select("id, name, muscle_group, equipment")
-      .in("muscle_group", groups)
-      .neq("id", orig.id)
-      .limit(limit * 3);
-    if (error) {
-      console.warn(`[SWAPS] findSwapCandidates list error:`, error.message);
-      return null;
-    }
-    return (data ?? []) as Omit<SwapCandidate, "equipmentMatch">[];
-  };
+  // Детерминированный порядок: при совпадении алиасов двух записей
+  // выбираем запись с меньшим id, а не случайную строку из ответа БД.
+  const rows = [...libraryRows].sort((a, b) => a.id.localeCompare(b.id));
+  const byCanonicalName = (row: (typeof rows)[number]): boolean =>
+    normalizeExerciseKey(row.name_key ?? "") === key || normalizeExerciseKey(row.name ?? "") === key;
+  const orig =
+    rows.find(byCanonicalName) ??
+    rows.find((row) => (row.aliases ?? []).some((alias) => normalizeExerciseKey(alias) === key));
+  if (!orig?.muscle_group) return { candidates: [], noMatch: true, error: false };
 
-  let rows = await loadCandidates([orig.muscle_group]);
-  if (rows === null) return { candidates: [], noMatch: true };
-
-  if (rows.length === 0) {
-    const fallbacks = (EXERCISE_GROUP_FALLBACKS[orig.muscle_group as ExerciseGroup] ?? []).filter(
-      (group) => group !== orig.muscle_group,
-    );
-    if (fallbacks.length > 0) {
-      const fallbackRows = await loadCandidates(fallbacks);
-      if (fallbackRows && fallbackRows.length > 0) rows = fallbackRows;
-    }
+  const groups: string[] = [orig.muscle_group];
+  for (const group of EXERCISE_GROUP_FALLBACKS[orig.muscle_group as ExerciseGroup] ?? []) {
+    if (!groups.includes(group)) groups.push(group);
   }
 
   const tokens = equipmentTokens(equipmentHint);
-  const scored = rows.map((r) => ({
-    ...r,
-    equipmentMatch: equipmentMatches(r.equipment, tokens),
+  const candidates = rows.filter(
+    (row) => row.id !== orig.id && row.muscle_group != null && groups.includes(row.muscle_group),
+  );
+  if (candidates.length === 0) return { candidates: [], noMatch: true, error: false };
+
+  const scored = candidates.map((row) => ({
+    id: row.id,
+    name: row.name,
+    muscle_group: row.muscle_group ?? null,
+    equipment: row.equipment ?? null,
+    equipmentMatch: equipmentMatches(row.equipment, tokens),
   }));
   scored.sort((a, b) => Number(b.equipmentMatch) - Number(a.equipmentMatch));
-  return { candidates: scored.slice(0, limit), noMatch: false };
+  return { candidates: scored.slice(0, limit), noMatch: false, error: false };
 }

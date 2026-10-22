@@ -74,6 +74,10 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const legacyGroup =
+    form.muscleGroup && !(EXERCISE_GROUPS as readonly string[]).includes(form.muscleGroup)
+      ? form.muscleGroup
+      : null;
   const [deleting, setDeleting] = useState(false);
 
   const ruAliases = lineList(form.aliases, (v) => setForm({ ...form, aliases: v }));
@@ -153,6 +157,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
               <SelectValue placeholder="Выбери группу" />
             </SelectTrigger>
             <SelectContent>
+              {legacyGroup ? <SelectItem value={legacyGroup}>{legacyGroup} (текущее)</SelectItem> : null}
               {EXERCISE_GROUPS.map((group) => (
                 <SelectItem key={group} value={group}>
                   {group}

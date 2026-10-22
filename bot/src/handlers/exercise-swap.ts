@@ -56,7 +56,13 @@ async function showCandidates(
   if (!ctx.client) return;
   const hint = await programEquipmentHint(ctx.client.program_id);
   const original = originalNameOf(target);
-  const { candidates, noMatch } = await findSwapCandidates(original, hint, CANDIDATE_LIMIT);
+  const { candidates, noMatch, error } = await findSwapCandidates(original, hint, CANDIDATE_LIMIT);
+
+  if (error) {
+    await ctx.reply(t("error.service_unavailable", lang));
+    await showExercise(ctx, index);
+    return;
+  }
 
   if (noMatch || candidates.length === 0) {
     await ctx.reply(t("swap.no_match", lang, { name: original } as Record<string, string>));

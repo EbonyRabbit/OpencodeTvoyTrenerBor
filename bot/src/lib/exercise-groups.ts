@@ -1,3 +1,4 @@
+// ⚠️ MUST stay in sync with web/src/lib/exercise-groups.ts (те же 14 групп).
 export const EXERCISE_GROUPS = [
   "Грудь",
   "Спина",

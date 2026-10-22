@@ -17,6 +17,7 @@ vi.mock("../../lib/supabase-admin.js", () => ({
 }));
 
 import { supabaseAdmin } from "../../lib/supabase-admin.js";
+import { clearExerciseLibraryCache } from "../exercise-library-cache.js";
 import {
   normalizeExerciseKey,
   getClientSwaps,
@@ -44,6 +45,7 @@ function mockFrom(result: { data: unknown; error: null }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearExerciseLibraryCache();
 });
 
 describe("normalizeExerciseKey", () => {
@@ -122,68 +124,123 @@ describe("saveSwap / revertSwap", () => {
 });
 
 describe("findSwapCandidates", () => {
-  it("noMatch when original not in library", async () => {
-    mockFrom({ data: [], error: null });
+  it("noMatch when original not in a non-empty library", async () => {
+    mockFrom({
+      data: [{ id: "x", name: "Жим лёжа", name_key: "жимлежа", aliases: [], muscle_group: "Грудь" }],
+      error: null,
+    });
     const r = await findSwapCandidates("Неизвестное", null);
-    expect(r).toEqual({ candidates: [], noMatch: true });
+    expect(r).toEqual({ candidates: [], noMatch: true, error: false });
   });
 
   it("noMatch when original has no muscle group", async () => {
-    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
-    fromMock.from.mockReturnValueOnce(
-      chain({ data: [{ id: "orig", name_key: "жимлежа", muscle_group: null }], error: null }),
-    );
+    mockFrom({
+      data: [
+        { id: "orig", name_key: "жимлежа", name: "Жим лёжа", aliases: [], muscle_group: null },
+        { id: "x", name: "Жим гантелей", name_key: "жимгантелей", aliases: [], muscle_group: "Грудь" },
+      ],
+      error: null,
+    });
     const r = await findSwapCandidates("Жим лёжа", null);
-    expect(r).toEqual({ candidates: [], noMatch: true });
+    expect(r).toEqual({ candidates: [], noMatch: true, error: false });
   });
 
   it("same muscle group, excludes original, equipment first", async () => {
-    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
-    fromMock.from
-      .mockReturnValueOnce(
-        chain({ data: [{ id: "orig", name_key: "присед", muscle_group: "Ноги" }], error: null }),
-      )
-      .mockReturnValueOnce(
-        chain({
-          data: [
-            { id: "a", name: "Выпады", muscle_group: "Ноги", equipment: "Гантели" },
-            { id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" },
-          ],
-          error: null,
-        }),
-      );
-    const r = await findSwapCandidates("Присед", "тренажёр гантели");
+    mockFrom({
+      data: [
+        { id: "orig", name: "Присед", name_key: "присед", aliases: [], muscle_group: "Ноги" },
+        { id: "a", name: "Выпады", muscle_group: "Ноги", equipment: "Гантели" },
+        { id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" },
+        { id: "c", name: "Планка", muscle_group: "Кор", equipment: "Коврик" },
+      ],
+      error: null,
+    });
+    const r = await findSwapCandidates("Присед", "гантели");
     expect(r.noMatch).toBe(false);
-    expect(r.candidates.map((c) => c.id)).not.toContain("orig");
-    expect(r.candidates).toHaveLength(2);
-    expect(fromMock.from).toHaveBeenCalledTimes(2);
+    expect(r.candidates.map((c) => c.id)).toEqual(["a", "b"]);
+    expect(r.candidates[0].equipmentMatch).toBe(true);
   });
 
-  it("finds original by a multi-word alias", async () => {
-    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
-    fromMock.from
-      .mockReturnValueOnce(
-        chain({
-          data: [
-            {
-              id: "orig",
-              name: "Выпады с гантелями",
-              name_key: "выпадысгантелями",
-              aliases: ["Шагающие выпады"],
-              muscle_group: "Ноги",
-            },
-          ],
-          error: null,
-        }),
-      )
-      .mockReturnValueOnce(
-        chain({
-          data: [{ id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" }],
-          error: null,
-        }),
-      );
+  it("falls back to related groups when the primary group has no peers", async () => {
+    mockFrom({
+      data: [
+        { id: "orig", name: "Подъём на носки", name_key: "подъемнаноски", aliases: [], muscle_group: "Икры" },
+        { id: "legs", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" },
+        { id: "chest", name: "Жим лёжа", muscle_group: "Грудь", equipment: "Штанга" },
+      ],
+      error: null,
+    });
+    const r = await findSwapCandidates("Подъём на носки", null);
+    expect(r.noMatch).toBe(false);
+    expect(r.candidates.map((c) => c.id)).toEqual(["legs"]);
+  });
+
+  it("resolves a multi-word alias", async () => {
+    mockFrom({
+      data: [
+        {
+          id: "orig",
+          name: "Выпады с гантелями",
+          name_key: "выпадысгантелями",
+          aliases: ["Шагающие выпады"],
+          muscle_group: "Ноги",
+        },
+        { id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" },
+      ],
+      error: null,
+    });
     const r = await findSwapCandidates("Шагающие выпады", null);
     expect(r.noMatch).toBe(false);
     expect(r.candidates.map((c) => c.id)).toEqual(["b"]);
+  });
+
+  it("prefers a canonical name over another row's alias", async () => {
+    mockFrom({
+      data: [
+        {
+          id: "alias-owner",
+          name: "Становая тяга",
+          name_key: "становаятяга",
+          aliases: ["Румынская тяга"],
+          muscle_group: "Ягодицы",
+        },
+        {
+          id: "canonical",
+          name: "Румынская тяга",
+          name_key: "румынскаятяга",
+          aliases: [],
+          muscle_group: "Ягодицы",
+        },
+        { id: "c", name: "Ягодичный мост", muscle_group: "Ягодицы", equipment: "Штанга" },
+      ],
+      error: null,
+    });
+    const r = await findSwapCandidates("Румынская тяга", null);
+    expect(r.noMatch).toBe(false);
+    const ids = r.candidates.map((c) => c.id);
+    expect(ids).toContain("alias-owner");
+    expect(ids).toContain("c");
+  });
+
+  it("caps candidates at the limit", async () => {
+    const data = [
+      { id: "orig", name: "Присед", name_key: "присед", aliases: [], muscle_group: "Ноги" },
+      ...Array.from({ length: 8 }, (_, i) => ({
+        id: `n${i}`,
+        name: `Ноги ${i}`,
+        muscle_group: "Ноги",
+        equipment: null,
+      })),
+    ];
+    mockFrom({ data, error: null });
+    const r = await findSwapCandidates("Присед", null, 3);
+    expect(r.candidates).toHaveLength(3);
+  });
+
+  it("returns error instead of noMatch when the library query fails", async () => {
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockReturnValue(chain({ data: null, error: { message: "boom" } } as never));
+    const r = await findSwapCandidates("Присед", null);
+    expect(r).toEqual({ candidates: [], noMatch: false, error: true });
   });
 });

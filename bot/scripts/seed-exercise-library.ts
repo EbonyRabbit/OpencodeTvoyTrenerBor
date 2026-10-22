@@ -14,6 +14,8 @@
  */
 import "dotenv/config";
 import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { supabaseAdmin } from "../src/lib/supabase-admin.js";
 import { normalizeExerciseName } from "../src/lib/exercise-library.js";
 import type { ExerciseGroup } from "../src/lib/exercise-groups.js";
@@ -1038,8 +1040,11 @@ function isFilled(value: string | null | undefined): boolean {
   return Boolean(value && value.trim().length > 0);
 }
 
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+
 async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
+  const forceMeta = process.argv.includes("--force-meta");
   const missingMeta = EXERCISES.filter((ex) => !EXERCISE_META[ex.name]);
   if (missingMeta.length > 0) {
     console.error("Нет группы/инвентаря для:", missingMeta.map((ex) => ex.name).join(", "));
@@ -1066,15 +1071,16 @@ async function main(): Promise<void> {
       console.error("Failed to back up exercises:", backupError.message);
       process.exit(1);
     }
-    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const backupPath = `scripts/exercises-backup-${stamp}.json`;
-    writeFileSync(backupPath, JSON.stringify(allRows ?? [], null, 2));
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
+    const backupPath = join(SCRIPT_DIR, `exercises-backup-${stamp}.json`);
+    writeFileSync(backupPath, JSON.stringify(allRows ?? [], null, 2), { flag: "wx" });
     console.log(`Backup: ${backupPath} (${(allRows ?? []).length} rows)`);
   }
 
   let inserted = 0;
   let updated = 0;
   let untouched = 0;
+  let failed = 0;
 
   for (const ex of EXERCISES) {
     const meta = EXERCISE_META[ex.name];
@@ -1109,6 +1115,7 @@ async function main(): Promise<void> {
           console.warn(`  ${ex.name}: race on name_key - skip (exists)`);
         } else {
           console.error(`  ${ex.name}: insert failed - ${error.message}`);
+          failed++;
         }
         continue;
       }
@@ -1117,7 +1124,8 @@ async function main(): Promise<void> {
     }
 
     // Контент заполняем только когда пуст (тренер мог отредактировать).
-    // Справочные поля muscle_group/equipment - канонические, обновляем всегда.
+    // Группа всегда каноническая; инвентарь не перетираем, если тренер
+    // уже что-то вписал, - для принудительного обновления есть --force-meta.
     const patch: {
       aliases?: string[];
       muscle_group?: string;
@@ -1131,7 +1139,9 @@ async function main(): Promise<void> {
     } = {};
 
     if (row.muscle_group !== meta.group) patch.muscle_group = meta.group;
-    if (row.equipment !== meta.equipment) patch.equipment = meta.equipment;
+    if ((forceMeta || !isFilled(row.equipment)) && row.equipment !== meta.equipment) {
+      patch.equipment = meta.equipment;
+    }
     if (!isFilled(row.technique_ru)) patch.technique_ru = ex.techniqueRu;
     if (!isFilled(row.technique_en)) patch.technique_en = ex.techniqueEn;
     if (!isFilled(row.description_ru)) patch.description_ru = ex.descriptionRu;
@@ -1161,6 +1171,7 @@ async function main(): Promise<void> {
     const { error } = await supabaseAdmin.from("exercises").update(patch).eq("id", row.id);
     if (error) {
       console.error(`  ${ex.name}: update failed - ${error.message}`);
+      failed++;
       continue;
     }
     updated++;
@@ -1169,9 +1180,15 @@ async function main(): Promise<void> {
   // Спорт-сиды (теннис/бег/плавание/триатлон) добавляют упражнения отдельно.
   // Приводим их группы/инвентарь к канону, не трогая контент.
   const seedNames = new Set(EXERCISES.map((ex) => ex.name));
+  const seenMeta = new Set<string>();
+  const metaByNorm = new Map(
+    Object.entries(EXERCISE_META).map(
+      ([name, meta]) => [normalizeExerciseName(name), { name, meta }] as const,
+    ),
+  );
   const { data: allRows, error: allError } = await supabaseAdmin
     .from("exercises")
-    .select("id, name, muscle_group, equipment");
+    .select("id, name, name_key, muscle_group, equipment");
   if (allError) {
     console.error("Failed to load exercises for canonical group pass:", allError.message);
     process.exit(1);
@@ -1179,9 +1196,21 @@ async function main(): Promise<void> {
   let extraUpdated = 0;
   for (const row of allRows ?? []) {
     if (seedNames.has(row.name)) continue;
-    const meta = EXERCISE_META[row.name];
-    if (!meta) continue;
-    if (row.muscle_group === meta.group && row.equipment === meta.equipment) continue;
+    // Ищем meta по нормализованному имени/name_key: display name мог быть
+    // отредактирован в CRUD, а ключ меты остался прежним.
+    const metaEntry = EXERCISE_META[row.name]
+      ? { name: row.name, meta: EXERCISE_META[row.name] }
+      : metaByNorm.get(normalizeExerciseName(row.name)) ??
+        metaByNorm.get(normalizeExerciseName(row.name_key));
+    if (!metaEntry) continue;
+    seenMeta.add(metaEntry.name);
+    const meta = metaEntry.meta;
+    const patch: { muscle_group?: string; equipment?: string } = {};
+    if (row.muscle_group !== meta.group) patch.muscle_group = meta.group;
+    if ((forceMeta || !isFilled(row.equipment)) && row.equipment !== meta.equipment) {
+      patch.equipment = meta.equipment;
+    }
+    if (Object.keys(patch).length === 0) continue;
     if (dryRun) {
       console.log(`  [DRY] canonicalize: ${row.name} (${row.muscle_group ?? "—"} → ${meta.group})`);
       extraUpdated++;
@@ -1189,19 +1218,28 @@ async function main(): Promise<void> {
     }
     const { error } = await supabaseAdmin
       .from("exercises")
-      .update({ muscle_group: meta.group, equipment: meta.equipment })
+      .update(patch)
       .eq("id", row.id);
     if (error) {
       console.error(`  ${row.name}: canonical group update failed - ${error.message}`);
+      failed++;
       continue;
     }
     extraUpdated++;
   }
 
+  for (const ex of EXERCISES) seenMeta.add(ex.name);
+  const unusedMeta = Object.keys(EXERCISE_META).filter((name) => !seenMeta.has(name));
+  if (unusedMeta.length > 0) {
+    console.warn(`Meta without DB row (${unusedMeta.length}): ${unusedMeta.join(", ")}`);
+  }
+
   console.log(
-    `${dryRun ? "[DRY-RUN] " : ""}Done. Inserted: ${inserted}, updated: ${updated}, untouched: ${untouched}, ` +
-    `canonicalized: ${extraUpdated} (total seed entries: ${EXERCISES.length})`,
+    `${dryRun ? "[DRY-RUN] " : ""}Done. Inserted: ${inserted}, updated: ${updated}, ` +
+    `untouched: ${untouched}, canonicalized: ${extraUpdated}, failed: ${failed} ` +
+    `(total seed entries: ${EXERCISES.length})`,
   );
+  if (failed > 0) process.exitCode = 1;
 }
 
 main().catch((err) => {

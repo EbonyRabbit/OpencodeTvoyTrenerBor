@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifySession } from "@/lib/dal";
 import { normalizeExerciseName } from "@/lib/exercise-library";
-import { isExerciseGroup } from "@/lib/exercise-groups";
+import { toExerciseGroup } from "@/lib/exercise-groups";
 import type { ExerciseFormData } from "./form-data";
 import type { Database } from "@/types/supabase";
 
@@ -29,7 +29,10 @@ function isRedirectError(error: unknown): boolean {
   );
 }
 
-function validateAndBuild(data: ExerciseFormData): { payload?: ExerciseInsert; error?: string } {
+function validateAndBuild(
+  data: ExerciseFormData,
+  currentMuscleGroup?: string | null,
+): { payload?: ExerciseInsert; error?: string } {
   if (typeof data !== "object" || data === null || typeof data.name !== "string") {
     return { error: "Некорректные данные формы" };
   }
@@ -70,10 +73,16 @@ function validateAndBuild(data: ExerciseFormData): { payload?: ExerciseInsert; e
     return { error: "Недопустимое значение сложности" };
   }
 
-  const muscleGroup = data.muscleGroup.trim();
-  if (!isExerciseGroup(muscleGroup)) {
+  // Старые строки могут содержать NULL или свободный текст: разрешаем
+  // сохранить их без изменений, но смена группы возможна только на канон.
+  const rawMuscleGroup = data.muscleGroup.trim();
+  const canonicalGroup = toExerciseGroup(rawMuscleGroup);
+  const keepLegacyGroup =
+    currentMuscleGroup !== undefined && rawMuscleGroup === (currentMuscleGroup ?? "").trim();
+  if (!canonicalGroup && !keepLegacyGroup) {
     return { error: "Выбери группу мышц из списка" };
   }
+  const muscleGroup = canonicalGroup ?? (rawMuscleGroup || null);
 
   const overMaxText = (
     value: string,
@@ -211,7 +220,15 @@ export async function updateExercise(
       return { error: "Нет прав" };
     }
 
-    const { payload, error } = validateAndBuild(data);
+    const { data: current, error: currentError } = await supabaseAdmin
+      .from("exercises")
+      .select("muscle_group")
+      .eq("id", id)
+      .maybeSingle();
+    if (currentError) return { error: "Не удалось сохранить упражнение" };
+    if (!current) return notFoundError();
+
+    const { payload, error } = validateAndBuild(data, current.muscle_group);
     if (error || !payload) return { error };
 
     const { name_key: _unusedNameKey, ...updatePayload } = payload;

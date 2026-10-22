@@ -93,6 +93,13 @@ describe("createExercise", () => {
     expect(result.error).toBe("Выбери группу мышц из списка");
   });
 
+  it("accepts a canonical group in a different case", async () => {
+    const chain = mockTable({ error: null, data: { id: UUID } });
+    const result = await createExercise({ ...VALID_DATA, muscleGroup: "грудь" });
+    expect(result.error).toBeUndefined();
+    expect(chain.insert).toHaveBeenCalledWith(expect.objectContaining({ muscle_group: "Грудь" }));
+  });
+
   it("normalizes ё to е in name_key", async () => {
     const chain = mockTable({ error: null, data: { id: UUID } });
     await createExercise({ ...VALID_DATA, name: "Подъём на ёлку" });
@@ -208,8 +215,44 @@ describe("updateExercise", () => {
     expect(result.error).toBe("Название обязательно");
   });
 
+  it("keeps a legacy muscle group unchanged", async () => {
+    const chain = mockTable({ error: null, data: { id: UUID, muscle_group: "Грудь/Трицепс" } });
+    const result = await updateExercise(UUID, { ...VALID_DATA, muscleGroup: "Грудь/Трицепс" });
+    expect(result.error).toBeUndefined();
+    const payload = (chain.update.mock.calls[0] as unknown[])[0];
+    expect(payload).toEqual(expect.objectContaining({ muscle_group: "Грудь/Трицепс" }));
+  });
+
+  it("rejects an unknown group when replacing a legacy value", async () => {
+    mockTable({ error: null, data: { id: UUID, muscle_group: "Грудь/Трицепс" } });
+    const result = await updateExercise(UUID, { ...VALID_DATA, muscleGroup: "Другое" });
+    expect(result.error).toBe("Выбери группу мышц из списка");
+  });
+
   it("maps duplicate key errors on update", async () => {
-    mockTable(mockErrorResult("23505"));
+    const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    const prefetch = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { muscle_group: "Грудь" }, error: null }),
+    };
+    prefetch.select.mockReturnValue(prefetch);
+    prefetch.eq.mockReturnValue(prefetch);
+
+    const updateChain = {
+      update: vi.fn(),
+      eq: vi.fn(),
+      select: vi.fn(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "23505", message: "duplicate" },
+      }),
+    };
+    updateChain.update.mockReturnValue(updateChain);
+    updateChain.eq.mockReturnValue(updateChain);
+    updateChain.select.mockReturnValue(updateChain);
+
+    fake.from.mockReturnValueOnce(prefetch).mockReturnValueOnce(updateChain);
     const result = await updateExercise(UUID, VALID_DATA);
     expect(result.error).toBe("Упражнение с таким названием уже есть в библиотеке");
   });

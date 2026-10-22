@@ -1423,3 +1423,37 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `bot/src/handlers/my-program.ts` | Изменение (секция Справка) |
 | `bot/src/i18n/index.ts` | Изменение (program.glossary_header ru/en) |
 | `bot/src/handlers/__tests__/my-program.test.ts` | Новый |
+
+---
+
+## Фаза 28: Замена упражнений — канонические группы и библиотека
+
+### Цель
+
+Кнопка «Замена» у клиента почти всегда отвечала «нет доступных упражнений»: у 81 из 108 упражнений библиотеки `muscle_group` был NULL (сид писал null), остальные группы были свободным текстом, а алиасы программ не находились. Привести библиотеку к 14 каноническим группам, заполнить группу и инвентарь для всех упражнений и починить поиск.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **28.1** | Канонические группы | `bot/src/lib/exercise-groups.ts` + зеркало в web: 14 групп (Грудь, Спина, Ноги, Ягодицы, Плечи, Бицепс, Трицепс, Кор, Икры, Предплечья, Приводящие, Голеностоп, Кардио, Взрывная работа), `isExerciseGroup` | ✅ done 22.10 |
+| **28.2** | Сид библиотеки | `EXERCISE_META` на 108 упражнений (группа + инвентарь), `EXTRA_ALIASES`, `--dry-run`, бэкап, второй проход канонизации спортивных строк | ✅ done 22.10 (бэкап 108 строк, 84 updated, 21 canonicalized, 0 inserts) |
+| **28.3** | Поиск замен | `findSwapCandidates`: нормализованный поиск оригинала по name/name_key/алиасам (алиасы в БД хранятся сырыми, `.cs` не работал), fallback для редких групп (Икры/Приводящие/Голеностоп→Ноги, Предплечья→Бицепс), стем-сравнение инвентаря | ✅ done 22.10 |
+| **28.4** | Web CRUD | Группа мышц в форме упражнения — Select из канона, валидация `isExerciseGroup` в actions | ✅ done 22.10 |
+| **28.5** | Аудит покрытия | `bot/scripts/audit-swap-coverage.ts`: по всем 7 программам, служебные блоки («Кор-круг», «Мобильность») исключены | ✅ done 22.10 (235/235 ок, 0 проблем) |
+| **28.6** | Тесты + gate | Тесты на алиасы, NULL-группу и невалидную группу в web; tsc bot+web, vitest, ревью ≥9.5 | ⏳ tsc/vitest зелёные (535 bot + 292 web), ждём ревью |
+
+### Файлы
+
+| Файл | Действие |
+|------|----------|
+| `bot/src/lib/exercise-groups.ts` | Новый (группы + fallback) |
+| `web/src/lib/exercise-groups.ts` | Новый (зеркало) |
+| `bot/scripts/seed-exercise-library.ts` | Изменение (meta, алиасы, dry-run, бэкап, канонизация) |
+| `bot/scripts/audit-swap-coverage.ts` | Новый |
+| `bot/src/lib/exercise-swaps.ts` | Изменение (поиск оригинала, fallback групп, инвентарь) |
+| `web/src/app/(coach)/exercises/_components/exercise-form.tsx` | Изменение (Select) |
+| `web/src/app/(coach)/exercises/actions.ts` | Изменение (валидация) |
+| `bot/src/handlers/__tests__/exercise-swap.test.ts` | Изменение (новая схема мока) |
+| `bot/src/lib/__tests__/exercise-swaps.test.ts` | Изменение (+2 теста) |
+| `web/src/app/(coach)/exercises/__tests__/actions.test.ts` | Изменение (+1 тест) |

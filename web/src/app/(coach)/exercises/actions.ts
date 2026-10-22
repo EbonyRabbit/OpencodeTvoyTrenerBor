@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifySession } from "@/lib/dal";
 import { normalizeExerciseName } from "@/lib/exercise-library";
+import { isExerciseGroup } from "@/lib/exercise-groups";
 import type { ExerciseFormData } from "./form-data";
 import type { Database } from "@/types/supabase";
 
@@ -67,6 +68,11 @@ function validateAndBuild(data: ExerciseFormData): { payload?: ExerciseInsert; e
   const difficulty = data.difficulty.trim();
   if (!ALLOWED_DIFFICULTY.has(difficulty)) {
     return { error: "Недопустимое значение сложности" };
+  }
+
+  const muscleGroup = data.muscleGroup.trim();
+  if (!isExerciseGroup(muscleGroup)) {
+    return { error: "Выбери группу мышц из списка" };
   }
 
   const overMaxText = (
@@ -143,7 +149,7 @@ function validateAndBuild(data: ExerciseFormData): { payload?: ExerciseInsert; e
       features_ru: featuresRu.result!,
       features_en: featuresEn.result!,
       video_url: videoUrl || null,
-      muscle_group: data.muscleGroup.trim() || null,
+      muscle_group: muscleGroup,
       equipment: data.equipment.trim() || null,
       difficulty: difficulty || null,
       contraindications: data.contraindications.trim() || null,

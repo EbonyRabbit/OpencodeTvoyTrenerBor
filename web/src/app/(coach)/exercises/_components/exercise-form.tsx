@@ -13,6 +13,7 @@ import {
 import { Loader2, Trash2 } from "lucide-react";
 import { createExercise, updateExercise, deleteExercise } from "../actions";
 import { defaultExerciseForm, type ExerciseFormData } from "../form-data";
+import { EXERCISE_GROUPS } from "@/lib/exercise-groups";
 import type { Database } from "@/types/supabase";
 
 type ExerciseRow = Database["public"]["Tables"]["exercises"]["Row"];
@@ -143,14 +144,22 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Field label="Группа мышц">
-          <Input
+        <Field label="Группа мышц *">
+          <Select
             value={form.muscleGroup}
-            onChange={(e) => setForm({ ...form, muscleGroup: e.target.value })}
-            placeholder="Грудь"
-            className="h-8 text-xs"
-            maxLength={4000}
-          />
+            onValueChange={(v) => setForm({ ...form, muscleGroup: v ?? "" })}
+          >
+            <SelectTrigger className="h-8 w-full text-xs">
+              <SelectValue placeholder="Выбери группу" />
+            </SelectTrigger>
+            <SelectContent>
+              {EXERCISE_GROUPS.map((group) => (
+                <SelectItem key={group} value={group}>
+                  {group}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Оборудование">
           <Input

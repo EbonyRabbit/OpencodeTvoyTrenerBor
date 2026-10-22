@@ -88,6 +88,11 @@ describe("createExercise", () => {
     expect(result.error).toBe("Название обязательно");
   });
 
+  it("rejects unknown muscle group", async () => {
+    const result = await createExercise({ ...VALID_DATA, muscleGroup: "Грудь/Трицепс" });
+    expect(result.error).toBe("Выбери группу мышц из списка");
+  });
+
   it("normalizes ё to е in name_key", async () => {
     const chain = mockTable({ error: null, data: { id: UUID } });
     await createExercise({ ...VALID_DATA, name: "Подъём на ёлку" });

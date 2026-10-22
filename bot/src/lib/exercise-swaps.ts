@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabase-admin.js";
 import { normalizeExerciseName } from "./exercise-library.js";
+import { EXERCISE_GROUP_FALLBACKS, type ExerciseGroup } from "./exercise-groups.js";
 import type { ParsedExercise } from "./program-utils.js";
 
 export interface SwapRow {
@@ -94,6 +95,21 @@ function equipmentTokens(hint: string | null | undefined): string[] {
     .filter((t) => t.length > 2);
 }
 
+/** Совпадение по основе: «гантели» ↔ «гантель», «тренажёры» ↔ «тренажёр». */
+function sharesStem(a: string, b: string): boolean {
+  if (a === b) return true;
+  const len = Math.min(a.length, b.length, 5);
+  if (len < 4) return false;
+  return a.slice(0, len) === b.slice(0, len);
+}
+
+function equipmentMatches(equipment: string | null | undefined, tokens: string[]): boolean {
+  if (!equipment || tokens.length === 0) return false;
+  const equipmentTokensList = equipmentTokens(equipment);
+  if (equipmentTokensList.length === 0) return false;
+  return equipmentTokensList.some((eqToken) => tokens.some((token) => sharesStem(eqToken, token)));
+}
+
 /**
  * Кандидаты на замену: та же группа мышц из библиотеки, кроме оригинала.
  * Совпавшие по инвентарю (подсказка из programs.equipment) — первыми,
@@ -107,34 +123,56 @@ export async function findSwapCandidates(
 ): Promise<{ candidates: SwapCandidate[]; noMatch: boolean }> {
   const key = normalizeExerciseKey(originalName);
   if (!key) return { candidates: [], noMatch: true };
-  const { data: origRows, error: origErr } = await supabaseAdmin
+
+  // Ищем оригинал по name_key, имени и алиасам в нормализованном виде:
+  // алиасы в БД хранятся «как есть» (с пробелами/пунктуацией), поэтому
+  // PostgREST-фильтр по массиву тут не подходит.
+  const { data: libraryRows, error: origErr } = await supabaseAdmin
     .from("exercises")
-    .select("id, name, name_key, aliases, muscle_group")
-    .or(`name_key.eq.${key},aliases.cs.{${key}}`)
-    .limit(1);
+    .select("id, name, name_key, aliases, muscle_group");
   if (origErr) {
     console.warn(`[SWAPS] findSwapCandidates lookup error:`, origErr.message);
     return { candidates: [], noMatch: true };
   }
-  const orig = (origRows ?? [])[0] as { id: string; muscle_group: string | null } | undefined;
+  const orig = (libraryRows ?? []).find((row) => {
+    if (normalizeExerciseKey(row.name_key ?? "") === key) return true;
+    if (normalizeExerciseKey(row.name ?? "") === key) return true;
+    return (row.aliases ?? []).some((alias) => normalizeExerciseKey(alias) === key);
+  }) as { id: string; muscle_group: string | null } | undefined;
   if (!orig?.muscle_group) return { candidates: [], noMatch: true };
 
-  const { data, error } = await supabaseAdmin
-    .from("exercises")
-    .select("id, name, muscle_group, equipment")
-    .eq("muscle_group", orig.muscle_group)
-    .neq("id", orig.id)
-    .limit(limit * 3);
-  if (error) {
-    console.warn(`[SWAPS] findSwapCandidates list error:`, error.message);
-    return { candidates: [], noMatch: true };
+  const loadCandidates = async (groups: string[]) => {
+    const { data, error } = await supabaseAdmin
+      .from("exercises")
+      .select("id, name, muscle_group, equipment")
+      .in("muscle_group", groups)
+      .neq("id", orig.id)
+      .limit(limit * 3);
+    if (error) {
+      console.warn(`[SWAPS] findSwapCandidates list error:`, error.message);
+      return null;
+    }
+    return (data ?? []) as Omit<SwapCandidate, "equipmentMatch">[];
+  };
+
+  let rows = await loadCandidates([orig.muscle_group]);
+  if (rows === null) return { candidates: [], noMatch: true };
+
+  if (rows.length === 0) {
+    const fallbacks = (EXERCISE_GROUP_FALLBACKS[orig.muscle_group as ExerciseGroup] ?? []).filter(
+      (group) => group !== orig.muscle_group,
+    );
+    if (fallbacks.length > 0) {
+      const fallbackRows = await loadCandidates(fallbacks);
+      if (fallbackRows && fallbackRows.length > 0) rows = fallbackRows;
+    }
   }
 
   const tokens = equipmentTokens(equipmentHint);
-  const scored = ((data ?? []) as Omit<SwapCandidate, "equipmentMatch">[]).map((r) => {
-    const eq = (r.equipment ?? "").toLowerCase();
-    return { ...r, equipmentMatch: tokens.length > 0 && tokens.some((t) => eq.includes(t)) };
-  });
+  const scored = rows.map((r) => ({
+    ...r,
+    equipmentMatch: equipmentMatches(r.equipment, tokens),
+  }));
   scored.sort((a, b) => Number(b.equipmentMatch) - Number(a.equipmentMatch));
   return { candidates: scored.slice(0, limit), noMatch: false };
 }

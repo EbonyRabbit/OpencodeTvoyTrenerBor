@@ -13,8 +13,10 @@
  * Run from bot/: DOTENV_CONFIG_PATH=.env.local npx tsx scripts/seed-exercise-library.ts
  */
 import "dotenv/config";
+import { writeFileSync } from "node:fs";
 import { supabaseAdmin } from "../src/lib/supabase-admin.js";
 import { normalizeExerciseName } from "../src/lib/exercise-library.js";
+import type { ExerciseGroup } from "../src/lib/exercise-groups.js";
 
 interface SeedExercise {
   name: string;
@@ -872,9 +874,152 @@ const EXERCISES: SeedExercise[] = [
   },
 ];
 
+/**
+ * Справочные поля библиотеки: каноническая группа мышц и инвентарь.
+ * Группы - единый список из src/lib/exercise-groups.ts (нужен для подбора
+ * замен: бот ищет кандидатов строго внутри одной группы).
+ * Инвентарь - свободный текст в едином словаре (Штанга, Гантели, Гиря...).
+ */
+const EXERCISE_META: Record<string, { group: ExerciseGroup; equipment: string }> = {
+  "Bird-dog": { group: "Кор", equipment: "Без инвентаря" },
+  "Dead bug": { group: "Кор", equipment: "Без инвентаря" },
+  "Power clean (толчок штанги)": { group: "Взрывная работа", equipment: "Штанга" },
+  "V-складки": { group: "Кор", equipment: "Без инвентаря" },
+  "Wall Ball": { group: "Взрывная работа", equipment: "Медбол" },
+  "Барьерные выпрыгивания": { group: "Взрывная работа", equipment: "Барьеры" },
+  "Бег": { group: "Кардио", equipment: "Без инвентаря" },
+  "Бёрпи": { group: "Взрывная работа", equipment: "Без инвентаря" },
+  "Боковая планка": { group: "Кор", equipment: "Без инвентаря" },
+  "Боковые выпады": { group: "Ноги", equipment: "Гантели" },
+  "Боковые запрыгивания/приземления": { group: "Взрывная работа", equipment: "Тумба" },
+  "Боковые подъёмы гантелей": { group: "Плечи", equipment: "Гантели" },
+  "Боковые шаги с резинкой": { group: "Ягодицы", equipment: "Резинка" },
+  "Болгарские выпады": { group: "Ноги", equipment: "Гантели, скамья" },
+  "Брусья с весом": { group: "Грудь", equipment: "Брусья" },
+  "Велосипед": { group: "Кардио", equipment: "Велосипед" },
+  "Вертикальная тяга одной рукой": { group: "Спина", equipment: "Блок" },
+  "Выпады в ножницы с гантелями": { group: "Ноги", equipment: "Гантели" },
+  "Выпады назад с гантелями": { group: "Ноги", equipment: "Гантели" },
+  "Выпады с гантелями": { group: "Ноги", equipment: "Гантели" },
+  "Гоблет-приседания": { group: "Ноги", equipment: "Гиря" },
+  "Гребной тренажёр": { group: "Кардио", equipment: "Гребной тренажёр" },
+  "Дьявольский жим": { group: "Плечи", equipment: "Гиря" },
+  "Жим в тренажёре от груди": { group: "Грудь", equipment: "Тренажёр" },
+  "Жим гантелей лёжа": { group: "Грудь", equipment: "Гантели" },
+  "Жим гантелей на наклонной": { group: "Грудь", equipment: "Гантели, скамья" },
+  "Жим гантелей сидя": { group: "Плечи", equipment: "Гантели" },
+  "Жим гантелей стоя": { group: "Плечи", equipment: "Гантели" },
+  "Жим ногами в тренажёре": { group: "Ноги", equipment: "Тренажёр" },
+  "Жим штанги лёжа": { group: "Грудь", equipment: "Штанга" },
+  "Жим штанги стоя": { group: "Плечи", equipment: "Штанга" },
+  "Заножки": { group: "Ноги", equipment: "Тренажёр" },
+  "Запрыгивания на тумбу": { group: "Взрывная работа", equipment: "Тумба" },
+  "Кабель-ротация туловища": { group: "Кор", equipment: "Блок" },
+  "Казак-приседания": { group: "Ноги", equipment: "Без инвентаря" },
+  "Лёгкий бег": { group: "Кардио", equipment: "Без инвентаря" },
+  "Лопаточный отжим (scapular push-up)": { group: "Плечи", equipment: "Без инвентаря" },
+  "Лыжи (SkiErg)": { group: "Кардио", equipment: "SkiErg" },
+  "Махи гантелью (свинг)": { group: "Взрывная работа", equipment: "Гантели" },
+  "Медбол-слэм": { group: "Взрывная работа", equipment: "Медбол" },
+  "Молотки с гантелями": { group: "Бицепс", equipment: "Гантели" },
+  "Наружная ротация плеча (кабель, стоя)": { group: "Плечи", equipment: "Блок" },
+  "Нордические наклоны": { group: "Ноги", equipment: "Без инвентаря" },
+  "Обратные скручивания": { group: "Кор", equipment: "Без инвентаря" },
+  "Односторонняя румынская тяга": { group: "Ягодицы", equipment: "Гантели" },
+  "Односторонняя румянская тяга": { group: "Ягодицы", equipment: "Гантели" },
+  "Отведение бедра (кабель/резинка)": { group: "Ягодицы", equipment: "Блок/резинка" },
+  "Отведение плеча назад": { group: "Плечи", equipment: "Резинка" },
+  "Отведение плеча наружу (кабель лёжа)": { group: "Плечи", equipment: "Блок" },
+  "Отжимания": { group: "Грудь", equipment: "Без инвентаря" },
+  "Отжимания на брусьях": { group: "Грудь", equipment: "Брусья" },
+  "Отжимания узким хватом": { group: "Трицепс", equipment: "Без инвентаря" },
+  "Паллоф-пресс": { group: "Кор", equipment: "Блок/резинка" },
+  "Плавание": { group: "Кардио", equipment: "Бассейн" },
+  "Планка": { group: "Кор", equipment: "Без инвентаря" },
+  "Планка Копенгагена": { group: "Кор", equipment: "Скамья" },
+  "Планка на прямых руках": { group: "Кор", equipment: "Без инвентаря" },
+  "Подтягивания": { group: "Спина", equipment: "Турник" },
+  "Подтягивания в гравитроне": { group: "Спина", equipment: "Тренажёр" },
+  "Подъём на носки (икры)": { group: "Икры", equipment: "Штанга" },
+  "Подъём ног в висе": { group: "Кор", equipment: "Турник" },
+  "Подъём носка на себя (передняя большеберцовая)": { group: "Голеностоп", equipment: "Без инвентаря" },
+  "Подъёмы на прямые руки из планки на локтях": { group: "Кор", equipment: "Без инвентаря" },
+  "Подъёмы ног лёжа": { group: "Кор", equipment: "Без инвентаря" },
+  "Приведение бедра": { group: "Приводящие", equipment: "Тренажёр/резинка" },
+  "Приседания со штангой": { group: "Ноги", equipment: "Штанга" },
+  "Протяжка и жим вверх одной рукой": { group: "Плечи", equipment: "Гантели" },
+  "Пуловер с гантелью": { group: "Грудь", equipment: "Гантели" },
+  "Разведение рук с резинкой": { group: "Плечи", equipment: "Резинка" },
+  "Разводка гантелей лёжа": { group: "Грудь", equipment: "Гантели" },
+  "Разгибание голени сидя (тренажёр)": { group: "Ноги", equipment: "Тренажёр" },
+  "Разгибание руки с гантелью из-за головы": { group: "Трицепс", equipment: "Гантели" },
+  "Разгибания на трицепс (блок)": { group: "Трицепс", equipment: "Блок" },
+  "Ракушка (clamshell)": { group: "Ягодицы", equipment: "Резинка" },
+  "Ренегат-тяга": { group: "Спина", equipment: "Гантели" },
+  "Ротации с резинкой": { group: "Кор", equipment: "Резинка" },
+  "Ротационный бросок медбола": { group: "Кор", equipment: "Медбол" },
+  "Румынская тяга с гантелями": { group: "Ягодицы", equipment: "Гантели" },
+  "Русский твист": { group: "Кор", equipment: "Без инвентаря" },
+  "Рывок гантели": { group: "Взрывная работа", equipment: "Гантели" },
+  "Сгибание голени сидя (тренажёр)": { group: "Ноги", equipment: "Тренажёр" },
+  "Сгибание предплечья (хват/кисть)": { group: "Предплечья", equipment: "Гантели/блок" },
+  "Сгибание рук с гантелями": { group: "Бицепс", equipment: "Гантели" },
+  "Сгибания EZ-штанги на бицепс": { group: "Бицепс", equipment: "Штанга" },
+  "Сгибания рук с супинацией": { group: "Бицепс", equipment: "Гантели" },
+  "Скручивания лёжа": { group: "Кор", equipment: "Без инвентаря" },
+  "Становая тяга": { group: "Ягодицы", equipment: "Штанга" },
+  "Степ-ап с гантелями": { group: "Ноги", equipment: "Гантели, скамья" },
+  "Темповый бег": { group: "Кардио", equipment: "Без инвентаря" },
+  "Толкание саней": { group: "Взрывная работа", equipment: "Санки" },
+  "Толчок гантели": { group: "Плечи", equipment: "Гантели" },
+  "Трастеры": { group: "Взрывная работа", equipment: "Штанга" },
+  "Тяга верхнего блока": { group: "Спина", equipment: "Блок" },
+  "Тяга гантелей к поясу": { group: "Спина", equipment: "Гантели" },
+  "Тяга гантелей стоя к груди": { group: "Плечи", equipment: "Гантели" },
+  "Тяга гантели в наклоне": { group: "Спина", equipment: "Гантели" },
+  "Тяга гантели к поясу в упоре": { group: "Спина", equipment: "Гантели" },
+  "Тяга горизонтальная в тренажёре": { group: "Спина", equipment: "Тренажёр" },
+  "Тяга горилла": { group: "Спина", equipment: "Гантели" },
+  "Тяга к лицу": { group: "Плечи", equipment: "Блок/резинка" },
+  "Тяга саней": { group: "Взрывная работа", equipment: "Санки" },
+  "Тяга штанги в наклоне": { group: "Спина", equipment: "Штанга" },
+  "Фермерская прогулка": { group: "Кор", equipment: "Гантели" },
+  "Французский жим": { group: "Трицепс", equipment: "Штанга" },
+  "Эксцентрика инверсии голеностопа": { group: "Голеностоп", equipment: "Резинка" },
+  "Ягодичный мост со штангой": { group: "Ягодицы", equipment: "Штанга" },
+  "Ягодичный мостик с гантелью": { group: "Ягодицы", equipment: "Гантели" },
+  "Ягодичный мостик с резинкой": { group: "Ягодицы", equipment: "Резинка" },
+};
+
+/**
+ * Алиасы из названий в программах, которые не совпадают с каноническими.
+ * Аддитивно: тренерские алиасы не удаляются.
+ */
+const EXTRA_ALIASES: Record<string, string[]> = {
+  "Гребной тренажёр": ["Гребля 4-5×500 м", "Гребля 3×500 м", "Гребля 5-6×500 м", "Гребля 500 м"],
+  "Темповый бег": ["Темповый бег 3×8 мин"],
+  "Лёгкий бег": ["Лёгкий бег Z2"],
+  "Вертикальная тяга одной рукой": ["Однуручная тяга вертикальная обратным хватом"],
+  "Выпады с гантелями": ["Шагающие выпады"],
+  "Разгибания на трицепс (блок)": ["Разгибание предплечья из-за головы в тренажере"],
+  "Жим в тренажёре от груди": ["Жим в тренажере сидя от груди"],
+  "Ягодичный мост со штангой": ["Ягодичный мост", "Ягодичный мост с отягощением"],
+  "Румынская тяга с гантелями": ["Румынская тяга"],
+  "Сгибание рук с гантелями": ["Сгибания на бицепс"],
+  "Сгибания EZ-штанги на бицепс": ["Сгибания EZ-штангой на бицепс"],
+  "Жим штанги стоя": ["Армейский жим", "Армейский жим (силовой)"],
+  "Тяга гантелей к поясу": ["Тяга гантели к поясу"],
+  "Толкание саней": ["Санки толкать"],
+  "Тяга саней": ["Санки тянуть"],
+  "Трастеры": ["Трастеры (2×12 кг)"],
+  "Махи гантелью (свинг)": ["Махи гирей (24 кг)", "Махи гирей"],
+};
+
 interface ExistingRow {
   id: string;
   aliases: string[];
+  muscle_group: string | null;
+  equipment: string | null;
   technique_ru: string | null;
   technique_en: string | null;
   description_ru: string | null;
@@ -884,16 +1029,28 @@ interface ExistingRow {
   video_url: string | null;
 }
 
+function seedAliases(ex: SeedExercise): string[] {
+  return Array.from(new Set([...ex.aliases, ...(EXTRA_ALIASES[ex.name] ?? [])]));
+}
+
+
 function isFilled(value: string | null | undefined): boolean {
   return Boolean(value && value.trim().length > 0);
 }
 
 async function main(): Promise<void> {
+  const dryRun = process.argv.includes("--dry-run");
+  const missingMeta = EXERCISES.filter((ex) => !EXERCISE_META[ex.name]);
+  if (missingMeta.length > 0) {
+    console.error("Нет группы/инвентаря для:", missingMeta.map((ex) => ex.name).join(", "));
+    process.exit(1);
+  }
+
   const nameKeys = EXERCISES.map((ex) => normalizeExerciseName(ex.name));
 
   const { data: existingRows, error: selectError } = await supabaseAdmin
     .from("exercises")
-    .select("id, name_key, aliases, technique_ru, technique_en, description_ru, description_en, features_ru, features_en, video_url")
+    .select("id, name_key, aliases, muscle_group, equipment, technique_ru, technique_en, description_ru, description_en, features_ru, features_en, video_url")
     .in("name_key", nameKeys);
   if (selectError) {
     console.error("Failed to load existing exercises:", selectError.message);
@@ -903,19 +1060,38 @@ async function main(): Promise<void> {
     (existingRows ?? []).map((row) => [row.name_key, row as ExistingRow]),
   );
 
+  if (!dryRun) {
+    const { data: allRows, error: backupError } = await supabaseAdmin.from("exercises").select("*");
+    if (backupError) {
+      console.error("Failed to back up exercises:", backupError.message);
+      process.exit(1);
+    }
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const backupPath = `scripts/exercises-backup-${stamp}.json`;
+    writeFileSync(backupPath, JSON.stringify(allRows ?? [], null, 2));
+    console.log(`Backup: ${backupPath} (${(allRows ?? []).length} rows)`);
+  }
+
   let inserted = 0;
   let updated = 0;
   let untouched = 0;
 
   for (const ex of EXERCISES) {
+    const meta = EXERCISE_META[ex.name];
+    const aliases = seedAliases(ex);
     const nameKey = normalizeExerciseName(ex.name);
     const row: ExistingRow | undefined = existingByKey.get(nameKey);
 
     if (!row) {
+      if (dryRun) {
+        console.log(`  [DRY] insert: ${ex.name} (${meta.group}, ${meta.equipment})`);
+        inserted++;
+        continue;
+      }
       const { error } = await supabaseAdmin.from("exercises").insert({
         name: ex.name,
         name_key: nameKey,
-        aliases: ex.aliases,
+        aliases,
         description_ru: ex.descriptionRu,
         description_en: ex.descriptionEn,
         technique_ru: ex.techniqueRu,
@@ -923,8 +1099,8 @@ async function main(): Promise<void> {
         features_ru: ex.featuresRu,
         features_en: ex.featuresEn,
         video_url: null,
-        muscle_group: null,
-        equipment: null,
+        muscle_group: meta.group,
+        equipment: meta.equipment,
         difficulty: null,
         contraindications: null,
       });
@@ -940,9 +1116,12 @@ async function main(): Promise<void> {
       continue;
     }
 
-    // Заполняем только пустые поля - не перетираем ручные правки тренера.
+    // Контент заполняем только когда пуст (тренер мог отредактировать).
+    // Справочные поля muscle_group/equipment - канонические, обновляем всегда.
     const patch: {
       aliases?: string[];
+      muscle_group?: string;
+      equipment?: string;
       technique_ru?: string;
       technique_en?: string;
       description_ru?: string;
@@ -951,12 +1130,14 @@ async function main(): Promise<void> {
       features_en?: string[];
     } = {};
 
+    if (row.muscle_group !== meta.group) patch.muscle_group = meta.group;
+    if (row.equipment !== meta.equipment) patch.equipment = meta.equipment;
     if (!isFilled(row.technique_ru)) patch.technique_ru = ex.techniqueRu;
     if (!isFilled(row.technique_en)) patch.technique_en = ex.techniqueEn;
     if (!isFilled(row.description_ru)) patch.description_ru = ex.descriptionRu;
     if (!isFilled(row.description_en)) patch.description_en = ex.descriptionEn;
 
-    const mergedAliases = Array.from(new Set([...(row.aliases ?? []), ...ex.aliases]));
+    const mergedAliases = Array.from(new Set([...(row.aliases ?? []), ...aliases]));
     if (mergedAliases.length !== (row.aliases ?? []).length) {
       patch.aliases = mergedAliases;
     }
@@ -971,6 +1152,12 @@ async function main(): Promise<void> {
       continue;
     }
 
+    if (dryRun) {
+      console.log(`  [DRY] update: ${ex.name} → ${Object.keys(patch).join(", ")}`);
+      updated++;
+      continue;
+    }
+
     const { error } = await supabaseAdmin.from("exercises").update(patch).eq("id", row.id);
     if (error) {
       console.error(`  ${ex.name}: update failed - ${error.message}`);
@@ -979,9 +1166,41 @@ async function main(): Promise<void> {
     updated++;
   }
 
+  // Спорт-сиды (теннис/бег/плавание/триатлон) добавляют упражнения отдельно.
+  // Приводим их группы/инвентарь к канону, не трогая контент.
+  const seedNames = new Set(EXERCISES.map((ex) => ex.name));
+  const { data: allRows, error: allError } = await supabaseAdmin
+    .from("exercises")
+    .select("id, name, muscle_group, equipment");
+  if (allError) {
+    console.error("Failed to load exercises for canonical group pass:", allError.message);
+    process.exit(1);
+  }
+  let extraUpdated = 0;
+  for (const row of allRows ?? []) {
+    if (seedNames.has(row.name)) continue;
+    const meta = EXERCISE_META[row.name];
+    if (!meta) continue;
+    if (row.muscle_group === meta.group && row.equipment === meta.equipment) continue;
+    if (dryRun) {
+      console.log(`  [DRY] canonicalize: ${row.name} (${row.muscle_group ?? "—"} → ${meta.group})`);
+      extraUpdated++;
+      continue;
+    }
+    const { error } = await supabaseAdmin
+      .from("exercises")
+      .update({ muscle_group: meta.group, equipment: meta.equipment })
+      .eq("id", row.id);
+    if (error) {
+      console.error(`  ${row.name}: canonical group update failed - ${error.message}`);
+      continue;
+    }
+    extraUpdated++;
+  }
+
   console.log(
-    `Done. Inserted: ${inserted}, updated: ${updated}, untouched: ${untouched} ` +
-    `(total seed entries: ${EXERCISES.length})`,
+    `${dryRun ? "[DRY-RUN] " : ""}Done. Inserted: ${inserted}, updated: ${updated}, untouched: ${untouched}, ` +
+    `canonicalized: ${extraUpdated} (total seed entries: ${EXERCISES.length})`,
   );
 }
 

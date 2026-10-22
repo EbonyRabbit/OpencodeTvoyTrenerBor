@@ -29,7 +29,7 @@ import type { ParsedExercise } from "../../lib/program-utils.js";
 
 function chain(result: { data: unknown; error: null }) {
   const c: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "neq", "or", "limit", "delete", "upsert"]) {
+  for (const m of ["select", "eq", "neq", "in", "or", "limit", "delete", "upsert"]) {
     c[m] = vi.fn().mockReturnValue(c);
   }
   c.then = (cb: (v: unknown) => unknown) => Promise.resolve(result).then(cb);
@@ -128,11 +128,20 @@ describe("findSwapCandidates", () => {
     expect(r).toEqual({ candidates: [], noMatch: true });
   });
 
+  it("noMatch when original has no muscle group", async () => {
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockReturnValueOnce(
+      chain({ data: [{ id: "orig", name_key: "жимлежа", muscle_group: null }], error: null }),
+    );
+    const r = await findSwapCandidates("Жим лёжа", null);
+    expect(r).toEqual({ candidates: [], noMatch: true });
+  });
+
   it("same muscle group, excludes original, equipment first", async () => {
     const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     fromMock.from
       .mockReturnValueOnce(
-        chain({ data: [{ id: "orig", muscle_group: "Ноги" }], error: null }),
+        chain({ data: [{ id: "orig", name_key: "присед", muscle_group: "Ноги" }], error: null }),
       )
       .mockReturnValueOnce(
         chain({
@@ -148,5 +157,33 @@ describe("findSwapCandidates", () => {
     expect(r.candidates.map((c) => c.id)).not.toContain("orig");
     expect(r.candidates).toHaveLength(2);
     expect(fromMock.from).toHaveBeenCalledTimes(2);
+  });
+
+  it("finds original by a multi-word alias", async () => {
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from
+      .mockReturnValueOnce(
+        chain({
+          data: [
+            {
+              id: "orig",
+              name: "Выпады с гантелями",
+              name_key: "выпадысгантелями",
+              aliases: ["Шагающие выпады"],
+              muscle_group: "Ноги",
+            },
+          ],
+          error: null,
+        }),
+      )
+      .mockReturnValueOnce(
+        chain({
+          data: [{ id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" }],
+          error: null,
+        }),
+      );
+    const r = await findSwapCandidates("Шагающие выпады", null);
+    expect(r.noMatch).toBe(false);
+    expect(r.candidates.map((c) => c.id)).toEqual(["b"]);
   });
 });

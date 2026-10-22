@@ -39,11 +39,12 @@ import {
   handleSwapRevert,
   handleSwapBack,
 } from "../exercise-swap.js";
+import { clearExerciseLibraryCache } from "../exercise-info.js";
 import type { MyContext } from "../../bot.js";
 
 function chain(result: { data: unknown; error: null | { message: string } }) {
   const c: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "neq", "or", "limit", "delete", "upsert", "maybeSingle"]) {
+  for (const m of ["select", "eq", "neq", "in", "or", "limit", "delete", "upsert", "maybeSingle"]) {
     c[m] = vi.fn().mockReturnValue(c);
   }
   c.then = (cb: (v: unknown) => unknown) => Promise.resolve(result).then(cb);
@@ -75,6 +76,7 @@ function todayWorkout() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearExerciseLibraryCache();
   mockGetTodayWorkout.mockResolvedValue(todayWorkout());
 });
 
@@ -83,7 +85,7 @@ describe("handleSwapOpen", () => {
     const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     fromMock.from
       .mockReturnValueOnce(chain({ data: { equipment: "Штанга" }, error: null }))
-      .mockReturnValueOnce(chain({ data: [{ id: "o", muscle_group: "Ноги" }], error: null }))
+      .mockReturnValueOnce(chain({ data: [{ id: "o", name: "Приседания со штангой", name_key: "приседаниясоштангой", aliases: [], muscle_group: "Ноги" }], error: null }))
       .mockReturnValueOnce(
         chain({ data: [{ id: "b", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" }], error: null }),
       )

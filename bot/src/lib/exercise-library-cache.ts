@@ -46,14 +46,17 @@ export async function loadExerciseLibraryRows(): Promise<ExerciseLibraryRow[]> {
       return rows;
     });
 
-  inFlight = Promise.resolve(task)
+  let pending: Promise<ExerciseLibraryRow[]>;
+  pending = Promise.resolve(task)
     .catch(() => {
       // Транспортный reject (сеть, таймаут) - stale-снимок вместо пустоты.
       console.error(`[EXERCISE_LIBRARY] Library fetch rejected`);
       return cache?.rows ?? [];
     })
     .finally(() => {
-      inFlight = null;
+      // Не затираем новый in-flight, если кэш очистили во время запроса.
+      if (inFlight === pending) inFlight = null;
     });
-  return inFlight;
+  inFlight = pending;
+  return pending;
 }

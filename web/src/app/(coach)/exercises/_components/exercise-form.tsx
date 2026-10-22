@@ -13,7 +13,7 @@ import {
 import { Loader2, Trash2 } from "lucide-react";
 import { createExercise, updateExercise, deleteExercise } from "../actions";
 import { defaultExerciseForm, type ExerciseFormData } from "../form-data";
-import { EXERCISE_GROUPS } from "@/lib/exercise-groups";
+import { EXERCISE_GROUPS, toExerciseGroup } from "@/lib/exercise-groups";
 import type { Database } from "@/types/supabase";
 
 type ExerciseRow = Database["public"]["Tables"]["exercises"]["Row"];
@@ -74,10 +74,7 @@ export function ExerciseForm({ exercise, onDone }: { exercise?: ExerciseRow; onD
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const legacyGroup =
-    form.muscleGroup && !(EXERCISE_GROUPS as readonly string[]).includes(form.muscleGroup)
-      ? form.muscleGroup
-      : null;
+  const legacyGroup = form.muscleGroup && !toExerciseGroup(form.muscleGroup) ? form.muscleGroup : null;
   const [deleting, setDeleting] = useState(false);
 
   const ruAliases = lineList(form.aliases, (v) => setForm({ ...form, aliases: v }));

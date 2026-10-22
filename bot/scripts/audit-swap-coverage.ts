@@ -136,13 +136,16 @@ async function main(): Promise<void> {
         programProblems++;
         continue;
       }
+      const sameGroup = (byGroup.get(row.muscle_group) ?? []).filter((c) => c.id !== row.id);
       const fallbacks = (EXERCISE_GROUP_FALLBACKS[row.muscle_group as ExerciseGroup] ?? []).filter(
         (group) => group !== row.muscle_group,
       );
-      const candidateGroups = [row.muscle_group, ...fallbacks];
-      const candidates = candidateGroups
-        .flatMap((group) => byGroup.get(group) ?? [])
-        .filter((c) => c.id !== row.id);
+      const candidates =
+        sameGroup.length > 0
+          ? sameGroup
+          : fallbacks
+              .flatMap((group) => byGroup.get(group) ?? [])
+              .filter((c) => c.id !== row.id);
       if (candidates.length === 0) {
         problems.push({
           program: program.title,

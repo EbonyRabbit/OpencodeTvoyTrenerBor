@@ -1071,6 +1071,9 @@ async function main(): Promise<void> {
       console.error("Failed to back up exercises:", backupError.message);
       process.exit(1);
     }
+    if ((allRows ?? []).length >= 1000) {
+      console.warn("Backup may be truncated by the PostgREST 1000-row limit");
+    }
     const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
     const backupPath = join(SCRIPT_DIR, `exercises-backup-${stamp}.json`);
     writeFileSync(backupPath, JSON.stringify(allRows ?? [], null, 2), { flag: "wx" });

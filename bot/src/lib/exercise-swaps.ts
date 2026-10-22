@@ -144,17 +144,23 @@ export async function findSwapCandidates(
     rows.find((row) => (row.aliases ?? []).some((alias) => normalizeExerciseKey(alias) === key));
   if (!orig?.muscle_group) return { candidates: [], noMatch: true, error: false };
 
-  const groups: string[] = [orig.muscle_group];
-  for (const group of EXERCISE_GROUP_FALLBACKS[orig.muscle_group as ExerciseGroup] ?? []) {
-    if (!groups.includes(group)) groups.push(group);
-  }
+  const candidatesIn = (groups: string[]) =>
+    rows.filter(
+      (row) => row.id !== orig.id && row.muscle_group != null && groups.includes(row.muscle_group),
+    );
 
-  const tokens = equipmentTokens(equipmentHint);
-  const candidates = rows.filter(
-    (row) => row.id !== orig.id && row.muscle_group != null && groups.includes(row.muscle_group),
-  );
+  // Fallback-группы подключаем только если в основной группе вообще нет
+  // кандидатов, иначе упражнения из смежной группы могут вытеснить свои.
+  let candidates = candidatesIn([orig.muscle_group]);
+  if (candidates.length === 0) {
+    const fallbacks = (EXERCISE_GROUP_FALLBACKS[orig.muscle_group as ExerciseGroup] ?? []).filter(
+      (group) => group !== orig.muscle_group,
+    );
+    if (fallbacks.length > 0) candidates = candidatesIn(fallbacks);
+  }
   if (candidates.length === 0) return { candidates: [], noMatch: true, error: false };
 
+  const tokens = equipmentTokens(equipmentHint);
   const scored = candidates.map((row) => ({
     id: row.id,
     name: row.name,

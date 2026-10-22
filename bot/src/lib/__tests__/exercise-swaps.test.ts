@@ -175,6 +175,19 @@ describe("findSwapCandidates", () => {
     expect(r.candidates.map((c) => c.id)).toEqual(["legs"]);
   });
 
+  it("does not mix fallback groups while the primary group has peers", async () => {
+    mockFrom({
+      data: [
+        { id: "orig", name: "Подъём на носки", name_key: "подъемнаноски", aliases: [], muscle_group: "Икры" },
+        { id: "calf", name: "Подъём на носки сидя", muscle_group: "Икры", equipment: "Тренажёр" },
+        { id: "legs", name: "Жим ногами", muscle_group: "Ноги", equipment: "Тренажёр" },
+      ],
+      error: null,
+    });
+    const r = await findSwapCandidates("Подъём на носки", "тренажёр");
+    expect(r.candidates.map((c) => c.id)).toEqual(["calf"]);
+  });
+
   it("resolves a multi-word alias", async () => {
     mockFrom({
       data: [

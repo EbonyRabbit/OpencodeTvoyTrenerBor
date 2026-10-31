@@ -8,6 +8,7 @@ import { buildPrivacyUrl, PRIVACY_POLICY_VERSION } from "./consent.js";
 import { findClientByTelegramId, type Client } from "../lib/clients.js";
 import { truncateButtonLabel } from "./programs.js";
 import { InlineKeyboard } from "grammy";
+import { deleteDedup, markAsSent } from "../cron/dedup.js";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TELEGRAM_BUTTON_MAX_BYTES = 64;
@@ -462,7 +463,7 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
     }
 
     if (!request.consent_given) {
-      const { error: updateError } = await supabaseAdmin
+      const { data: consentUpdated, error: updateError } = await supabaseAdmin
         .from("purchase_requests")
         .update({
           consent_given: true,
@@ -472,14 +473,17 @@ export async function handleConsentPurchase(ctx: MyContext, requestId: string): 
         .eq("id", requestId)
         .eq("telegram_id", telegramId)
         .eq("status", "pending")
-        .eq("consent_given", false);
+        .eq("consent_given", false)
+        .select("id")
+        .maybeSingle();
       if (updateError) {
         console.error(`[PURCHASE] Consent update failed for ${telegramId}:`, updateError.message);
         await ctx.reply(t("purchase.error", lang));
         return;
       }
-      // 0 затронутых строк не блокируем: двойной тап уже проставил согласие,
-      // а если статус изменился - это поймает финальная проверка ниже
+      // Двойной тап: согласие уже проставил параллельный обработчик. Ссылку
+      // отправляет только победитель CAS, иначе клиент получит две кнопки.
+      if (!consentUpdated) return;
     }
 
     // финальная проверка ПЕРЕД выдачей ссылки: статус и согласие могли
@@ -522,12 +526,32 @@ async function sendPaymentLink(
   requestId: string,
   program: BuyableProgram,
   amount: number,
-): Promise<void> {
+): Promise<boolean> {
   const lang = ctx.language;
   if (!config.prodamusPayformBaseUrl) {
     console.error("[PURCHASE] PRODAMUS_PAYFORM_BASE_URL is not set");
     await ctx.reply(t("purchase.payment_unavailable", lang));
-    return;
+    return false;
+  }
+  // Один платёжный линк на заявку в сутки: двойной тап и повторное нажатие
+  // старой кнопки не должны создавать две платёжные сессии.
+  const dedupKey = `payment_link:${requestId}`;
+  const dedup = await markAsSent(dedupKey, 24);
+  if (dedup === "duplicate") {
+    const keyboard = new InlineKeyboard().text(
+      t("purchase.resend_button", lang),
+      `resend_payment_link:${requestId}`,
+    );
+    await ctx.reply(t("purchase.payment_link_already_sent", lang), {
+      reply_markup: keyboard,
+    });
+    return false;
+  }
+  if (dedup === "error") {
+    // Платёжный поток не должен открывать вторую сессию при сбое дедупа.
+    console.error(`[PURCHASE] Payment link dedup failed for ${requestId}`);
+    await ctx.reply(t("purchase.error", lang));
+    return false;
   }
   try {
     const linkOpts = {
@@ -551,8 +575,102 @@ async function sendPaymentLink(
       `${t("purchase.consent_given", lang)}\n\n${t("purchase.pay_hint", lang)}`,
       { reply_markup: keyboard },
     );
+    return true;
   } catch (err) {
+    await deleteDedup(dedupKey);
     console.error(`[PURCHASE] buildPaymentUrl failed for ${ctx.from?.id}:`, err);
+    await ctx.reply(t("purchase.error", lang));
+    return false;
+  }
+}
+
+export async function resendPaymentLink(
+  ctx: MyContext,
+  requestId: string,
+): Promise<void> {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    return;
+  }
+  if (!UUID_REGEX.test(requestId)) {
+    await ctx.answerCallbackQuery({
+      text: t("error.unknown_callback", ctx.language),
+      show_alert: true,
+    }).catch(() => {});
+    return;
+  }
+  await ctx.answerCallbackQuery().catch(() => {});
+  const lang = ctx.language;
+  try {
+    const { data: request, error } = await supabaseAdmin
+      .from("purchase_requests")
+      .select("id, program_id, status, consent_given, sub_type, telegram_id, amount")
+      .eq("id", requestId)
+      .maybeSingle<{
+        id: string;
+        program_id: string | null;
+        status: string;
+        consent_given: boolean;
+        sub_type: string;
+        telegram_id: number | null;
+        amount: number | null;
+      }>();
+    if (error || !request) {
+      console.error(
+        `[PURCHASE] Resend request fetch failed for ${telegramId}:`,
+        error?.message,
+      );
+      await ctx.reply(t("purchase.invalid_request", lang));
+      return;
+    }
+    if (
+      request.telegram_id !== telegramId ||
+      request.sub_type !== "program" ||
+      request.status !== "pending" ||
+      !request.consent_given ||
+      !request.program_id
+    ) {
+      await ctx.reply(t("purchase.invalid_request", lang));
+      return;
+    }
+    const program = await fetchBuyableProgram(request.program_id);
+    if (!program) {
+      await ctx.reply(t("purchase.not_found", lang));
+      return;
+    }
+    if (!(await ensureNoPriorPayment(ctx, telegramId, request.program_id, lang))) {
+      return;
+    }
+    // Быстрый двойной тап по кнопке не должен создавать две платёжные
+    // сессии. Блокировка живёт минуту; после неё можно запросить ссылку снова.
+    const lockKey = `payment_link_resend:${requestId}`;
+    const lock = await markAsSent(lockKey, 1 / 60);
+    if (lock === "duplicate") {
+      await ctx.reply(t("purchase.payment_link_already_sent", lang));
+      return;
+    }
+    if (lock === "error") {
+      await ctx.reply(t("purchase.error", lang));
+      return;
+    }
+    // Явный запрос от пользователя: старый ключ не должен блокировать
+    // новую ссылку.
+    const released = await deleteDedup(`payment_link:${requestId}`);
+    if (!released) {
+      await deleteDedup(lockKey);
+      await ctx.reply(t("purchase.error", lang));
+      return;
+    }
+    const sent = await sendPaymentLink(
+      ctx,
+      requestId,
+      program,
+      requestAmount(request, program),
+    );
+    if (!sent) await deleteDedup(lockKey);
+  } catch (err) {
+    console.error(`[PURCHASE] Resend payment link failed for ${telegramId}:`, err);
     await ctx.reply(t("purchase.error", lang));
   }
 }

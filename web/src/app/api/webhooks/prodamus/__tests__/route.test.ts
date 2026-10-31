@@ -26,14 +26,21 @@ type ChainRes = { data?: unknown; error?: { message: string } | null };
 function mockDb(calls: Array<() => Promise<ChainRes>>) {
   const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   fake.from.mockReset();
+  const eqCalls: Array<[string, unknown]> = [];
   let idx = 0;
   fake.from.mockImplementation(() => {
     const link = {
       select: () => link,
-      eq: () => link,
+      eq: (column: string, value: unknown) => {
+        eqCalls.push([column, value]);
+        return link;
+      },
       is: () => link,
       update: () => link,
       delete: () => link,
+      insert: () => Promise.resolve({ data: null, error: null }),
+      lt: () => Promise.resolve({ data: null, error: null }),
+      gt: () => link,
       maybeSingle: () => {
         const step = calls[idx++];
         if (!step) return Promise.resolve({ data: null, error: null });
@@ -42,6 +49,7 @@ function mockDb(calls: Array<() => Promise<ChainRes>>) {
     };
     return link;
   });
+  return eqCalls;
 }
 
 function signedRequest(
@@ -57,11 +65,37 @@ function signedRequest(
   });
 }
 
+function signedMultipartRequest(
+  fields: Record<string, string>,
+  secret = SECRET,
+): Request {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.append(key, value);
+  const canonicalBody = new URLSearchParams(fields).toString();
+  const sign = buildProdamusSignature(canonicalBody, secret);
+  return new Request("http://localhost/api/webhooks/prodamus", {
+    method: "POST",
+    headers: { sign },
+    body: form,
+  });
+}
+
 const activationMock = vi.mocked(activatePurchaseByOrder);
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("PRODAMUS_SECRET_KEY", SECRET);
+  const fake = supabaseAdmin as unknown as {
+    from: ReturnType<typeof vi.fn>;
+  };
+  const link = {
+    select: () => link,
+    eq: () => link,
+    gt: () => link,
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    insert: () => Promise.resolve({ data: null, error: null }),
+  };
+  fake.from.mockImplementation(() => link);
 });
 
 afterEach(() => {
@@ -86,6 +120,24 @@ describe("prodamus webhook", () => {
     const res = await POST(signedRequest({ payment_status: "success" }));
     expect(res.status).toBe(400);
     expect(activationMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a multipart/form-data webhook", async () => {
+    activationMock.mockResolvedValueOnce({});
+    const res = await POST(
+      signedMultipartRequest({
+        order_id: ORDER_ID,
+        payment_status: "success",
+        sum: "5900",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(activationMock).toHaveBeenCalledWith({
+      orderId: ORDER_ID,
+      coachId: null,
+      paymentStatus: "success",
+      paidSum: 5900,
+    });
   });
 
   it("activates a successful payment and answers 200", async () => {
@@ -133,6 +185,34 @@ describe("prodamus webhook", () => {
     });
   });
 
+  it("persists a warning when COACH_CHAT_ID is missing", async () => {
+    vi.stubEnv("COACH_CHAT_ID", "");
+    activationMock.mockResolvedValueOnce({
+      programAssigned: true,
+      warning: "Инструкции не доставлены.",
+    });
+    const res = await POST(
+      signedRequest({ order_id: ORDER_ID, payment_status: "success" }),
+    );
+    expect(res.status).toBe(500);
+    const fake = supabaseAdmin as unknown as {
+      from: ReturnType<typeof vi.fn>;
+    };
+    expect(fake.from).toHaveBeenCalledWith("bot_logs");
+  });
+
+  it("answers 500 when a permanent-failure alert cannot be delivered", async () => {
+    vi.stubEnv("COACH_CHAT_ID", "42");
+    vi.mocked(sendTelegramMessage).mockResolvedValueOnce(false);
+    activationMock.mockResolvedValueOnce({
+      error: "Программа недоступна для активации.",
+    });
+    const res = await POST(
+      signedRequest({ order_id: ORDER_ID, payment_status: "success" }),
+    );
+    expect(res.status).toBe(500);
+  });
+
   it("answers 200 idempotently when already activated", async () => {
     activationMock.mockResolvedValueOnce({ alreadyActivated: true });
     const res = await POST(
@@ -144,6 +224,7 @@ describe("prodamus webhook", () => {
   it("answers 503 so prodamus retries while activation is in progress", async () => {
     activationMock.mockResolvedValueOnce({
       error: "Активация уже выполняется. Повторите запрос позднее.",
+      inProgress: true,
     });
     const res = await POST(
       signedRequest({ order_id: ORDER_ID, payment_status: "success" }),
@@ -151,14 +232,51 @@ describe("prodamus webhook", () => {
     expect(res.status).toBe(503);
   });
 
-  it("answers 500 on activation failure", async () => {
+  it("alerts the coach and answers 200 on a permanent activation failure", async () => {
+    vi.stubEnv("COACH_CHAT_ID", "42");
+    const sent = vi.mocked(sendTelegramMessage).mockResolvedValueOnce(true);
     activationMock.mockResolvedValueOnce({
-      error: "Программа не найдена или недоступна.",
+      error: "Программа недоступна для активации.",
+    });
+    const res = await POST(
+      signedRequest({
+        order_id: ORDER_ID,
+        payment_status: "success",
+        sum: "5900",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(sent).toHaveBeenCalledTimes(1);
+    expect(sent.mock.calls[0][0]).toBe("42");
+    expect(sent.mock.calls[0][1]).toContain(ORDER_ID);
+    expect(sent.mock.calls[0][1]).toContain("Программа недоступна");
+  });
+
+  it("answers 500 only for retryable activation failures", async () => {
+    vi.stubEnv("COACH_CHAT_ID", "42");
+    activationMock.mockResolvedValueOnce({
+      error: "Ошибка обновления статуса заказа.",
+      retryable: true,
     });
     const res = await POST(
       signedRequest({ order_id: ORDER_ID, payment_status: "success" }),
     );
     expect(res.status).toBe(500);
+    expect(sendTelegramMessage).not.toHaveBeenCalled();
+  });
+
+  it("alerts the coach about an instruction delivery warning", async () => {
+    vi.stubEnv("COACH_CHAT_ID", "42");
+    const sent = vi.mocked(sendTelegramMessage).mockResolvedValueOnce(true);
+    activationMock.mockResolvedValueOnce({
+      warning: "Инструкции не доставлены в Telegram.",
+    });
+    const res = await POST(
+      signedRequest({ order_id: ORDER_ID, payment_status: "success" }),
+    );
+    expect(res.status).toBe(200);
+    expect(sent).toHaveBeenCalledTimes(1);
+    expect(sent.mock.calls[0][1]).toContain("Инструкции не доставлены");
   });
 
   it("marks a pending request cancelled and notifies the coach", async () => {
@@ -192,7 +310,7 @@ describe("prodamus webhook", () => {
     vi.stubEnv("COACH_CHAT_ID", "42");
     const sent = vi.mocked(sendTelegramMessage).mockResolvedValueOnce(true);
     const fromSpy = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
-    mockDb([
+    const eqCalls = mockDb([
       () =>
         Promise.resolve({
           data: {
@@ -213,13 +331,25 @@ describe("prodamus webhook", () => {
       }),
     );
     expect(res.status).toBe(200);
-    // Заявка искалась именно по нашей таблице (cancel CAS), а не мимо
+    // Заявка искалась именно по нашей таблице и по order_num, а не по
+    // числовому order_id Продамуса.
     expect(fromSpy.from).toHaveBeenCalledWith("purchase_requests");
+    expect(eqCalls).toContainEqual(["id", ORDER_ID]);
     expect(sent).toHaveBeenCalledTimes(1);
     expect(activationMock).not.toHaveBeenCalled();
   });
 
-  it("does not cancel a paid request", async () => {
+  it("ignores a cancellation with a non-UUID order id", async () => {
+    const res = await POST(
+      signedRequest({ order_id: "47987743", payment_status: "order_canceled" }),
+    );
+    expect(res.status).toBe(200);
+    expect(supabaseAdmin.from).not.toHaveBeenCalled();
+  });
+
+  it("alerts the coach when a cancellation races with a paid request", async () => {
+    vi.stubEnv("COACH_CHAT_ID", "42");
+    const sent = vi.mocked(sendTelegramMessage).mockResolvedValueOnce(true);
     mockDb([
       () => Promise.resolve({ data: null, error: null }), // cancel CAS misses
       () => Promise.resolve({ data: { status: "paid" }, error: null }), // re-read
@@ -228,7 +358,8 @@ describe("prodamus webhook", () => {
       signedRequest({ order_id: ORDER_ID, payment_status: "order_denied" }),
     );
     expect(res.status).toBe(200);
-    expect(sendTelegramMessage).not.toHaveBeenCalled();
+    expect(sent).toHaveBeenCalledTimes(1);
+    expect(sent.mock.calls[0][1]).toContain("оплаченной");
   });
 
   it("ignores other payment statuses with 200", async () => {

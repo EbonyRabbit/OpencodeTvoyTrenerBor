@@ -13,5 +13,7 @@ export function isValidContact(value: string): boolean {
 }
 
 export function formatContact(value: string): string {
-  return /^\+?\d/.test(value) ? value : `@${value}`;
+  const trimmed = value.trim();
+  if (/^\+?\d/.test(trimmed)) return trimmed;
+  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
 }

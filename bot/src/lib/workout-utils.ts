@@ -6,6 +6,8 @@ import { t, type Language } from "../i18n/index.js";
 import { DEFAULT_TIMEZONE } from "./constants.js";
 import { isPseudoExercise } from "./log-markers.js";
 import { getClientSwaps, applySwapsToExercises } from "./exercise-swaps.js";
+import { calculateE1rm, isAssistedExercise, parseRepsToSets } from "./training-progress.js";
+import type { ExerciseTarget } from "./training-progress.js";
 
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
@@ -362,6 +364,11 @@ export interface PreviousLog {
   distance_km: number | null;
   pace: string | null;
   heart_rate: number | null;
+  date?: string | null;
+}
+
+export interface ExerciseHistoryEntry extends PreviousLog {
+  date: string;
 }
 
 export function isPseudoName(name: string): boolean {
@@ -398,6 +405,10 @@ function cacheSet(key: string, value: Map<string, PreviousLog>): void {
     if (!oldest.done) lastLogsCache.delete(oldest.value);
   }
   lastLogsCache.set(key, { at: Date.now(), value });
+}
+
+export function clearWorkoutLogsCache(): void {
+  lastLogsCache.clear();
 }
 
 export async function getPreviousWorkoutLogs(
@@ -449,11 +460,202 @@ export async function getPreviousWorkoutLogs(
       distance_km: row.distance_km,
       pace: row.pace,
       heart_rate: row.heart_rate,
+      date: row.date ?? null,
     });
   }
 
   cacheSet(key, result);
   return result;
+}
+
+function toHistoryEntry(row: Record<string, unknown>): ExerciseHistoryEntry {
+  return {
+    date: String(row.date ?? ""),
+    weight: (row.weight as number | null) ?? null,
+    sets: (row.sets as number | null) ?? null,
+    reps: (row.reps as string | null) ?? null,
+    rounds: (row.rounds as number | null) ?? null,
+    duration_sec: (row.duration_sec as number | null) ?? null,
+    distance_km: (row.distance_km as number | null) ?? null,
+    pace: (row.pace as string | null) ?? null,
+    heart_rate: (row.heart_rate as number | null) ?? null,
+  };
+}
+
+export async function getExerciseHistory(
+  client: Client,
+  exerciseName: string,
+  limit = 5,
+): Promise<ExerciseHistoryEntry[]> {
+  const name = exerciseName.trim();
+  if (!name) return [];
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+
+  const { data, error } = await supabaseAdmin
+    .from("workout_logs")
+    .select("exercise, date, sets, reps, weight, rounds, duration_sec, distance_km, pace, heart_rate, created_at")
+    .eq("client_id", client.id)
+    .ilike("exercise", escapeLikeValue(name))
+    .lte("date", todayStr)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(Math.max(1, limit));
+
+  if (error) {
+    console.error(`[WORKOUT] History query error for ${client.id}:`, error.message);
+    throw new Error(`History query failed: ${error.message}`);
+  }
+
+  return (data ?? [])
+    .map((row) => toHistoryEntry(row as Record<string, unknown>))
+    .filter((entry) => entry.date !== "");
+}
+
+export async function getBestE1rms(
+  client: Client,
+  exerciseNames: string[],
+  equipmentByName?: ReadonlyMap<string, string | null>,
+): Promise<Map<string, number>> {
+  const best = new Map<string, number>();
+  const wanted = new Set(
+    exerciseNames.map((name) => name.trim().toLowerCase()).filter(Boolean),
+  );
+  if (wanted.size === 0) return best;
+
+  const tz = client.timezone || DEFAULT_TIMEZONE;
+  const todayStr = getTodayDateStr(tz);
+  const orFilter = Array.from(wanted)
+    .map(postgrestValue)
+    .map((name) => `exercise.ilike.${name}`)
+    .join(",");
+
+  const pageSize = 1000;
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from("workout_logs")
+      .select("exercise, weight, reps")
+      .eq("client_id", client.id)
+      .lt("date", todayStr)
+      .or(orFilter)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      console.error(`[WORKOUT] Best e1RM query error for ${client.id}:`, error.message);
+      return new Map();
+    }
+
+    const rows = data ?? [];
+    for (const row of rows) {
+      const name = row.exercise?.trim().toLowerCase() ?? "";
+      if (!name || !wanted.has(name) || isAssistedExercise(name, equipmentByName?.get(name))) continue;
+      if (row.weight == null || row.weight <= 0) continue;
+      const sets = parseRepsToSets(row.reps);
+      if (!sets) continue;
+      const current = best.get(name) ?? 0;
+      for (const reps of sets) {
+        const value = calculateE1rm(row.weight, reps);
+        if (value > current) best.set(name, value);
+      }
+    }
+
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return best;
+}
+
+function historyDateLabel(date: string): string {
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}.${match[2]}` : date;
+}
+
+export function pickBestHistoryEntry(
+  entries: ExerciseHistoryEntry[],
+  assisted = false,
+): ExerciseHistoryEntry | null {
+  let best: ExerciseHistoryEntry | null = null;
+  let bestScore = -Infinity;
+  for (const entry of entries) {
+    let score = -Infinity;
+    const sets = parseRepsToSets(entry.reps);
+    if (assisted && entry.weight != null && entry.weight >= 0) {
+      const reps = sets
+        ? sets.length === 1
+          ? sets[0] * (entry.sets ?? 1)
+          : sets.reduce((sum, value) => sum + value, 0)
+        : 0;
+      score = -entry.weight + reps / 1000;
+    } else if (entry.weight != null && entry.weight > 0 && sets) {
+      for (const reps of sets) {
+        score = Math.max(score, calculateE1rm(entry.weight, reps));
+      }
+    } else if (sets) {
+      score = sets.length === 1
+        ? sets[0] * (entry.sets ?? 1)
+        : sets.reduce((sum, reps) => sum + reps, 0);
+    } else if (entry.rounds != null) {
+      score = entry.rounds === -1 ? Number.MAX_SAFE_INTEGER : entry.rounds;
+    } else if (entry.distance_km != null) {
+      score = entry.distance_km;
+    } else if (entry.duration_sec != null) {
+      score = entry.duration_sec;
+    } else if (entry.weight != null) {
+      score = entry.weight;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = entry;
+    }
+  }
+  return best;
+}
+
+export function formatExerciseHistoryBlock(
+  name: string,
+  entries: ExerciseHistoryEntry[],
+  lang: Language,
+  assisted = false,
+): string {
+  const lines = [`<b>${t("workout.history_title", lang, { exercise: escapeHtml(name) })}</b>`];
+  if (entries.length === 0) {
+    lines.push(t("workout.history_empty", lang));
+    return lines.join("\n");
+  }
+  const best = pickBestHistoryEntry(entries, assisted);
+  if (best) {
+    lines.push(`<i>${t("workout.history_best", lang, { detail: formatPreviousLog(best, lang) })}</i>`);
+  }
+  for (const entry of entries) {
+    const detail = formatPreviousLog(entry, lang);
+    if (!detail) continue;
+    lines.push(t("workout.history_item", lang, {
+      date: historyDateLabel(entry.date),
+      detail,
+    }));
+  }
+  return lines.join("\n");
+}
+
+export function formatTargetLine(
+  target: ExerciseTarget | null | undefined,
+  lang: Language,
+): string {
+  if (!target) return "";
+  const reps = target.repsMin === target.repsMax
+    ? String(target.repsMin)
+    : `${target.repsMin}–${target.repsMax}`;
+  const detail = target.weightKg != null && target.weightKg > 0
+    ? t("workout.target_weight_reps", lang, {
+        weight: Number(target.weightKg.toFixed(2)),
+        reps,
+      })
+    : t("workout.target_reps", lang, { reps });
+  return t("workout.target_line", lang, { detail });
 }
 
 function formatPreviousLog(log: PreviousLog, lang: Language): string {
@@ -544,6 +746,7 @@ function formatChildLine(
   child: ParsedExercise,
   lang: Language,
   last?: PreviousLog | null,
+  target?: ExerciseTarget | null,
 ): string {
   const lines: string[] = [];
   const detail = formatPlannedDetail(child, lang, " · ");
@@ -551,6 +754,8 @@ function formatChildLine(
     ? ` ${t("workout.exercise_swapped_from", lang, { name: escapeHtml(child.swapped_from) })}`
     : "";
   lines.push(`${letter}. ${escapeHtml(child.name)}${detail ? ` - ${detail}` : ""}${swapped}`);
+  const targetLine = formatTargetLine(target, lang);
+  if (targetLine) lines.push(targetLine);
   const lastDetail = last ? formatPreviousLog(last, lang) : "";
   if (lastDetail) {
     lines.push(`<i>${t("workout.exercise_last", lang, { detail: lastDetail })}</i>`);
@@ -724,6 +929,7 @@ export function formatSingleExercise(
   lang: Language,
   lastLogs: ReadonlyMap<string, PreviousLog>,
   compositeLetter = "A",
+  targets?: ReadonlyMap<string, ExerciseTarget>,
 ): string {
   const lines: string[] = [];
 
@@ -739,7 +945,13 @@ export function formatSingleExercise(
     for (let i = 0; i < ex.children.length; i++) {
       const child = ex.children[i];
       lines.push("");
-      lines.push(formatChildLine(`${compositeLetter}${i + 1}`, child, lang, lastLogs.get(child.name.trim().toLowerCase())));
+      lines.push(formatChildLine(
+        `${compositeLetter}${i + 1}`,
+        child,
+        lang,
+        lastLogs.get(child.name.trim().toLowerCase()),
+        targets?.get(child.name.trim().toLowerCase()),
+      ));
     }
 
     if (ex.rest) {
@@ -779,7 +991,12 @@ export function formatSingleExercise(
       for (let i = 0; i < ex.children.length; i++) {
         const child = ex.children[i];
         lines.push("");
-        lines.push(formatChildLine(`${compositeLetter}${i + 1}`, child, lang, lastLogs.get(child.name.trim().toLowerCase())));
+        lines.push(formatChildLine(
+          `${compositeLetter}${i + 1}`,
+          child,
+          lang,
+          lastLogs.get(child.name.trim().toLowerCase()),
+        ));
       }
     }
 
@@ -798,6 +1015,14 @@ export function formatSingleExercise(
   if (ex.rest) {
     lines.push("");
     lines.push(`<i>${t("workout.exercise_rest_detail", lang, { rest: escapeHtml(ex.rest) })}</i>`);
+  }
+
+  const targetLine = ex.type === "cardio" || ex.type === "circuit"
+    ? ""
+    : formatTargetLine(targets?.get(ex.name.trim().toLowerCase()), lang);
+  if (targetLine) {
+    lines.push("");
+    lines.push(targetLine);
   }
 
   const last = lastLogs.get(ex.name.trim().toLowerCase());

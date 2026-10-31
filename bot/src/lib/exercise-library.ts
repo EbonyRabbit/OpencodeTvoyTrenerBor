@@ -29,6 +29,7 @@ export interface ExerciseLibraryEntry {
   id: string;
   name: string;
   nameKey: string;
+  equipment?: string | null;
   techniqueRu: string | null;
   techniqueEn: string | null;
   featuresRu: string[];
@@ -59,6 +60,7 @@ export function buildExerciseLibraryMap(rows: ExerciseLibraryRow[]): Map<string,
       id: row.id,
       name: row.name,
       nameKey: row.name_key,
+      equipment: row.equipment ?? null,
       techniqueRu: row.technique_ru ?? null,
       techniqueEn: row.technique_en ?? null,
       featuresRu: row.features_ru ?? [],

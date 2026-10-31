@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint src/",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "node ../scripts/test-db.mjs web"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

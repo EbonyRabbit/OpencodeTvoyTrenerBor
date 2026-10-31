@@ -9,6 +9,7 @@ import {
   collectHistoryNames,
   withSwappedHistoryFallback,
   truncateMessage,
+  getTodayDateStr,
   type TodayWorkout,
 } from "../lib/workout-utils.js";
 import { t, type Language } from "../i18n/index.js";
@@ -36,10 +37,11 @@ import {
   handleSwapRevert,
   handleSwapBack,
 } from "./exercise-swap.js";
-import { buildExerciseLibraryMap } from "../lib/exercise-library.js";
+import { buildExerciseLibraryMap, findLibraryEntry, type ExerciseLibraryEntry } from "../lib/exercise-library.js";
+import { suggestTarget, type ExerciseTarget } from "../lib/training-progress.js";
+import { handleExerciseHistory } from "./exercise-history.js";
 // import { showPhotoHistory } from "./photos.js"; // DISABLED: photo storage removed
 import { supabaseAdmin } from "../lib/supabase-admin.js";
-import { getTodayDateStr } from "../lib/workout-utils.js";
 import { getCompositeLetters, isWarmCool, type ParsedExercise } from "../lib/program-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import { markAsSent } from "../cron/dedup.js";
@@ -119,6 +121,7 @@ registerCallback("today_open", handleTodayOpen);
 registerCallback("exercise_log", handleExerciseLog);
 registerCallback("exercise_skip", handleExerciseSkip);
 registerCallback("exercise_done_simple", handleExerciseDoneSimple);
+registerCallback("exercise_history", handleExerciseHistory);
 registerCallback("exercise_prev", handleExercisePrev);
 registerCallback("exercise_next", handleExerciseNext);
 registerCallback("exercise_swap", handleSwapOpen);
@@ -212,7 +215,10 @@ function buildExerciseKeyboard(
       { text: t("workout.btn_skip_exercise", lang), callback_data: `exercise_skip:${index}` },
     ]);
 
-    rows.push([{ text: t("workout.btn_swap", lang), callback_data: `exercise_swap:${index}` }]);
+    rows.push([
+      { text: t("workout.btn_swap", lang), callback_data: `exercise_swap:${index}` },
+      { text: t("workout.btn_history", lang), callback_data: `exercise_history:${index}` },
+    ]);
   }
 
   const navRow: { text: string; callback_data: string }[] = [];
@@ -229,12 +235,22 @@ async function withLibraryButton(
   rows: { text: string; callback_data: string }[][],
   ex: ParsedExercise,
   lang: Language,
+  map: Map<string, ExerciseLibraryEntry>,
 ): Promise<{ text: string; callback_data: string }[][]> {
-  const libraryRows = await loadExerciseLibraryRows();
-  const map = buildExerciseLibraryMap(libraryRows);
   const button = await buildExerciseInfoButton(ex, map, lang);
   if (!button) return rows;
   return [...rows, [button]];
+}
+
+function targetEntries(ex: ParsedExercise): ParsedExercise[] {
+  if (isWarmCool(ex)) return [];
+  if (ex.type === "superset") {
+    return (ex.children ?? []).filter(
+      (child) => child.type !== "cardio" && child.type !== "circuit" && !isWarmCool(child),
+    );
+  }
+  if (ex.type === "cardio" || ex.type === "circuit") return [];
+  return [ex];
 }
 
 export async function showExercise(
@@ -267,10 +283,28 @@ export async function showExercise(
 
   const compositeLetters = getCompositeLetters(effectiveWorkout.exercises);
   const currentExercise = effectiveWorkout.exercises[index];
-  const lastLogs = withSwappedHistoryFallback(
-    [currentExercise],
-    await getPreviousWorkoutLogs(ctx.client, collectHistoryNames([currentExercise])),
-  );
+  const libraryRows = await loadExerciseLibraryRows();
+  const libraryMap = buildExerciseLibraryMap(libraryRows ?? []);
+  const historyNames = collectHistoryNames([currentExercise]);
+  const rawLogs = await getPreviousWorkoutLogs(ctx.client, historyNames);
+  const lastLogs = withSwappedHistoryFallback([currentExercise], rawLogs);
+  const todayStr = getTodayDateStr(ctx.client.timezone || DEFAULT_TIMEZONE);
+  const targets = new Map<string, ExerciseTarget>();
+  for (const ex of targetEntries(currentExercise)) {
+    const key = ex.name.trim().toLowerCase();
+    const target = suggestTarget({
+      exerciseName: ex.name,
+      plannedWeight: ex.weight,
+      plannedSets: ex.sets,
+      plannedReps: ex.reps,
+      lastLog: rawLogs.get(key) ?? null,
+      equipment: findLibraryEntry(libraryMap, ex.name)?.equipment ?? null,
+      isDeload: effectiveWorkout.is_deload,
+      isSwapped: Boolean(ex.swapped_from),
+      today: todayStr,
+    });
+    if (target) targets.set(key, target);
+  }
   const text = truncateMessage(
     formatSingleExercise(
       index,
@@ -279,6 +313,7 @@ export async function showExercise(
       ctx.language,
       lastLogs,
       compositeLetters.get(index) ?? "A",
+      targets,
     ),
     t("program.truncation_suffix", ctx.language),
     { html: true },
@@ -287,6 +322,7 @@ export async function showExercise(
     buildExerciseKeyboard(index, effectiveWorkout.exercises.length, ctx.language, currentExercise),
     currentExercise,
     ctx.language,
+    libraryMap,
   );
 
   await ctx.reply(text, {

@@ -24,7 +24,7 @@ vi.mock("../../lib/workout-utils.js", async (importOriginal) => {
     ...orig,
     getTodayWorkout: mockGetTodayWorkout,
     isTodayWorkoutCompleted: vi.fn().mockResolvedValue(false),
-    getPreviousWorkoutLogs: vi.fn().mockResolvedValue([]),
+    getPreviousWorkoutLogs: vi.fn().mockResolvedValue(new Map()),
     formatSingleExercise: vi.fn().mockReturnValue("EX"),
     collectLoggableNames: vi.fn().mockReturnValue(["Приседания со штангой"]),
     truncateMessage: vi.fn().mockImplementation((t: string) => t),

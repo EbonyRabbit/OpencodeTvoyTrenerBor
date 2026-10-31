@@ -1,7 +1,17 @@
 import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import type { TodayWorkout } from "../lib/workout-utils.js";
-import { getTodayDateStr, getTodayWorkout, isTodayWorkoutCompleted, formatDuration } from "../lib/workout-utils.js";
+import {
+  clearWorkoutLogsCache,
+  getBestE1rms,
+  getTodayDateStr,
+  getTodayWorkout,
+  isTodayWorkoutCompleted,
+  formatDuration,
+} from "../lib/workout-utils.js";
+import { calculateE1rm, isAssistedExercise, parseRepsToSets } from "../lib/training-progress.js";
+import { loadExerciseLibraryRows } from "./exercise-info.js";
+import { buildExerciseLibraryMap, findLibraryEntry } from "../lib/exercise-library.js";
 import {
   parseSets,
   parseReps,
@@ -158,6 +168,67 @@ function currentChildName(data: WizardData): string {
   const child = data.children?.[data.child_index];
   if (!child) return data.exercise_name;
   return child.letter ? `${child.letter}. ${child.name}` : child.name;
+}
+
+export interface PrLogRow {
+  exercise: string;
+  weight: number | null;
+  reps: string | null;
+}
+
+export function buildPrLines(
+  rows: PrLogRow[],
+  previousBest: ReadonlyMap<string, number>,
+  lang: Language,
+  equipmentByName?: ReadonlyMap<string, string | null>,
+): string[] {
+  const current = new Map<string, { name: string; value: number }>();
+  for (const row of rows) {
+    const name = row.exercise?.trim();
+    if (!name || row.weight == null || row.weight <= 0) continue;
+    const equipment = equipmentByName?.get(name.toLowerCase());
+    if (isAssistedExercise(name, equipment)) continue;
+    const sets = parseRepsToSets(row.reps);
+    if (!sets) continue;
+
+    let value = 0;
+    for (const reps of sets) {
+      value = Math.max(value, calculateE1rm(row.weight, reps));
+    }
+    if (value <= 0) continue;
+
+    const key = name.toLowerCase();
+    const existing = current.get(key);
+    if (!existing || value > existing.value) {
+      current.set(key, { name, value });
+    }
+  }
+
+  const lines: string[] = [];
+  for (const [key, result] of current) {
+    const previous = previousBest.get(key);
+    if (previous == null || result.value <= previous + 0.05) continue;
+    lines.push(t("wizard.pr_new", lang, {
+      exercise: result.name,
+      value: Number(result.value.toFixed(1)),
+    }));
+    if (lines.length >= 3) break;
+  }
+  return lines;
+}
+
+export async function safePrLines(
+  rows: PrLogRow[],
+  previousBest: Promise<ReadonlyMap<string, number>>,
+  lang: Language,
+  equipmentByName?: ReadonlyMap<string, string | null>,
+): Promise<string[]> {
+  try {
+    return buildPrLines(rows, await previousBest, lang, equipmentByName);
+  } catch (err) {
+    console.warn("[WIZARD] PR lookup failed:", err);
+    return [];
+  }
 }
 
 function buildSummary(data: WizardData, lang: Language): string {
@@ -583,12 +654,40 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
     return { type: "expired" };
   }
 
+  clearWorkoutLogsCache();
+
+  let prLines: string[] = [];
+  try {
+    const names = Array.from(new Set(rows.map((row) => row.exercise)));
+    const equipmentByName = new Map<string, string | null>();
+    try {
+      const libraryRows = await loadExerciseLibraryRows();
+      const libraryMap = buildExerciseLibraryMap(libraryRows ?? []);
+      for (const name of names) {
+        equipmentByName.set(name.toLowerCase(), findLibraryEntry(libraryMap, name)?.equipment ?? null);
+      }
+    } catch (err) {
+      console.warn(`[WIZARD] PR equipment lookup failed for ${ctx.client.id}:`, err);
+    }
+    prLines = await safePrLines(
+      rows,
+      getBestE1rms(ctx.client, names, equipmentByName),
+      ctx.language,
+      equipmentByName,
+    );
+  } catch (err) {
+    console.warn(`[WIZARD] PR lookup failed for ${ctx.client.id}:`, err);
+  }
+
   const dedupResult = await markAsSent(`workout_completed:${ctx.client.id}:${todayStr}`);
   if (dedupResult === "error") {
     console.warn(`[WIZARD] Dedup write failed for ${ctx.client.id}`);
   }
 
-  const summary = buildSummary(data, ctx.language);
+  const summaryBase = buildSummary(data, ctx.language);
+  const summary = prLines.length > 0
+    ? `${summaryBase}\n\n${prLines.join("\n")}`
+    : summaryBase;
   await ctx.reply(summary);
 
   try {

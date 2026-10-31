@@ -15,6 +15,7 @@ function row(partial: Partial<ExerciseLibraryRow>): ExerciseLibraryRow {
     name: partial.name ?? "Тест",
     name_key: partial.name_key ?? normalizeExerciseName(partial.name ?? "Тест"),
     aliases: partial.aliases ?? [],
+    equipment: partial.equipment ?? null,
     description_ru: partial.description_ru ?? null,
     description_en: partial.description_en ?? null,
     technique_ru: partial.technique_ru ?? null,
@@ -56,6 +57,13 @@ describe("buildExerciseLibraryMap", () => {
     expect(map.get("жимлежа")?.id).toBe("a");
     expect(map.get("benchpress")?.id).toBe("a");
     expect(map.get("жимштангилежа")?.id).toBe("a");
+  });
+
+  it("carries equipment into the entry", () => {
+    const map = buildExerciseLibraryMap([
+      row({ id: "a", name: "Жим лёжа", name_key: "Жим лёжа", equipment: "Штанга" }),
+    ]);
+    expect(map.get("жимлежа")?.equipment).toBe("Штанга");
   });
 
   it("skips duplicate keys and empty keys", () => {

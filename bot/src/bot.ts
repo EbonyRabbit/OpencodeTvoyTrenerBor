@@ -16,6 +16,7 @@ import { programsHandler, handleProgramDetailsCallback } from "./handlers/progra
 import {
   startPurchase,
   handleConsentPurchase,
+  resendPaymentLink,
   startCoachRequest,
   handleConsentCoachRequest,
 } from "./handlers/purchase.js";
@@ -264,6 +265,11 @@ bot.on("callback_query:data", async (ctx, next) => {
   if (data?.startsWith("consent_purchase:")) {
     const requestId = data.slice("consent_purchase:".length);
     await handleConsentPurchase(ctx, requestId);
+    return;
+  }
+  if (data?.startsWith("resend_payment_link:")) {
+    const requestId = data.slice("resend_payment_link:".length);
+    await resendPaymentLink(ctx, requestId);
     return;
   }
   // coach_request must bypass guardActiveClient: new users (no clients row)

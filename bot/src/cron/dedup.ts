@@ -12,18 +12,35 @@ export async function markAsSent(key: string, ttlHours = DEFAULT_TTL_HOURS): Pro
     return "error";
   }
 
-  const expiresAt = new Date(Date.now() + ttlHours * 3600_000).toISOString();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + ttlHours * 3600_000).toISOString();
 
-  const { error } = await supabaseAdmin
-    .from("bot_dedup")
-    .insert({ key, expires_at: expiresAt });
+  const insert = () =>
+    supabaseAdmin.from("bot_dedup").insert({ key, expires_at: expiresAt });
+  const { error } = await insert();
 
   if (error) {
-    if (error.code === "23505") {
-      return "duplicate";
+    if (error.code !== "23505") {
+      console.error(`[DEDUP] Insert error for key "${key.slice(0, 30)}…":`, error.code);
+      return "error";
     }
-    console.error(`[DEDUP] Insert error for key "${key.slice(0, 30)}…":`, error.code);
-    return "error";
+    // Уникальный ключ может остаться от прошлого TTL: чистим только по
+    // конфликту, а не DELETE перед каждой отправкой.
+    const { error: purgeError } = await supabaseAdmin
+      .from("bot_dedup")
+      .delete()
+      .eq("key", key)
+      .lt("expires_at", now.toISOString());
+    if (purgeError) {
+      console.error(`[DEDUP] Purge error for key "${key.slice(0, 30)}…":`, purgeError.code);
+      return "error";
+    }
+    const { error: retryError } = await insert();
+    if (retryError) {
+      if (retryError.code === "23505") return "duplicate";
+      console.error(`[DEDUP] Retry error for key "${key.slice(0, 30)}…":`, retryError.code);
+      return "error";
+    }
   }
 
   return "sent";
@@ -41,8 +58,10 @@ export async function cleanupExpired(): Promise<void> {
   }
 }
 
-export async function deleteDedup(key: string): Promise<void> {
-  if (!key || typeof key !== "string" || key.length > MAX_KEY_LENGTH) return;
+export async function deleteDedup(key: string): Promise<boolean> {
+  if (!key || typeof key !== "string" || key.length > MAX_KEY_LENGTH) {
+    return false;
+  }
 
   const { error } = await supabaseAdmin
     .from("bot_dedup")
@@ -51,7 +70,9 @@ export async function deleteDedup(key: string): Promise<void> {
 
   if (error) {
     console.error(`[DEDUP] Delete error for key "${key.slice(0, 30)}…":`, error.code);
+    return false;
   }
+  return true;
 }
 
 export type ExistsResult = boolean | "error";

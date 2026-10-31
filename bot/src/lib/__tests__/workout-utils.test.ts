@@ -19,15 +19,40 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
-import { truncateMessage, formatExercise, formatSingleExercise, formatWorkoutMessage, getPreviousWorkoutLogs, isTodayWorkoutCompleted, getIsoWeekday, dayOrderForDate, matchDayByOrder, isPseudoName, getTodayISODay, getTodayDayOfMonth, parseTimeRounded, plannedDateForDay, escapeHtml } from "../workout-utils.js";
+import {
+  truncateMessage,
+  formatExercise,
+  formatSingleExercise,
+  formatWorkoutMessage,
+  getPreviousWorkoutLogs,
+  getExerciseHistory,
+  getBestE1rms,
+  clearWorkoutLogsCache,
+  pickBestHistoryEntry,
+  formatTargetLine,
+  formatExerciseHistoryBlock,
+  isTodayWorkoutCompleted,
+  getIsoWeekday,
+  dayOrderForDate,
+  matchDayByOrder,
+  isPseudoName,
+  getTodayISODay,
+  getTodayDayOfMonth,
+  parseTimeRounded,
+  plannedDateForDay,
+  escapeHtml,
+} from "../workout-utils.js";
 
 function mockLogsQuery(rows: Array<Record<string, unknown>>, error: { message: string } | null = null) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     lt: vi.fn(() => builder),
+    lte: vi.fn(() => builder),
+    ilike: vi.fn(() => builder),
     or: vi.fn(() => builder),
     order: vi.fn(() => builder),
+    range: vi.fn(() => ({ data: rows, error })),
     limit: vi.fn(() => ({ data: rows, error })),
   };
   mocks.mockFrom.mockReturnValue(builder);
@@ -538,6 +563,51 @@ describe("formatSingleExercise", () => {
     expect(result).toContain("До &amp; отказа раундов");
     expect(result).not.toContain("До & отказа");
   });
+
+  it("shows the target after the plan and before the previous log", () => {
+    const exercise = { name: "Приседания", sets: "3", reps: "8-10", weight: "100" };
+    const lastLogs = new Map([["приседания", { weight: 100, sets: 3, reps: "8/8/8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null }]]);
+    const targets = new Map([["приседания", { weightKg: 102.5, repsMin: 8, repsMax: 10, source: "history" as const }]]);
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", lastLogs, "A", targets);
+    const targetIndex = result.indexOf("Цель: 102.5 кг × 8–10");
+    expect(targetIndex).toBeGreaterThan(result.indexOf("3×8-10"));
+    expect(targetIndex).toBeLessThan(result.indexOf("Прошлый раз"));
+  });
+
+  it("shows a reps-only target for bodyweight work", () => {
+    expect(formatTargetLine({
+      weightKg: null, repsMin: 8, repsMax: 10, source: "history",
+    }, "ru")).toBe("Цель: 8–10 повторов");
+  });
+
+  it("shows targets for superset children", () => {
+    const exercise = {
+      name: "Грудь и спина",
+      type: "superset",
+      sets: "3",
+      children: [{ name: "Жим", sets: "3", reps: "8" }, { name: "Тяга", sets: "3", reps: "8" }],
+    };
+    const targets = new Map([["жим", { weightKg: 82.5, repsMin: 8, repsMax: 8, source: "history" as const }]]);
+    const result = formatSingleExercise(0, 1, exercise as never, "ru", new Map(), "A", targets);
+    expect(result).toContain("Цель: 82.5 кг × 8");
+    expect(result.match(/Цель:/g)).toHaveLength(1);
+  });
+
+  it("does not show targets for cardio or circuit cards", () => {
+    const target = { weightKg: 50, repsMin: 8, repsMax: 10, source: "history" as const };
+    const cardio = formatSingleExercise(
+      0, 1,
+      { name: "Бег", type: "cardio", duration: "20 мин", weight: "50", reps: "8" } as never,
+      "ru", new Map(), "A", new Map([["бег", target]]),
+    );
+    const circuit = formatSingleExercise(
+      0, 1,
+      { name: "Круг", type: "circuit", rounds: "3", children: [{ name: "Берпи", weight: "50", reps: "10" }] } as never,
+      "ru", new Map(), "A", new Map([["берпи", target]]),
+    );
+    expect(cardio).not.toContain("50 кг × 8");
+    expect(circuit).not.toContain("50 кг × 8");
+  });
 });
 
 describe("formatWorkoutMessage", () => {
@@ -646,6 +716,194 @@ describe("getPreviousWorkoutLogs", () => {
     mockLogsQuery([], { message: "boom" });
     const result = await getPreviousWorkoutLogs(client, ["Присед"]);
     expect(result.size).toBe(0);
+  });
+});
+
+describe("getExerciseHistory", () => {
+  const client = { id: "client-1", timezone: "Europe/Moscow" } as Parameters<typeof getExerciseHistory>[0];
+
+  it("returns the last five entries including today", async () => {
+    const builder = mockLogsQuery([
+      { exercise: "Приседания", date: "2026-10-20", weight: 100, sets: 3, reps: "5/5/5" },
+    ]);
+    const result = await getExerciseHistory(client, "Приседания");
+    expect(result[0]).toMatchObject({ date: "2026-10-20", weight: 100, reps: "5/5/5" });
+    expect(builder.eq).toHaveBeenCalledWith("client_id", "client-1");
+    expect(builder.ilike).toHaveBeenCalledWith("exercise", "Приседания");
+    expect(builder.lte).toHaveBeenCalledWith("date", expect.any(String));
+    expect(builder.limit).toHaveBeenCalledWith(5);
+  });
+
+  it("throws when the query fails so the UI can show a service error", async () => {
+    mockLogsQuery([], { message: "boom" });
+    await expect(getExerciseHistory(client, "Приседания")).rejects.toThrow("History query failed");
+  });
+
+  it("returns an empty list for a blank name", async () => {
+    expect(await getExerciseHistory(client, "  ")).toEqual([]);
+  });
+});
+
+describe("getBestE1rms", () => {
+  const client = { id: "client-1", timezone: "Europe/Moscow" } as Parameters<typeof getBestE1rms>[0];
+
+  it("keeps the best result per exercise and ignores invalid rows", async () => {
+    mockLogsQuery([
+      { exercise: "Приседания", weight: 100, reps: "5/5/5" },
+      { exercise: "приседания", weight: 105, reps: "3" },
+      { exercise: "Приседания", weight: 120, reps: "8-10" },
+      { exercise: "Приседания в гравитроне", weight: 50, reps: "5" },
+      { exercise: "Отжимания", weight: 0, reps: "10" },
+    ]);
+    const result = await getBestE1rms(client, ["Приседания", "Приседания в гравитроне", "Отжимания"]);
+    expect(result.get("приседания")).toBe(116.7);
+    expect(result.has("приседания в гравитроне")).toBe(false);
+    expect(result.has("отжимания")).toBe(false);
+  });
+
+  it("excludes assisted exercises identified by library equipment", async () => {
+    mockLogsQuery([{ exercise: "Подтягивания", weight: 50, reps: "5" }]);
+    const result = await getBestE1rms(
+      client,
+      ["Подтягивания"],
+      new Map([["подтягивания", "Гравитрон"]]),
+    );
+    expect(result.size).toBe(0);
+  });
+
+  it("paginates through more than one REST page", async () => {
+    const firstPage = Array.from({ length: 1000 }, () => ({
+      exercise: "Приседания",
+      weight: 100,
+      reps: "5",
+    }));
+    let page = 0;
+    const builder = {
+      select: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      lt: vi.fn(() => builder),
+      or: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      range: vi.fn(() => ({
+        data: page++ === 0 ? firstPage : [{ exercise: "Приседания", weight: 120, reps: "5" }],
+        error: null,
+      })),
+    };
+    mocks.mockFrom.mockReturnValue(builder);
+    const result = await getBestE1rms(client, ["Приседания"]);
+    expect(result.get("приседания")).toBe(140);
+    expect(builder.range).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops partial results when a later page fails", async () => {
+    let page = 0;
+    const builder = {
+      select: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      lt: vi.fn(() => builder),
+      or: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      range: vi.fn(() => {
+        if (page++ === 0) {
+          return {
+            data: Array.from({ length: 1000 }, (_, i) => ({
+              exercise: "Приседания",
+              weight: 100 + i,
+              reps: "5",
+            })),
+            error: null,
+          };
+        }
+        return { data: null, error: { message: "boom" } };
+      }),
+    };
+    mocks.mockFrom.mockReturnValue(builder);
+    expect((await getBestE1rms(client, ["Приседания"])).size).toBe(0);
+    expect(builder.range).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns an empty map on query error", async () => {
+    mockLogsQuery([], { message: "boom" });
+    expect((await getBestE1rms(client, ["Приседания"])).size).toBe(0);
+  });
+
+  it("does not query without names", async () => {
+    mocks.mockFrom.mockClear();
+    expect((await getBestE1rms(client, [])).size).toBe(0);
+    expect(mocks.mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe("previous logs cache", () => {
+  const client = { id: "cache-client", timezone: "Europe/Moscow" } as Parameters<typeof getPreviousWorkoutLogs>[0];
+
+  it("returns the cached snapshot and refreshes after clear", async () => {
+    clearWorkoutLogsCache();
+    mockLogsQuery([{ exercise: "Приседания", date: "2026-10-01", weight: 90, sets: 3, reps: "5" }]);
+    const first = await getPreviousWorkoutLogs(client, ["Приседания"]);
+    expect(first.get("приседания")?.weight).toBe(90);
+
+    mockLogsQuery([{ exercise: "Приседания", date: "2026-10-02", weight: 95, sets: 3, reps: "5" }]);
+    const cached = await getPreviousWorkoutLogs(client, ["Приседания"]);
+    expect(cached.get("приседания")?.weight).toBe(90);
+
+    clearWorkoutLogsCache();
+    const refreshed = await getPreviousWorkoutLogs(client, ["Приседания"]);
+    expect(refreshed.get("приседания")?.weight).toBe(95);
+  });
+
+  it("stores the log date for progression", async () => {
+    clearWorkoutLogsCache();
+    mockLogsQuery([{ exercise: "Приседания", date: "2026-10-01", weight: 90, sets: 3, reps: "5" }]);
+    const result = await getPreviousWorkoutLogs(client, ["Приседания"]);
+    expect(result.get("приседания")?.date).toBe("2026-10-01");
+  });
+});
+
+describe("history formatting", () => {
+  const entries = [
+    { date: "2026-10-20", weight: 100, sets: 3, reps: "5/5/5", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+    { date: "2026-10-10", weight: 90, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+  ];
+
+  it("picks the best entry by e1RM", () => {
+    expect(pickBestHistoryEntry(entries)?.weight).toBe(100);
+  });
+
+  it("uses total reps for a bodyweight best entry", () => {
+    const bodyweight = [
+      { date: "2026-10-20", weight: 0, sets: 3, reps: "8/8/8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-10", weight: 0, sets: 3, reps: "10/10/10", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+    ];
+    expect(pickBestHistoryEntry(bodyweight)?.date).toBe("2026-10-10");
+  });
+
+  it("ranks lower assistance as the best gravitron result", () => {
+    const assisted = [
+      { date: "2026-10-20", weight: 40, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-10", weight: 20, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+    ];
+    expect(pickBestHistoryEntry(assisted, true)?.weight).toBe(20);
+    expect(formatExerciseHistoryBlock("Подтягивания", assisted, "ru", true)).toContain("20 кг");
+  });
+
+  it("multiplies a single rep value by the logged set count", () => {
+    const bodyweight = [
+      { date: "2026-10-20", weight: 0, sets: 3, reps: "10", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-10", weight: 0, sets: 2, reps: "10/10", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+    ];
+    expect(pickBestHistoryEntry(bodyweight)?.date).toBe("2026-10-20");
+  });
+
+  it("formats dates and the best result", () => {
+    const text = formatExerciseHistoryBlock("Приседания", entries, "ru");
+    expect(text).toContain("История: Приседания");
+    expect(text).toContain("20.10");
+    expect(text).toContain("Лучший");
+  });
+
+  it("shows an empty state", () => {
+    expect(formatExerciseHistoryBlock("Приседания", [], "ru")).toContain("Пока нет записей");
   });
 });
 

@@ -11,10 +11,17 @@
 //   success                      → активация покупки (21.6), идемпотентно
 //   order_canceled / order_denied→ заявка → cancelled + уведомление тренеру
 //   всё остальное (fail, …)     → ack 200 без действий
-import { parseProdamusOrder, verifyProdamusSignature } from "@/lib/prodamus";
+import {
+  parseProdamusOrder,
+  verifyProdamusSignature,
+  type ProdamusFormEntries,
+} from "@/lib/prodamus";
 import { activatePurchaseByOrder } from "@/lib/activate-purchase";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { sendCoachAlertOnce } from "@/lib/coach-alert";
+import { UUID_REGEX } from "@/lib/validation";
+import { createHash } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,7 +87,66 @@ async function notifyCoachCancellation(
   }
 }
 
+
+async function notifyCoachActivationFailure(
+  orderId: string,
+  reason: string,
+  amount: number | null,
+): Promise<boolean> {
+  const text =
+    `⚠️ Оплата получена, но активация требует внимания\n\n` +
+    `Заказ: ${orderId}\n` +
+    `Сумма: ${formatAmount(amount)}\n` +
+    `Причина: ${reason}`;
+  const reasonHash = createHash("sha256")
+    .update(reason)
+    .digest("hex")
+    .slice(0, 12);
+  const delivered = await sendCoachAlertOnce(
+    `activation_alert:${orderId}:${reasonHash}`,
+    text,
+  );
+  if (!delivered) {
+    await persistActivationAlert(orderId, reason);
+  }
+  return delivered;
+}
+
+async function persistActivationAlert(
+  orderId: string,
+  reason: string,
+): Promise<boolean> {
+  const { error } = await supabaseAdmin.from("bot_logs").insert({
+    action: "activation_alert",
+    telegram_id: null,
+    status: "error",
+    details: `${orderId}: ${reason}`.slice(0, 500),
+  });
+  if (error) {
+    console.error(
+      "[PRODAMUS WEBHOOK] Failed to persist activation alert:",
+      error.message,
+    );
+    return false;
+  }
+  return true;
+}
+
+async function notifyCancelAfterPaid(orderId: string): Promise<boolean> {
+  return sendCoachAlertOnce(
+    `cancel_after_paid:${orderId}`,
+    `⚠️ Пришла отмена по уже оплаченной заявке ${orderId}. ` +
+      `Проверьте, не списаны ли деньги повторно, и при необходимости сделайте возврат.`,
+  );
+}
+
 async function handleCancellation(orderId: string): Promise<Response> {
+  // Числовой order_id Продамуса без order_num не является id нашей заявки.
+  // Не отдаём его в uuid-колонку: Postgres вернёт 22P02 и вебхук зациклится.
+  if (!UUID_REGEX.test(orderId)) {
+    console.warn("[PRODAMUS WEBHOOK] Cancel for non-UUID order");
+    return jsonResponse({ ok: true, ignored: "order_id" }, 200);
+  }
   // CAS pending -> cancelled: платную заявку не трогаем (возвраты - вне скоупа),
   // повторные отмены идемпотентны.
   const { data: cancelled, error } = await supabaseAdmin
@@ -116,7 +182,14 @@ async function handleCancellation(orderId: string): Promise<Response> {
     console.warn("[PRODAMUS WEBHOOK] Cancel for unknown order");
     return jsonResponse({ ok: true }, 200);
   }
-  // paid/cancelled - идемпотентный ack; повторная отмена paid не выполняется.
+  if (current.status === "paid") {
+    const alerted = await notifyCancelAfterPaid(orderId);
+    if (!alerted) {
+      return jsonResponse({ ok: false, error: "alert" }, 500);
+    }
+  }
+  // paid/cancelled - идемпотентный ack; повторная отмена paid не выполняется,
+  // но тренер получает предупреждение о гонке отмены с оплатой.
   return jsonResponse({ ok: true, status: current.status }, 200);
 }
 
@@ -127,20 +200,23 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse({ ok: false, error: "config" }, 500);
   }
 
-  let rawBody: string;
+  const contentType = req.headers.get("content-type") ?? "";
+  let entries: ProdamusFormEntries;
   try {
-    rawBody = await req.text();
+    entries = contentType.toLowerCase().includes("multipart/form-data")
+      ? await req.formData()
+      : await req.text();
   } catch {
     return jsonResponse({ ok: false, error: "body" }, 400);
   }
   const signHeader = req.headers.get("sign");
 
-  if (!verifyProdamusSignature(rawBody, signHeader, secretKey)) {
+  if (!verifyProdamusSignature(entries, signHeader, secretKey)) {
     console.error("[PRODAMUS WEBHOOK] Signature verification failed");
     return jsonResponse({ ok: false, error: "signature" }, 400);
   }
 
-  const order = parseProdamusOrder(rawBody);
+  const order = parseProdamusOrder(entries);
   if (!order.orderId) {
     console.error("[PRODAMUS WEBHOOK] Missing order_id in verified payload");
     return jsonResponse({ ok: false, error: "order_id" }, 400);
@@ -155,10 +231,20 @@ export async function POST(req: Request): Promise<Response> {
       paidSum: order.sum,
     });
     if (result.alreadyActivated || !result.error) {
+      if (result.warning) {
+        const alerted = await notifyCoachActivationFailure(
+          order.orderId,
+          result.warning,
+          order.sum,
+        );
+        if (!alerted) {
+          return jsonResponse({ ok: false, error: "alert" }, 500);
+        }
+      }
       return jsonResponse({ ok: true }, 200);
     }
     // Незавершённая параллельная активация - нужно повторить позже.
-    if (result.error.includes("уже выполняется")) {
+    if (result.inProgress) {
       return jsonResponse({ ok: false, error: "in_progress" }, 503);
     }
     console.error(
@@ -167,7 +253,21 @@ export async function POST(req: Request): Promise<Response> {
       ":",
       result.error,
     );
-    return jsonResponse({ ok: false, error: "activation" }, 500);
+    if (result.programAssigned || (!result.retryable && !result.alerted)) {
+      const alerted = await notifyCoachActivationFailure(
+        order.orderId,
+        result.error,
+        order.sum,
+      );
+      if (!alerted && !result.retryable) {
+        return jsonResponse({ ok: false, error: "alert" }, 500);
+      }
+    }
+    if (result.retryable) {
+      return jsonResponse({ ok: false, error: "activation" }, 500);
+    }
+    // Постоянная ошибка: Prodamus не должен ретраить её бесконечно.
+    return jsonResponse({ ok: false, error: "activation", manual: true }, 200);
   }
 
   if (CANCEL_STATUSES.has(paymentStatus)) {

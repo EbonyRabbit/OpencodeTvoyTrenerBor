@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Database } from "@/types/supabase";
 import { generateSchedule } from "@/lib/plan-adjustment";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { sendCoachAlertOnce } from "@/lib/coach-alert";
 import { buildProgramInstructions } from "@/lib/program-instructions";
 import { UUID_REGEX, formatContact, sanitizeText } from "@/lib/validation";
 import { formatPrice } from "@/lib/format-price";
@@ -89,12 +90,14 @@ export async function assignProgramAndNotify(
   connectCode?: string;
   warning?: string;
   programAssigned?: boolean;
+  retryable?: boolean;
 }> {
   const resetError = await resetPlanAssignments(input.clientId);
   if (resetError.error) {
     return {
       error: resetError.error,
       programAssigned: true,
+      retryable: true,
     };
   }
 
@@ -107,6 +110,7 @@ export async function assignProgramAndNotify(
     return {
       error: "Программа назначена, но не удалось создать расписание.",
       programAssigned: true,
+      retryable: true,
     };
   }
 
@@ -180,28 +184,34 @@ export async function deliverProgramInstructions(
     timezone: input.timezone,
   });
 
-  const { error: dbError } = await supabaseAdmin.from("messages").insert({
-    client_id: input.clientId,
-    coach_id: input.coachId,
-    direction: "to_client",
-    text,
-    sent_at: new Date().toISOString(),
-    read_at: null,
-  });
-  if (dbError) {
-    console.error("[INSTRUCTIONS] Failed to save message:", dbError.message);
-  }
+  const saveMessage = async (): Promise<{ error?: string }> => {
+    const { error } = await supabaseAdmin.from("messages").insert({
+      client_id: input.clientId,
+      coach_id: input.coachId,
+      direction: "to_client",
+      text,
+      sent_at: new Date().toISOString(),
+      read_at: null,
+    });
+    if (error) {
+      console.error("[INSTRUCTIONS] Failed to save message:", error.message);
+      return { error: error.message };
+    }
+    return {};
+  };
 
   if (input.clientTelegramId) {
     const sent = await sendTelegramMessage(input.clientTelegramId, text);
     if (!sent) {
+      // Не сохраняем запись до успешной доставки: hasInstructionsFor иначе
+      // примет её за доставленные инструкции и не повторит отправку.
       return {
-        warning: dbError
-          ? "Инструкции не доставлены в Telegram и не сохранены в истории. Проверьте доступность бота и попробуйте ещё раз."
-          : "Инструкции не доставлены в Telegram. Проверьте, что клиент не заблокировал бота и что токен бота настроен. Сообщение сохранено в истории чата.",
+        warning:
+          "Инструкции не доставлены в Telegram. Проверьте, что клиент не заблокировал бота и что токен бота настроен, затем повторите отправку.",
       };
     }
-    return dbError
+    const saved = await saveMessage();
+    return saved.error
       ? {
           warning:
             "Инструкции доставлены в Telegram, но не сохранены в истории чата.",
@@ -209,16 +219,18 @@ export async function deliverProgramInstructions(
       : {};
   }
 
+  const saved = await saveMessage();
   if (input.connectCode) {
     return {
-      warning: dbError
+      warning: saved.error
         ? "Инструкции не сохранены в истории чата. Передайте клиенту код подключения."
         : "Клиент не подключён к Telegram. Передайте ему код подключения; после подключения отправьте инструкции ещё раз кнопкой «Отправить инструкции».",
     };
   }
   return {
-    warning:
-      "Клиент не подключён к Telegram, а код подключения не удалось сгенерировать. Попробуйте кнопкой «Код подключения».",
+    warning: saved.error
+      ? "Инструкции не сохранены в истории чата, а код подключения не удалось сгенерировать. Попробуйте кнопкой «Код подключения»."
+      : "Клиент не подключён к Telegram, а код подключения не удалось сгенерировать. Попробуйте кнопкой «Код подключения».",
   };
 }
 
@@ -291,6 +303,9 @@ export type ActivationResult = {
   connectCode?: string;
   warning?: string;
   programAssigned?: boolean;
+  retryable?: boolean;
+  alerted?: boolean;
+  inProgress?: true;
 };
 
 export async function applyProgramActivation({
@@ -330,6 +345,10 @@ export async function applyProgramActivation({
     client.access_end_date !== null &&
     client.access_end_date !== undefined &&
     new Date(client.access_end_date).getTime() > now.getTime();
+  const effectiveAccessEndDate =
+    sameActiveProgram && client.access_end_date
+      ? client.access_end_date
+      : accessEndDate;
 
   const update: Database["public"]["Tables"]["clients"]["Update"] = {
     program_id: programId,
@@ -366,7 +385,7 @@ export async function applyProgramActivation({
     .eq("id", clientId);
   if (updateError) {
     console.error("[ACTIVATION] Client update failed:", updateError.message);
-    return { error: "Не удалось обновить данные клиента." };
+    return { error: "Не удалось обновить данные клиента.", retryable: true };
   }
 
   const assignment = await assignProgramAndNotify({
@@ -374,7 +393,7 @@ export async function applyProgramActivation({
     client,
     programId,
     programTitle,
-    accessEndDate,
+    accessEndDate: effectiveAccessEndDate,
     coachId,
     telegramIdToRecord: telegramIdToRecord ?? null,
   });
@@ -392,7 +411,7 @@ export async function applyProgramActivation({
         price,
         amount,
         durationWeeks,
-        accessEndDate,
+        accessEndDate: effectiveAccessEndDate,
       }),
     );
     if (!sent) {
@@ -405,6 +424,26 @@ export async function applyProgramActivation({
   }
 
   return assignment;
+}
+
+type CancelledPaymentInfo = {
+  name: string;
+  contact: string;
+  amount: number | null;
+};
+
+async function alertCancelledPayment(
+  orderId: string,
+  request: CancelledPaymentInfo,
+): Promise<boolean> {
+  const amountText =
+    request.amount != null
+      ? ` на сумму ${request.amount.toLocaleString("ru-RU")} ₽`
+      : "";
+  return sendCoachAlertOnce(
+    `cancelled_payment:${orderId}`,
+    `⚠️ Получена оплата${amountText} по ОТМЕНЁННОЙ заявке ${orderId} (клиент: ${sanitizeText(request.name)}, контакт: ${formatContact(request.contact)}). Доступ не выдан - сделайте возврат или выдайте доступ вручную.`,
+  );
 }
 
 export async function activatePurchaseByOrder({
@@ -436,67 +475,19 @@ export async function activatePurchaseByOrder({
       .maybeSingle();
     if (requestError) {
       console.error("[ACTIVATION] Request lookup error:", requestError.message);
-      return { error: "Ошибка при обработке заказа." };
+      return { error: "Ошибка при обработке заказа.", retryable: true };
     }
     if (!request) return { error: "Заявка не найдена." };
     if (request.status === "cancelled") {
       if (paymentStatus === "success") {
-        // Деньги списаны по отменённой заявке: доступ не выдаём автоматически,
-        // но молча терять оплату нельзя - требуем возврата или ручной выдачи.
-        console.error(
-          "[ACTIVATION] Payment received for CANCELLED request:",
-          orderId,
-        );
-        // Идемпотентность: вебхук Продамуса может ретраиться - алерт шлём один
-        // раз на заявку (bot_dedup с TTL 30 дней).
-        const dedupKey = `cancelled_payment:${orderId}`;
-        const expiresAt = new Date(
-          Date.now() + 30 * 24 * 60 * 60 * 1000,
-        ).toISOString();
-        const { error: purgeError } = await supabaseAdmin
-          .from("bot_dedup")
-          .delete()
-          .eq("key", dedupKey)
-          .lt("expires_at", new Date().toISOString());
-        if (purgeError) {
-          console.error(
-            "[ACTIVATION] Failed to purge expired dedup key:",
-            purgeError.message,
-          );
-        }
-        const { error: dedupError } = await supabaseAdmin
-          .from("bot_dedup")
-          .insert({ key: dedupKey, expires_at: expiresAt });
-        if (dedupError && dedupError.code !== "23505") {
-          console.error(
-            "[ACTIVATION] Failed to write dedup key:",
-            dedupError.message,
-          );
-        }
-        if (!dedupError || dedupError.code !== "23505") {
-          const coachChatId = process.env.COACH_CHAT_ID;
-          if (coachChatId) {
-            const amountText =
-              request.amount != null
-                ? ` на сумму ${request.amount.toLocaleString("ru-RU")} ₽`
-                : "";
-            const sent = await sendTelegramMessage(
-              coachChatId,
-              `⚠️ Получена оплата${amountText} по ОТМЕНЁННОЙ заявке ${orderId} (клиент: ${sanitizeText(request.name)}, контакт: ${formatContact(request.contact)}). Доступ не выдан - сделайте возврат или выдайте доступ вручную.`,
-            );
-            if (!sent) {
-              console.error(
-                "[ACTIVATION] Failed to notify coach about cancelled-request payment",
-              );
-            }
-          } else {
-            console.error(
-              "[ACTIVATION] COACH_CHAT_ID is not set; cancelled-payment alert skipped",
-            );
-          }
-        }
+        const alerted = await alertCancelledPayment(orderId, request);
+        return {
+          error: "Заявка отменена.",
+          alerted,
+          retryable: !alerted,
+        };
       }
-      return { error: "Заявка отменена." };
+      return { error: "Заявка отменена.", alerted: false };
     }
     if (request.sub_type !== "program") {
       return { error: "Неподдерживаемый тип заявки." };
@@ -516,7 +507,7 @@ export async function activatePurchaseByOrder({
       .maybeSingle();
     if (programError) {
       console.error("[ACTIVATION] Program lookup error:", programError.message);
-      return { error: "Ошибка при проверке программы." };
+      return { error: "Ошибка при проверке программы.", retryable: true };
     }
     if (!program) return { error: "Программа недоступна для активации." };
     if (program.duration_weeks <= 0) {
@@ -572,7 +563,7 @@ export async function activatePurchaseByOrder({
       .maybeSingle();
     if (claimError) {
       console.error("[ACTIVATION] Claim failed:", claimError.message);
-      return { error: "Ошибка обновления статуса заказа." };
+      return { error: "Ошибка обновления статуса заказа.", retryable: true };
     }
 
     let clientId: string | null = null;
@@ -585,6 +576,15 @@ export async function activatePurchaseByOrder({
         .eq("id", request.id)
         .maybeSingle();
       if (current?.status !== "paid") {
+        if (current?.status === "cancelled" && paymentStatus === "success") {
+          const alerted = await alertCancelledPayment(orderId, request);
+          return {
+            error: "Заявка отменена.",
+            requestId: request.id,
+            alerted,
+            retryable: !alerted,
+          };
+        }
         return { error: "Заявка уже была обработана.", requestId: request.id };
       }
       if (current.client_id) {
@@ -593,6 +593,7 @@ export async function activatePurchaseByOrder({
           clientId: current.client_id,
           paidAt: current.paid_at ?? null,
           programId: request.program_id,
+          telegramId: request.telegram_id,
         });
         if (recovered.kind === "alreadyActivated") {
           return {
@@ -604,6 +605,14 @@ export async function activatePurchaseByOrder({
         if (recovered.kind === "inProgress") {
           return {
             error: "Активация уже выполняется. Повторите запрос позднее.",
+            requestId: request.id,
+            clientId: recovered.clientId,
+            inProgress: true,
+          };
+        }
+        if (recovered.kind === "mismatch") {
+          return {
+            error: "Данные клиента не совпадают. Свяжитесь с тренером.",
             requestId: request.id,
             clientId: recovered.clientId,
           };
@@ -628,7 +637,9 @@ export async function activatePurchaseByOrder({
         request.program_id,
         program.duration_weeks,
       );
-      if (!resolution.ok) return { ...resolution, requestId: request.id };
+      if (!resolution.ok) {
+        return { ...resolution, requestId: request.id };
+      }
       clientId = resolution.clientId;
       client = resolution.client;
 
@@ -645,7 +656,11 @@ export async function activatePurchaseByOrder({
           "[ACTIVATION] request->client link failed:",
           linkError.message,
         );
-        return { error: "Ошибка обновления заказа.", requestId: request.id };
+        return {
+          error: "Ошибка обновления заказа.",
+          requestId: request.id,
+          retryable: true,
+        };
       }
       if (!linked) {
         const { data: current } = await supabaseAdmin
@@ -671,10 +686,29 @@ export async function activatePurchaseByOrder({
           }
         }
         if (!linkedClientId) {
+          if (resolution.created) {
+            // Линковка не удалась, а карточка уже создана. Для заявки без
+            // Telegram повторный resolve не найдёт её по telegram_id и создаст
+            // ещё одну сироту. Удаляем только что созданную карточку; retry
+            // повторит resolve с чистого листа.
+            const { error: orphanError } = await supabaseAdmin
+              .from("clients")
+              .delete()
+              .eq("id", clientId)
+              .is("telegram_id", null);
+            if (orphanError) {
+              console.error(
+                "[ACTIVATION] Orphan client cleanup failed:",
+                orphanError.message,
+              );
+            }
+          }
           return {
             error: "Активация уже выполняется. Повторите запрос позднее.",
             requestId: request.id,
             clientId,
+            retryable: true,
+            inProgress: true,
           };
         }
         // Регрессия e2e 24.08.2026: панельные заявки (21.9) приходят с
@@ -698,6 +732,7 @@ export async function activatePurchaseByOrder({
             clientId: linkedClientId,
             paidAt: current?.paid_at ?? null,
             programId: request.program_id,
+            telegramId: request.telegram_id,
           });
           if (recovered.kind === "alreadyActivated") {
             return {
@@ -709,6 +744,14 @@ export async function activatePurchaseByOrder({
           if (recovered.kind === "inProgress") {
             return {
               error: "Активация уже выполняется. Повторите запрос позднее.",
+              requestId: request.id,
+              clientId: recovered.clientId,
+              inProgress: true,
+            };
+          }
+          if (recovered.kind === "mismatch") {
+            return {
+              error: "Данные клиента не совпадают. Свяжитесь с тренером.",
               requestId: request.id,
               clientId: recovered.clientId,
             };
@@ -735,25 +778,29 @@ export async function activatePurchaseByOrder({
     return { ...activation, requestId: request.id, clientId };
   } catch (e) {
     console.error("[ACTIVATION] activatePurchaseByOrder error:", e);
-    return { error: "Произошла ошибка при активации." };
+    return { error: "Произошла ошибка при активации.", retryable: true };
   }
 }
+
 
 type RecoveryOutcome =
   | { kind: "alreadyActivated"; clientId: string }
   | { kind: "takeover"; clientId: string; client: ClientForInstructions }
-  | { kind: "inProgress"; clientId: string };
+  | { kind: "inProgress"; clientId: string }
+  | { kind: "mismatch"; clientId: string };
 
 async function recoverLinkedRequest({
   requestId,
   clientId,
   paidAt,
   programId,
+  telegramId,
 }: {
   requestId: string;
   clientId: string;
   paidAt: string | null;
   programId: string;
+  telegramId: number | null;
 }): Promise<RecoveryOutcome> {
   const loaded = await loadClientForInstructions(clientId);
   if (!loaded.ok) {
@@ -774,6 +821,17 @@ async function recoverLinkedRequest({
     return { kind: "inProgress", clientId };
   }
   const linkedClient = loaded.client;
+  if (
+    telegramId !== null &&
+    linkedClient.telegram_id !== null &&
+    linkedClient.telegram_id !== telegramId
+  ) {
+    console.error(
+      "[ACTIVATION] Telegram mismatch during recovery for client",
+      clientId,
+    );
+    return { kind: "mismatch", clientId };
+  }
 
   const activated = await isClientActivated(clientId, programId);
   if (activated) {
@@ -840,10 +898,11 @@ async function hasInstructionsFor(
   clientId: string,
   sinceIso: string,
 ): Promise<boolean> {
-  // Accepted limitation: any to_client message sent after paid_at counts as
-  // delivered instructions, and the message row is inserted before the Telegram
-  // send. A false positive can only mask auto-redelivery - the coach keeps the
-  // synchronous warning and the manual "Отправить инструкции" action.
+  // Accepted limitation: any to_client message saved after paid_at counts as
+  // delivered instructions. The row is now written only after Telegram accepts
+  // the message, so an undelivered attempt cannot mask auto-redelivery. A save
+  // failure after a successful send can still duplicate instructions on a
+  // later takeover; the coach warning covers that case.
   const { data, error } = await supabaseAdmin
     .from("messages")
     .select("id")
@@ -904,7 +963,7 @@ async function resolveOrCreateClient(
       client: ClientForInstructions;
       created: boolean;
     }
-  | { ok: false; error: string }
+  | { ok: false; error: string; retryable?: boolean }
 > {
   let clientId = request.client_id;
   let client: ClientForInstructions | null = null;
@@ -922,7 +981,11 @@ async function resolveOrCreateClient(
       .maybeSingle();
     if (lookupError) {
       console.error("[ACTIVATION] Client lookup error:", lookupError.message);
-      return { ok: false, error: "Ошибка при поиске клиента." };
+      return {
+        ok: false,
+        error: "Ошибка при поиске клиента.",
+        retryable: true,
+      };
     }
     clientId = existing?.id ?? null;
     client = existing as ClientForInstructions | null;
@@ -936,7 +999,11 @@ async function resolveOrCreateClient(
       .maybeSingle();
     if (cErr) {
       console.error("[ACTIVATION] Client lookup error:", cErr.message);
-      return { ok: false, error: "Ошибка при поиске клиента." };
+      return {
+        ok: false,
+        error: "Ошибка при поиске клиента.",
+        retryable: true,
+      };
     }
     client = c as ClientForInstructions | null;
     if (
@@ -1009,7 +1076,11 @@ async function resolveOrCreateClient(
         .maybeSingle();
       if (lookupError) {
         console.error("[ACTIVATION] Client lookup error:", lookupError.message);
-        return { ok: false, error: "Ошибка при поиске клиента." };
+        return {
+          ok: false,
+          error: "Ошибка при поиске клиента.",
+          retryable: true,
+        };
       }
       clientId = existing?.id ?? null;
       client = existing as ClientForInstructions | null;
@@ -1018,7 +1089,11 @@ async function resolveOrCreateClient(
         "[ACTIVATION] Client creation failed:",
         createError.message,
       );
-      return { ok: false, error: "Не удалось создать карточку клиента." };
+      return {
+        ok: false,
+        error: "Не удалось создать карточку клиента.",
+        retryable: true,
+      };
     } else {
       created = true;
       clientId = createdClient?.id ?? null;

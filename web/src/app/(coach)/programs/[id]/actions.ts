@@ -181,15 +181,24 @@ export async function updateProgramType(
 
     const { data: program, error: fetchError } = await supabaseAdmin
       .from("programs")
-      .select("id")
+      .select("id, client_id")
       .eq("id", programId)
       .maybeSingle();
     if (fetchError) return { error: fetchError.message };
     if (!program) return { error: "Программа не найдена" };
+    if (type === "personal" && !program.client_id) {
+      return {
+        error: "Личную программу нужно создавать из карточки клиента",
+      };
+    }
 
     const { error } = await supabaseAdmin
       .from("programs")
-      .update({ type, updated_at: new Date().toISOString() })
+      .update({
+        type,
+        client_id: type === "template" ? null : program.client_id,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", programId);
     if (error) return { error: error.message };
 
@@ -285,7 +294,7 @@ export async function assignToClient(
 
     const { data: program, error: programError } = await supabaseAdmin
       .from("programs")
-      .select("id, active")
+      .select("id, active, type, client_id")
       .eq("id", programId)
       .maybeSingle();
 
@@ -293,6 +302,12 @@ export async function assignToClient(
     if (!program) return { error: "Программа не найдена" };
     if (!program.active) {
       return { error: "Программа не опубликована. Сначала опубликуйте программу." };
+    }
+    if (program.client_id !== null && program.client_id !== clientId) {
+      return { error: "Программа принадлежит другому клиенту" };
+    }
+    if (program.type === "personal" && program.client_id === null) {
+      return { error: "Личная программа не привязана к клиенту" };
     }
 
     const { data: client, error: clientError } = await supabaseAdmin

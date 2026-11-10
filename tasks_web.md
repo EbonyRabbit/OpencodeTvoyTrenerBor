@@ -1,7 +1,7 @@
 # TASKS_WEB.md - План миграции Telegram-бота на Node.js
 
 > **🔴 P0 (следующие задачи):**
-> - Фаза 29: цель на сегодня, PR и история упражнения (29.1–29.6)
+> - Фаза 30: пивот на подписку, все программы, история периодов и автосписание Prodamus (30.1–30.14)
 
 ---
 
@@ -1558,3 +1558,109 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 - sRPE, готовность, HRV.
 - Автоматическое изменение программы по факту.
 - AI-импорт программ.
+
+---
+
+## Фаза 30: Пивот на подписку, все программы и автосписание Prodamus
+
+### Цель
+
+Перевести бота с разовой покупки одной программы на подписку, которая открывает все программы. Сохранить историю тренировок при смене программы, считать веса отдельно в рамках каждого периода, убрать health-данные и `heart_rate`, упростить идентификацию клиента до `@username`, закрыть P0-уязвимости и удалить legacy-данные.
+
+### Зафиксированные решения
+
+- Подписка открывает все активные программы, без отдельной покупки программы.
+- У клиента одна активная программа; история старых программ сохраняется.
+- При выборе новой программы создаётся новый период; при повторном выборе той же программы тоже новый период, веса начинаются заново.
+- Расписание и паузы старого периода архивируются, а не удаляются.
+- История тренировок, расписание и подсказки веса фильтруются по активному `program_period_id`.
+- Автосписание 30 дней через Prodamus; клубная система/робот автосписаний должна быть включена.
+- Telegram Stars и разовые платежи не используем.
+- Имя клиента — `@username`; если username нет, `Клиент #A1B2C3`. `first_name`/`last_name` не сохраняем.
+- Чат только в Telegram; таблицу `messages` не используем.
+- Health-данные не собираем: замеры, чек-ины, фото и самочувствие. Напоминания о замерах и фото только отправляются, ответы не сохраняются.
+- Тренировочные логи и `RPE` остаются. `heart_rate` удаляем.
+- 18+; детские программы и minors-условия удаляем.
+- Смета не требуется.
+- P0 входит в общий план и выполняется до запуска подписки.
+- Порядок выката 30.2: применить миграции `20261031000000`–`20261031000200` и `20261031000400`, задеплоить web/bot, затем вручную выполнить `supabase/post-deploy/001_clear_plaintext_client_tokens.sql`. После него старые сборки перестают валидировать portal-ссылки.
+
+### Задачи
+
+| # | Задача | Описание | Статус |
+|---|--------|----------|--------|
+| **30.1** | Заморозка legacy, бэкап, Prodamus Subscription | Остановить новые оплаты в старом контуре, сделать бэкап БД и Storage. Включить клубную систему Prodamus/робота автосписаний, проверить URL-уведомления, зафиксировать план 30 дней и цену. | ⬜ pending |
+| **30.2** | P0: auth, RLS, grants, токены, webhook | `enable_signup = false`; убрать `role` из metadata; закрыть RLS/grants на `bot_logs`, `bot_state`, `bot_schedule`, `bot_dedup`; `dal.ts` проверяет роль; `client_tokens` хэшировать, добавить expiry и revoke; проверить подпись и идемпотентность webhook; починить `deleteClient`, чтобы удалял все связанные данные. | ✅ done 10.11.2026 (миграции 000/001/002/004, review 9.5/10; plaintext cleanup — post-deploy; production-настройки и выкат — в 30.1) |
+| **30.3** | Схема подписок | Миграция `subscription_plans`, `subscriptions`, `subscription_payments`: план, цена, период, `provider_subscription_id`, `status` (`pending/active/past_due/cancelled/expired`), `current_period_start/end`, `cancel_at_period_end`, `next_payment_at`, `paid_at`. Индексы, RLS, типы bot/web. `clients.access_end_date` синхронизировать с активной подпиской. | ⬜ pending |
+| **30.4** | Схема периодов программ | Миграция `client_program_periods(id, client_id, program_id, started_at, ended_at, status)` + partial unique на один активный период. Добавить `program_id` и `program_period_id` в `workout_logs` и `program_schedule`, индексы. Бэкфилл только сохраняемых данных; health-данные не мигрировать. Типы bot/web. | ⬜ pending |
+| **30.5** | Переключение программы | Транзакция: закрыть старый период, создать новый, обновить `clients.program_id`, архивировать `program_schedule`, закрыть `plan_pauses`, сгенерировать расписание нового периода с недели 1. Старые логи и расписание не удалять. Переделать `resetPlanAssignments` в `activate-purchase.ts`. | ⬜ pending |
+| **30.6** | Веса и история по периодам | Фильтровать по активному `program_period_id`: `getTodayWorkout`, `isTodayWorkoutCompleted`, `getPreviousWorkoutLogs`, подсказку последнего веса, `getBestE1rms`, `training-days`, `plan-adjustment`, web-страницы. История упражнения и общая история показывают все периоды; цель на сегодня считается только по активному периоду. При повторном выборе той же программы веса начинаются заново. | ⬜ pending |
+| **30.7** | Все программы вместо «куплена одна» | Убрать проверку «программа уже куплена» и `purchased_program_id`. Каталог показывает все активные программы; при активной подписке клиент выбирает любую. `programs.price` не использовать как цену подписки. `bot/src/handlers/purchase.ts` заменить на `subscribe.ts`; веб `/buy/[id]` оставить карточкой и deep link без формы имени и контакта. | ⬜ pending |
+| **30.8** | Доступ по подписке | Доступ в бот и клиентский портал проверять по активной подписке, а не по `program_id`. `past_due` даёт grace 3 дня, отмена работает до конца периода. Обновить `access-expiry.ts`, guard-функции и тексты. | ⬜ pending |
+| **30.9** | Prodamus: автосписание и webhook | Создание подписки, первый платёж, продление, неуспех, отмена и завершение. Расширить `web/src/app/api/webhooks/prodamus/route.ts`, синхронизировать `bot/src/lib/prodamus.ts` и `web/src/lib/prodamus.ts`. Проверять подпись, сумму, идемпотентность; failed payment → `past_due` + grace; отмена → `cancel_at_period_end`; ежедневная сверка. | ⬜ pending |
+| **30.10** | Удаление health-данных и чата | Убрать запись в `measurements`, `checkins`, `photos`, `messages`. Отключить/удалить `measurements.ts`, `checkin.ts`, `photos.ts`; `measurement-reminder` только отправляет текст без проверки БД; `checkin-reminder` удалить; `chat.ts` не пишет в `messages`; очистить клиентский портал, i18n и политику от прогресса тела, замеров, чек-инов и истории сообщений. Если клиент присылает фото, не скачивать и не класть в Storage. Тренировочные логи не трогать. | ⬜ pending |
+| **30.11** | Удаление `heart_rate` | Удалить `workout_logs.heart_rate`, типы, wizard, validators, i18n, web-форму, web-history, `program-utils`, `program-editor`, `program-week-preview`, тесты. Старые `parsed_content.heart_rate` игнорировать. `RPE` оставить. | ⬜ pending |
+| **30.12** | Имя `@username` и 18+ | `clients.name = @username`; fallback `Клиент #A1B2C3`; `first_name`/`last_name` не сохранять; `purchase_requests.name` = `@username`, `contact` убрать; обновлять username при `/start`; добавить 18+ до оплаты; удалить детские программы и minors-условия. | ⬜ pending |
+| **30.13** | Документы и удаление legacy | Обновить политику, оферту и consent под подписку, автосписание, `@username`, Telegram ID и платёжные данные; зафиксировать отмену, возврат и 54-ФЗ. Удалить старые health-данные, `messages`, `client-photos`, старые `purchase_requests`, `bot_logs`, `client_tokens`; проверить retention бэкапов; уведомить клиентов. | ⬜ pending |
+| **30.14** | Тесты, gate, ручная проверка | Тесты миграций, подписки, доступа, переключения программ, сброса весов, всех программ, webhook, grace, отмены, отсутствия health-данных и `heart_rate`, P0. `npx tsc --noEmit` и `npx vitest run` в bot и web; `@code-reviewer` ≥9.5; ручной тест в Telegram и вебе. | ⬜ pending |
+
+### Файлы
+
+| Файл | Действие |
+|------|----------|
+| `supabase/config.toml` | Изменение (`enable_signup = false`) |
+| `supabase/migrations/*_subscriptions.sql` | Новый (планы, подписки, платежи) |
+| `supabase/migrations/*_client_program_periods.sql` | Новый (периоды + поля логов и расписания) |
+| `supabase/migrations/*_drop_heart_rate.sql` | Новый (удаление `heart_rate`) |
+| `supabase/migrations/*_p0_security.sql` | Новый (RLS, grants, функции) |
+| `bot/src/lib/types.ts` | Изменение (подписки, периоды, username) |
+| `web/src/types/supabase.ts` | Изменение (подписки, периоды) |
+| `bot/src/handlers/purchase.ts` | Замена на `subscribe.ts` |
+| `bot/src/handlers/programs.ts` | Изменение (все программы) |
+| `bot/src/handlers/wizard.ts` | Изменение (`program_period_id`, удаление `heart_rate`) |
+| `bot/src/handlers/evening-poll.ts` | Изменение (`program_period_id`) |
+| `bot/src/handlers/callbacks.ts` | Изменение (`program_period_id`, удаление `heart_rate`) |
+| `bot/src/lib/workout-utils.ts` | Изменение (фильтр периода, история, веса) |
+| `bot/src/lib/training-progress.ts` | Изменение (цель только по активному периоду) |
+| `bot/src/handlers/training-days.ts` | Изменение (фильтр `program_schedule` по периоду) |
+| `web/src/lib/plan-adjustment.ts` | Изменение (период, архивирование пауз) |
+| `web/src/lib/activate-purchase.ts` | Изменение (период вместо удаления) |
+| `web/src/app/buy/[id]/actions.ts`, `page.tsx`, `buy-form.tsx` | Изменение (без имени и контакта, deep link) |
+| `bot/src/handlers/measurements.ts`, `checkin.ts`, `photos.ts` | Удалить/отключить |
+| `bot/src/handlers/chat.ts` | Изменение (не писать в `messages`) |
+| `bot/src/cron/measurement-reminder.ts`, `checkin-reminder.ts` | Изменение/удаление |
+| `bot/src/lib/wizard-validators.ts` | Изменение (удалить `heart_rate`) |
+| `web/src/lib/history-format.ts`, `program-utils.ts` | Изменение (удалить `heart_rate`) |
+| `web/src/app/client/[token]/workout/workout-form.tsx`, `actions.ts`, `history/page.tsx` | Изменение (удалить `heart_rate`, health-UI) |
+| `web/src/app/(coach)/programs/_components/program-editor.tsx`, `program-week-preview.tsx` | Изменение (удалить `heart_rate`) |
+| `web/src/app/api/webhooks/prodamus/route.ts` | Изменение (подписки, продления) |
+| `bot/src/lib/prodamus.ts`, `web/src/lib/prodamus.ts` | Изменение (подписки) |
+| `web/src/app/privacy/page.tsx`, `web/src/lib/consent.ts`, `Оферта_публичная.md` | Изменение (подписка, автосписание, 18+, без health) |
+| `web/src/app/(coach)/clients/[id]/actions.ts` | Изменение (`deleteClient`) |
+| `web/src/lib/dal.ts`, `web/src/proxy.ts` | Изменение (P0, роли, rate limit) |
+| `bot/src/cron/access-expiry.ts` | Изменение (подписка, grace) |
+
+### Критерии приёмки
+
+- Подписка открывает все активные программы; отдельной покупки программы нет.
+- У клиента один активный период программы; история всех периодов сохраняется.
+- При смене программы старые логи и расписание не удаляются.
+- При повторном выборе той же программы создаётся новый период, веса начинаются заново.
+- Текущее расписание, завершённость тренировки и цель на сегодня используют только активный период.
+- История упражнения и общая история показывают все периоды.
+- Автосписание Prodamus работает: первый платёж, продление, неуспех, grace, отмена и завершение.
+- Имя клиента — `@username` или fallback; `first_name`/`last_name` не сохраняются.
+- Health-данные не собираются и не хранятся; напоминания только отправляются.
+- Чат не пишется в `messages`; `heart_rate` отсутствует в коде и БД; `RPE` работает.
+- P0 закрыт: регистрация, роли, RLS, grants, токены, webhook, `deleteClient`.
+- Legacy-данные удалены, бэкапы проверены, политика и оферта обновлены.
+- `npx tsc --noEmit` и `npx vitest run` зелёные в bot и web; ревью `@code-reviewer` ≥9.5.
+
+### Не входит
+
+- Смета и оценка сроков.
+- Telegram Stars и разовые платежи.
+- Сбор health-данных, замеров, чек-инов, фото и самочувствия.
+- Чат с хранением сообщений в БД.
+- Несколько активных программ одновременно.
+- Сохранение весов при повторном выборе той же программы.

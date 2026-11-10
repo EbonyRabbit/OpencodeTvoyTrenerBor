@@ -23,7 +23,7 @@ import { updateProgramType } from "../actions";
 
 const UUID = "11111111-2222-3333-4444-555555555555";
 
-function mockProgramsTable(existing: { id: string } | null) {
+function mockProgramsTable(existing: { id: string; client_id: string | null } | null) {
   const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   const chain = {
     select: vi.fn(() => chain),
@@ -70,16 +70,34 @@ describe("updateProgramType", () => {
     expect(result.error).toBe("Программа не найдена");
   });
 
-  it("updates type and returns success for an existing program", async () => {
-    const chain = mockProgramsTable({ id: UUID });
+  it("updates type and returns success for an owned personal program", async () => {
+    const chain = mockProgramsTable({ id: UUID, client_id: "client-1" });
     const result = await updateProgramType(UUID, "personal");
     expect(result.error).toBeUndefined();
     expect(chain.update).toHaveBeenCalledWith({
       type: "personal",
+      client_id: "client-1",
       updated_at: expect.any(String),
     });
     expect(chain.eq).toHaveBeenCalledWith("id", UUID);
     expect(revalidatePath).toHaveBeenCalledWith(`/programs/${UUID}`);
     expect(revalidatePath).toHaveBeenCalledWith("/programs");
+  });
+
+  it("clears ownership when converting a personal program to template", async () => {
+    const chain = mockProgramsTable({ id: UUID, client_id: "client-1" });
+    const result = await updateProgramType(UUID, "template");
+    expect(result.error).toBeUndefined();
+    expect(chain.update).toHaveBeenCalledWith({
+      type: "template",
+      client_id: null,
+      updated_at: expect.any(String),
+    });
+  });
+
+  it("rejects converting an unowned program to personal", async () => {
+    mockProgramsTable({ id: UUID, client_id: null });
+    const result = await updateProgramType(UUID, "personal");
+    expect(result.error).toContain("из карточки клиента");
   });
 });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase-proxy";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { hashClientToken } from "@/lib/client-token";
 
 const protectedRoutes = ["/dashboard", "/clients", "/programs", "/checkins", "/chat", "/exercises"];
 const authRoutes = ["/login"];
@@ -45,7 +46,8 @@ async function validateClientToken(token: string): Promise<{ clientId: string } 
     const { data } = await supabaseAdmin
       .from("client_tokens")
       .select("client_id, clients!inner(status)")
-      .eq("token", token)
+      .eq("token_hash", hashClientToken(token))
+      .is("revoked_at", null)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
     if (!data) return null;
@@ -62,14 +64,26 @@ async function updateLastUsedAt(token: string): Promise<void> {
     await supabaseAdmin
       .from("client_tokens")
       .update({ last_used_at: new Date().toISOString() })
-      .eq("token", token);
+      .eq("token_hash", hashClientToken(token));
   } catch {
     // best-effort audit update
   }
 }
 
+function redirectWithCookies(
+  url: URL,
+  response: NextResponse,
+): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  for (const cookie of response.cookies.getAll()) {
+    redirect.cookies.set(cookie);
+  }
+  return redirect;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  request.headers.delete("x-client-id");
 
   const clientToken = extractClientToken(pathname);
   if (clientToken) {
@@ -98,11 +112,22 @@ export async function proxy(request: NextRequest) {
   if (isProtected && !user) {
     const url = new URL("/login", request.url);
     url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, supabaseResponse);
   }
 
   if (isAuth && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle<{ role: string }>();
+
+    if (profile?.role === "admin" || profile?.role === "coach") {
+      return redirectWithCookies(new URL("/dashboard", request.url), supabaseResponse);
+    }
+
+    await supabase.auth.signOut();
+    return supabaseResponse;
   }
 
   return supabaseResponse;

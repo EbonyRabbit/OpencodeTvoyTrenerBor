@@ -501,7 +501,7 @@ export async function activatePurchaseByOrder({
 
     const { data: program, error: programError } = await supabaseAdmin
       .from("programs")
-      .select("id, title, price, duration_weeks")
+      .select("id, title, price, duration_weeks, type, client_id")
       .eq("id", request.program_id)
       .eq("active", true)
       .maybeSingle();
@@ -510,6 +510,12 @@ export async function activatePurchaseByOrder({
       return { error: "Ошибка при проверке программы.", retryable: true };
     }
     if (!program) return { error: "Программа недоступна для активации." };
+    if (program.client_id !== null && program.client_id !== request.client_id) {
+      return { error: "Программа принадлежит другому клиенту." };
+    }
+    if (program.type === "personal" && program.client_id === null) {
+      return { error: "Личная программа не привязана к клиенту." };
+    }
     if (program.duration_weeks <= 0) {
       return { error: "Некорректная длительность программы" };
     }
@@ -564,6 +570,33 @@ export async function activatePurchaseByOrder({
     if (claimError) {
       console.error("[ACTIVATION] Claim failed:", claimError.message);
       return { error: "Ошибка обновления статуса заказа.", retryable: true };
+    }
+
+    // Re-read after the CAS claim: deleteClient may anonymize the request
+    // between the initial read and the claim. Never revive a deleted client.
+    const { data: claimedRequest, error: claimedRequestError } =
+      await supabaseAdmin
+        .from("purchase_requests")
+        .select("status, client_id, consent_given")
+        .eq("id", request.id)
+        .maybeSingle();
+    if (claimedRequestError) {
+      console.error(
+        "[ACTIVATION] Claimed request refresh failed:",
+        claimedRequestError.message,
+      );
+      return { error: "Ошибка обновления статуса заказа.", retryable: true };
+    }
+    if (
+      !claimedRequest ||
+      claimedRequest.status !== "paid" ||
+      !claimedRequest.consent_given
+    ) {
+      return {
+        error: "Заявка отменена.",
+        requestId: request.id,
+        alerted: false,
+      };
     }
 
     let clientId: string | null = null;
@@ -625,7 +658,7 @@ export async function activatePurchaseByOrder({
     if (!clientId || !client) {
       const resolution = await resolveOrCreateClient(
         {
-          client_id: request.client_id,
+          client_id: claimedRequest.client_id,
           telegram_id: request.telegram_id,
           name: request.name,
           first_name: request.first_name,
@@ -1026,6 +1059,10 @@ async function resolveOrCreateClient(
         error: "Данные клиента не совпадают. Свяжитесь с тренером.",
       };
     }
+  }
+
+  if (clientId && !client) {
+    return { ok: false, error: "Клиент удалён." };
   }
 
   if (!clientId || !client) {

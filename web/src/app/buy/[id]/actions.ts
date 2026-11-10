@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { formatPrice } from "@/lib/format-price";
@@ -174,7 +175,7 @@ export async function createPurchaseRequest(
       return { error: "Программа недоступна для покупки." };
     }
 
-    dbDedupKey = `purchase:${programId}:${contactNorm}`;
+    dbDedupKey = `purchase:${programId}:${hashContact(contactNorm)}`;
     const nowIso = new Date().toISOString();
     const { error: purgeError } = await supabaseAdmin
       .from("bot_dedup")
@@ -207,9 +208,6 @@ export async function createPurchaseRequest(
     const logged = await insertBotLog("purchase_request", "info", telegramId, {
       program_id: program.id,
       program_title: program.title,
-      name,
-      contact,
-      telegram_username: telegramUsername ?? null,
     });
     if (!logged) {
       dedupMap.delete(dedupKey);
@@ -225,8 +223,6 @@ export async function createPurchaseRequest(
         telegramId,
         {
           program_id: program.id,
-          contact,
-          telegram_username: telegramUsername ?? null,
           reason,
         },
       );
@@ -270,6 +266,10 @@ export type CoachRequestInput = {
   contact: string;
   consentGiven: boolean;
 };
+
+function hashContact(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 function normalizeContactKey(value: string): string {
   const trimmed = value.replace(/^@/, "").trim().toLowerCase();
@@ -349,7 +349,7 @@ export async function createCoachRequest(
       return { error: COACH_REQUEST_ALREADY_SENT_MESSAGE };
     }
 
-    dbDedupKey = `individ:${contactNorm}`;
+    dbDedupKey = `individ:${hashContact(contactNorm)}`;
     const nowIso = new Date().toISOString();
     const { error: purgeError } = await supabaseAdmin
       .from("bot_dedup")
@@ -406,8 +406,6 @@ export async function createCoachRequest(
     await insertBotLog("coach_request", "info", null, {
       purchase_request_id: request?.id ?? null,
       sub_type: "individ",
-      name,
-      contact,
     });
 
     const coachChatId = process.env.COACH_CHAT_ID;
@@ -418,7 +416,6 @@ export async function createCoachRequest(
         null,
         {
           purchase_request_id: request?.id ?? null,
-          contact,
           reason,
         },
       );

@@ -401,14 +401,22 @@ export interface Database {
         Row: {
           id: string;
           client_id: string;
-          token: string;
+          token: string | null;
+          token_hash: string;
           expires_at: string;
           last_used_at: string | null;
+          revoked_at: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["client_tokens"]["Row"], "id" | "created_at" | "updated_at"> & {
+        Insert: Omit<
+          Database["public"]["Tables"]["client_tokens"]["Row"],
+          "id" | "created_at" | "updated_at" | "token" | "last_used_at" | "revoked_at"
+        > & {
           id?: string;
+          token?: string | null;
+          last_used_at?: string | null;
+          revoked_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["client_tokens"]["Row"]>;
         Relationships: [];
@@ -440,7 +448,20 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      create_client_token: {
+        Args: {
+          p_client_id: string;
+          p_token_hash: string;
+          p_expires_at: string;
+        };
+        Returns: undefined;
+      };
+      delete_client_cascade: {
+        Args: { p_client_id: string; p_telegram_id?: number | null };
+        Returns: undefined;
+      };
+    };
     Enums: {
       client_status: ClientStatus;
       payment_status: PaymentStatus;

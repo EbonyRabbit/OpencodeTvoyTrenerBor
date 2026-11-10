@@ -9,21 +9,25 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export const verifySession = cache(async () => {
   const supabase = await createClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("id, name, email, role")
-    .eq("id", session.user.id)
+    .eq("id", user.id)
     .single<Profile>();
 
+  if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+    redirect("/login");
+  }
+
   return {
-    user: session.user,
+    user,
     profile,
     supabase,
   };

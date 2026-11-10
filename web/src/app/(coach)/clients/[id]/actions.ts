@@ -11,6 +11,12 @@ import { sendTelegramMessage } from "@/lib/telegram";
 import { resolvePaymentUrl } from "@/lib/prodamus";
 import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import {
+  CLIENT_TOKEN_EXPIRY_DAYS,
+  generateClientTokenValue,
+  hashClientToken,
+} from "@/lib/client-token";
+import { deleteClientPhotoStorage } from "@/lib/client-storage";
+import {
   resetPlanAssignments,
   assignProgramAndNotify,
   notifyClientForProgram,
@@ -201,16 +207,22 @@ export async function loadMoreActivity(
   return fetchPage(supabase, clientId, offset);
 }
 
-export async function getActivePrograms() {
+export async function getActivePrograms(clientId: string) {
   const { profile } = await verifySession();
   if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
     return [];
   }
-  const { data } = await supabaseAdmin
+  if (!UUID_RE.test(clientId)) return [];
+  const { data, error } = await supabaseAdmin
     .from("programs")
     .select("id, title, active, type")
     .eq("active", true)
+    .or(`type.eq.template,client_id.eq.${clientId}`)
     .order("title");
+  if (error) {
+    console.error("getActivePrograms failed:", error.message);
+    return [];
+  }
   return data ?? [];
 }
 
@@ -225,6 +237,8 @@ export async function getPayablePrograms(): Promise<
     .from("programs")
     .select("id, title, price")
     .eq("active", true)
+    .eq("type", "template")
+    .is("client_id", null)
     .gt("price", 0)
     .order("title");
   if (error) {
@@ -264,10 +278,16 @@ export async function activateProgram(
 
     const { data: program } = await supabaseAdmin
       .from("programs")
-      .select("id, title, duration_weeks")
+      .select("id, title, duration_weeks, type, client_id")
       .eq("id", programId)
       .maybeSingle();
     if (!program) return { error: "Программа не найдена" };
+    if (program.client_id !== null && program.client_id !== clientId) {
+      return { error: "Программа принадлежит другому клиенту" };
+    }
+    if (program.type === "personal" && program.client_id === null) {
+      return { error: "Личная программа не привязана к клиенту" };
+    }
     if (program.duration_weeks <= 0)
       return { error: "Некорректная длительность программы" };
 
@@ -378,23 +398,6 @@ export async function generateConnectCode(
   }
 }
 
-// ⚠️ MUST stay in sync with bot/src/handlers/my-web.ts
-// TODO: Extract to shared lib when monorepo tooling is available
-const TOKEN_EXPIRY_DAYS = 30;
-const TOKEN_LENGTH = 16;
-const TOKEN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-function generateToken(length: number): string {
-  let token = "";
-  while (token.length < length) {
-    const byte = crypto.getRandomValues(new Uint8Array(1))[0];
-    if (byte < 252) {
-      token += TOKEN_CHARS[byte % TOKEN_CHARS.length];
-    }
-  }
-  return token;
-}
-
 export async function generateClientToken(
   clientId: string,
 ): Promise<{ error?: string; token?: string }> {
@@ -412,23 +415,16 @@ export async function generateClientToken(
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
 
-    const { error: deleteError } = await supabaseAdmin
-      .from("client_tokens")
-      .delete()
-      .eq("client_id", clientId);
-    if (deleteError) return { error: deleteError.message };
-
     const expiresAt = new Date(
-      Date.now() + TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+      Date.now() + CLIENT_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
     ).toISOString();
 
     for (let i = 0; i < 5; i++) {
-      const token = generateToken(TOKEN_LENGTH);
-      const { error } = await supabaseAdmin.from("client_tokens").insert({
-        client_id: clientId,
-        token,
-        expires_at: expiresAt,
-        last_used_at: null,
+      const token = generateClientTokenValue();
+      const { error } = await supabaseAdmin.rpc("create_client_token", {
+        p_client_id: clientId,
+        p_token_hash: hashClientToken(token),
+        p_expires_at: expiresAt,
       });
       if (!error) {
         revalidatePath(`/clients/${clientId}`);
@@ -493,6 +489,7 @@ export async function disableClient(
 
 export async function deleteClient(
   clientId: string,
+  force = false,
 ): Promise<{ error?: string }> {
   try {
     const { profile } = await verifySession();
@@ -502,18 +499,67 @@ export async function deleteClient(
 
     if (!UUID_RE.test(clientId)) return { error: "Некорректный идентификатор" };
 
-    const { data: client } = await supabaseAdmin
+    const { data: client, error: clientError } = await supabaseAdmin
       .from("clients")
-      .select("id")
+      .select("id, telegram_id, spreadsheet_id")
       .eq("id", clientId)
       .maybeSingle();
-    if (!client) return { error: "Клиент не найден" };
+    if (clientError) {
+      console.error("deleteClient: client lookup failed:", clientError.message);
+      return { error: "Не удалось загрузить клиента. Повторите попытку." };
+    }
+    if (!client) {
+      try {
+        await deleteClientPhotoStorage(clientId);
+        return {};
+      } catch (storageError) {
+        console.error(
+          "deleteClient: photo storage cleanup failed:",
+          storageError instanceof Error ? storageError.message : storageError,
+        );
+        return { error: "Не удалось удалить фото клиента. Повторите попытку." };
+      }
+    }
 
-    const { error } = await supabaseAdmin
-      .from("clients")
-      .delete()
-      .eq("id", clientId);
+    const { data: externalPhoto, error: externalPhotoError } = await supabaseAdmin
+      .from("photos")
+      .select("id")
+      .eq("client_id", clientId)
+      .or("drive_url.not.is.null,folder_url.not.is.null")
+      .limit(1)
+      .maybeSingle();
+    if (externalPhotoError) {
+      console.error(
+        "deleteClient: external photo check failed:",
+        externalPhotoError.message,
+      );
+      return { error: "Не удалось проверить внешние файлы. Повторите попытку." };
+    }
+    if ((client.spreadsheet_id || externalPhoto) && !force) {
+      return {
+        error:
+          "У клиента есть файлы в Google Drive/Sheets. Удалите их вручную и повторите с подтверждением.",
+      };
+    }
+
+    const { error } = await supabaseAdmin.rpc("delete_client_cascade", {
+      p_client_id: clientId,
+      p_telegram_id: client.telegram_id ?? null,
+    });
     if (error) return { error: error.message };
+
+    try {
+      await deleteClientPhotoStorage(clientId);
+    } catch (storageError) {
+      console.error(
+        "deleteClient: photo storage cleanup failed:",
+        storageError instanceof Error ? storageError.message : storageError,
+      );
+      return {
+        error:
+          "Клиент удалён, но фото не удалены. Повторите удаление для очистки.",
+      };
+    }
 
     revalidatePath("/clients");
     revalidatePath(`/clients/${clientId}`);
@@ -608,10 +654,16 @@ export async function markPurchased(
 
     const { data: program } = await supabaseAdmin
       .from("programs")
-      .select("id, title, price, duration_weeks")
+      .select("id, title, price, duration_weeks, type, client_id")
       .eq("id", programId)
       .maybeSingle();
     if (!program) return { error: "Программа не найдена" };
+    if (program.client_id !== null && program.client_id !== clientId) {
+      return { error: "Программа принадлежит другому клиенту" };
+    }
+    if (program.type === "personal" && program.client_id === null) {
+      return { error: "Личная программа не привязана к клиенту" };
+    }
 
     const activation = await applyProgramActivation({
       clientId,
@@ -740,10 +792,16 @@ export async function createPaymentLink(
 
     const { data: program } = await supabaseAdmin
       .from("programs")
-      .select("id, title, price, active")
+      .select("id, title, price, active, type, client_id")
       .eq("id", programId)
       .maybeSingle();
     if (!program || !program.active) return { error: "Программа не найдена" };
+    if (program.client_id !== null && program.client_id !== clientId) {
+      return { error: "Программа принадлежит другому клиенту" };
+    }
+    if (program.type === "personal" && program.client_id === null) {
+      return { error: "Личная программа не привязана к клиенту" };
+    }
 
     const price = toFiniteNumber(program.price);
     if (price == null || price <= 0) {

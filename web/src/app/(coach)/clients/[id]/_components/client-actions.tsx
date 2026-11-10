@@ -144,7 +144,7 @@ export function ClientActions({
     setError(null);
     setLoadingPrograms(true);
     try {
-      const list = await getActivePrograms();
+      const list = await getActivePrograms(clientId);
       setPrograms(list);
       setShowProgramSelect(true);
     } catch (e) {
@@ -152,7 +152,7 @@ export function ClientActions({
     } finally {
       setLoadingPrograms(false);
     }
-  }, []);
+  }, [clientId]);
 
   const handleActivate = useCallback(async () => {
     if (!selectedProgram) return;
@@ -280,7 +280,15 @@ export function ClientActions({
     setDeleting(true);
     setError(null);
     try {
-      const result = await deleteClient(clientId);
+      let result = await deleteClient(clientId);
+      if (
+        result.error?.includes("Google Drive/Sheets") &&
+        confirm(
+          "Файлы клиента удалены из Google Drive/Sheets вручную? Продолжить удаление профиля?",
+        )
+      ) {
+        result = await deleteClient(clientId, true);
+      }
       if (result.error) {
         setError(result.error);
         return;
@@ -323,14 +331,14 @@ export function ClientActions({
     setPrograms([]);
     setLoadingPrograms(true);
     try {
-      const list = await getActivePrograms();
+      const list = await getActivePrograms(clientId);
       setPrograms(list);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки программ");
     } finally {
       setLoadingPrograms(false);
     }
-  }, []);
+  }, [clientId]);
 
   const handleConfirmPurchase = useCallback(async () => {
     if (!selectedProgram) return;

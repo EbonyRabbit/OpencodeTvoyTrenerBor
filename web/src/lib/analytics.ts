@@ -1,3 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
+
 export const FUNNEL_ACTIONS = [
   "channel_join_inst",
   "welcome_sent",
@@ -13,7 +16,7 @@ export function funnelActions(): readonly string[] {
 }
 
 export async function getFunnelCounts(
-  supabase: { from: (table: string) => any },
+  supabase: SupabaseClient<Database>,
   sinceIso: string,
 ): Promise<FunnelCounts> {
   const counts: FunnelCounts = {

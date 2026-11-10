@@ -2,45 +2,24 @@ import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
 import { t } from "../i18n/index.js";
+import {
+  CLIENT_TOKEN_EXPIRY_DAYS,
+  generateClientTokenValue,
+  hashClientToken,
+} from "../lib/client-token.js";
 
-// ⚠️ MUST stay in sync with web/src/app/clients/[id]/actions.ts
-// TODO: Extract to shared lib when monorepo tooling is available
-const TOKEN_EXPIRY_DAYS = 30;
-const TOKEN_LENGTH = 16;
-const TOKEN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-function generateToken(length: number): string {
-  let token = "";
-  while (token.length < length) {
-    const byte = crypto.getRandomValues(new Uint8Array(1))[0];
-    if (byte < 252) {
-      token += TOKEN_CHARS[byte % TOKEN_CHARS.length];
-    }
-  }
-  return token;
-}
-
-async function getOrCreateToken(clientId: string): Promise<string | null> {
-  const now = new Date().toISOString();
-
-  const { data: existing } = await supabaseAdmin
-    .from("client_tokens")
-    .select("token")
-    .eq("client_id", clientId)
-    .gt("expires_at", now)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<{ token: string }>();
-
-  if (existing?.token) return existing.token;
-
-  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+async function createToken(clientId: string): Promise<string | null> {
+  const expiresAt = new Date(
+    Date.now() + CLIENT_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   for (let i = 0; i < 5; i++) {
-    const token = generateToken(TOKEN_LENGTH);
-    const { error } = await supabaseAdmin
-      .from("client_tokens")
-      .insert({ client_id: clientId, token, expires_at: expiresAt, last_used_at: null });
+    const token = generateClientTokenValue();
+    const { error } = await supabaseAdmin.rpc("create_client_token", {
+      p_client_id: clientId,
+      p_token_hash: hashClientToken(token),
+      p_expires_at: expiresAt,
+    });
     if (!error) return token;
     if (error.code !== "23505") return null;
   }
@@ -53,7 +32,7 @@ export async function buildPortalLink(
   section?: string,
 ): Promise<string | null> {
   if (!config.clientPortalUrl) return null;
-  const token = await getOrCreateToken(clientId);
+  const token = await createToken(clientId);
   if (!token) return null;
   return `${config.clientPortalUrl}/client/${token}${section ? `/${section}` : ""}`;
 }

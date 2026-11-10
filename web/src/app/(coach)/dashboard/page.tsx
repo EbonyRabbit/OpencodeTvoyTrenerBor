@@ -1,4 +1,5 @@
 import { verifySession } from "@/lib/dal";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -142,7 +143,9 @@ export default async function DashboardPage() {
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
   const dateThreshold = twoWeeksAgo.toISOString().split("T")[0];
-  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const sevenDaysAgo = new Date(twoWeeksAgo);
+  sevenDaysAgo.setDate(twoWeeksAgo.getDate() + 7);
+  const sevenDaysAgoIso = sevenDaysAgo.toISOString();
 
   const [
     totalResult,
@@ -170,7 +173,7 @@ export default async function DashboardPage() {
       .limit(500),
     (async () => {
       const { getFunnelCounts } = await import("@/lib/analytics");
-      return getFunnelCounts(supabase as any, sevenDaysAgoIso);
+      return getFunnelCounts(supabaseAdmin, sevenDaysAgoIso);
     })(),
   ]);
 
@@ -272,7 +275,7 @@ export default async function DashboardPage() {
               ] as const
             ).map(([key, label]) => (
               <div key={key} className="rounded-lg border p-3 text-center">
-                <div className="text-2xl font-bold">{(funnelResult as any)[key] ?? 0}</div>
+                <div className="text-2xl font-bold">{funnelResult[key] ?? 0}</div>
                 <div className="text-xs text-muted-foreground">{label}</div>
               </div>
             ))}

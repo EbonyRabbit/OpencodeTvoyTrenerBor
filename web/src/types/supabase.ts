@@ -256,7 +256,9 @@ export type Database = {
           expires_at: string
           id: string
           last_used_at: string | null
-          token: string
+          revoked_at: string | null
+          token: string | null
+          token_hash: string
           updated_at: string
         }
         Insert: {
@@ -265,7 +267,9 @@ export type Database = {
           expires_at: string
           id?: string
           last_used_at?: string | null
-          token: string
+          revoked_at?: string | null
+          token?: string | null
+          token_hash: string
           updated_at?: string
         }
         Update: {
@@ -274,7 +278,9 @@ export type Database = {
           expires_at?: string
           id?: string
           last_used_at?: string | null
-          token?: string
+          revoked_at?: string | null
+          token?: string | null
+          token_hash?: string
           updated_at?: string
         }
         Relationships: [
@@ -1070,9 +1076,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_client_token: {
+        Args: {
+          p_client_id: string
+          p_token_hash: string
+          p_expires_at: string
+        }
+        Returns: undefined
+      }
       count_client_workout_days: {
         Args: { p_client_id: string }
         Returns: number
+      }
+      delete_client_cascade: {
+        Args: { p_client_id: string; p_telegram_id?: number | null }
+        Returns: undefined
       }
     }
     Enums: {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createHash } from "node:crypto";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -178,7 +179,7 @@ describe("createCoachRequest", () => {
     const dedupInsertKey = calls("bot_dedup")
       .filter((c) => c.method === "insert")
       .map((c) => (c.args[0] as { key: string }).key);
-    expect(dedupInsertKey).toContain("individ:ivan");
+    expect(dedupInsertKey).toContain(`individ:${createHash("sha256").update("ivan").digest("hex")}`);
 
     const logInserts = calls("bot_logs").filter((c) => c.method === "insert");
     expect(
@@ -296,7 +297,7 @@ describe("createCoachRequest", () => {
     const dedupInsertKey = calls("bot_dedup")
       .filter((c) => c.method === "insert")
       .map((c) => (c.args[0] as { key: string }).key);
-    expect(dedupInsertKey).toContain("individ:900ivan");
+    expect(dedupInsertKey).toContain(`individ:${createHash("sha256").update("900ivan").digest("hex")}`);
   });
 
   it("keeps the request successful even if the bot_logs insert rejects", async () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createHash } from "node:crypto";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -233,6 +234,6 @@ describe("createPurchaseRequest", () => {
     const dedupKeys = calls("bot_dedup")
       .filter((c) => c.method === "insert")
       .map((c) => (c.args[0] as { key: string }).key);
-    expect(dedupKeys).toContain(`purchase:${UUID}:+79001234567`);
+    expect(dedupKeys).toContain(`purchase:${UUID}:${createHash("sha256").update("+79001234567").digest("hex")}`);
   });
 });

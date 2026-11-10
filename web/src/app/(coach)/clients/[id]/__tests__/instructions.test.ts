@@ -74,6 +74,8 @@ const baseProgram = {
   id: PROGRAM_ID,
   title: "Сила 12 недель",
   duration_weeks: 12,
+  type: "template",
+  client_id: null,
 };
 
 beforeEach(() => {
@@ -338,6 +340,19 @@ describe("markPurchased", () => {
     expect(result.warning).toBeUndefined();
     expect(sendTelegramMessage).toHaveBeenCalledTimes(1);
   });
+
+  it("rejects another client's program on purchase", async () => {
+    mockDb({
+      client: baseClient,
+      program: {
+        ...baseProgram,
+        client_id: "22222222-2222-2222-2222-222222222222",
+      },
+    });
+
+    const result = await markPurchased(CLIENT_ID, PROGRAM_ID);
+    expect(result.error).toBe("Программа принадлежит другому клиенту");
+  });
 });
 
 describe("activateProgram", () => {
@@ -429,6 +444,20 @@ describe("activateProgram", () => {
 
     const result = await activateProgram("not-a-uuid", PROGRAM_ID);
     expect(result.error).toBe("Некорректный идентификатор");
+  });
+
+  it("rejects another client's personal program", async () => {
+    mockDb({
+      client: { ...baseClient, payment_status: "paid" },
+      program: {
+        ...baseProgram,
+        type: "personal",
+        client_id: "22222222-2222-2222-2222-222222222222",
+      },
+    });
+
+    const result = await activateProgram(CLIENT_ID, PROGRAM_ID);
+    expect(result.error).toBe("Программа принадлежит другому клиенту");
   });
 });
 

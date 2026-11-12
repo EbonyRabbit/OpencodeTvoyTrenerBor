@@ -328,6 +328,54 @@ export type Database = {
           },
         ]
       }
+      client_program_periods: {
+        Row: {
+          client_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          program_id: string | null
+          started_at: string
+          status: "active" | "completed"
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          program_id?: string | null
+          started_at?: string
+          status?: "active" | "completed"
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          program_id?: string | null
+          started_at?: string
+          status?: "active" | "completed"
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_program_periods_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_program_periods_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           access_end_date: string | null
@@ -775,7 +823,7 @@ export type Database = {
           email: string | null
           id: string
           name: string
-          role: "admin" | "coach"
+          role: "admin" | "coach" | "client"
           updated_at: string
         }
         Insert: {
@@ -784,7 +832,7 @@ export type Database = {
           email?: string | null
           id: string
           name: string
-          role?: "admin" | "coach"
+          role?: "admin" | "coach" | "client"
           updated_at?: string
         }
         Update: {
@@ -793,7 +841,7 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string
-          role?: "admin" | "coach"
+          role?: "admin" | "coach" | "client"
           updated_at?: string
         }
         Relationships: []
@@ -808,6 +856,8 @@ export type Database = {
           is_deload: boolean
           original_end_date: string | null
           original_start_date: string | null
+          program_id: string | null
+          program_period_id: string | null
           sheet_name: string | null
           start_date: string | null
           status: string | null
@@ -824,6 +874,8 @@ export type Database = {
           is_deload?: boolean
           original_end_date?: string | null
           original_start_date?: string | null
+          program_id?: string | null
+          program_period_id?: string | null
           sheet_name?: string | null
           start_date?: string | null
           status?: string | null
@@ -840,6 +892,8 @@ export type Database = {
           is_deload?: boolean
           original_end_date?: string | null
           original_start_date?: string | null
+          program_id?: string | null
+          program_period_id?: string | null
           sheet_name?: string | null
           start_date?: string | null
           status?: string | null
@@ -853,6 +907,20 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_schedule_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_schedule_program_period_id_fkey"
+            columns: ["program_period_id"]
+            isOneToOne: false
+            referencedRelation: "client_program_periods"
             referencedColumns: ["id"]
           },
         ]
@@ -1000,6 +1068,152 @@ export type Database = {
           },
         ]
       }
+      subscription_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          order_id: string | null
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          provider_payment_id: string | null
+          status: "pending" | "success" | "failed" | "cancelled" | "refunded"
+          subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          provider_payment_id?: string | null
+          status?: "pending" | "success" | "failed" | "cancelled" | "refunded"
+          subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          provider_payment_id?: string | null
+          status?: "pending" | "success" | "failed" | "cancelled" | "refunded"
+          subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          period_days: number
+          price: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          period_days?: number
+          price: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          period_days?: number
+          price?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          client_id: string
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          next_payment_at: string | null
+          paid_at: string | null
+          plan_id: string
+          provider: "prodamus"
+          provider_subscription_id: string | null
+          status: "pending" | "active" | "past_due" | "cancelled" | "expired"
+          updated_at: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          client_id: string
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          next_payment_at?: string | null
+          paid_at?: string | null
+          plan_id: string
+          provider?: "prodamus"
+          provider_subscription_id?: string | null
+          status?: "pending" | "active" | "past_due" | "cancelled" | "expired"
+          updated_at?: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          client_id?: string
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          next_payment_at?: string | null
+          paid_at?: string | null
+          plan_id?: string
+          provider?: "prodamus"
+          provider_subscription_id?: string | null
+          status?: "pending" | "active" | "past_due" | "cancelled" | "expired"
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_logs: {
         Row: {
           client_id: string
@@ -1013,6 +1227,8 @@ export type Database = {
           heart_rate: number | null
           id: string
           pace: string | null
+          program_id: string | null
+          program_period_id: string | null
           reps: string | null
           rounds: number | null
           rpe: number | null
@@ -1033,6 +1249,8 @@ export type Database = {
           heart_rate?: number | null
           id?: string
           pace?: string | null
+          program_id?: string | null
+          program_period_id?: string | null
           reps?: string | null
           rounds?: number | null
           rpe?: number | null
@@ -1053,6 +1271,8 @@ export type Database = {
           heart_rate?: number | null
           id?: string
           pace?: string | null
+          program_id?: string | null
+          program_period_id?: string | null
           reps?: string | null
           rounds?: number | null
           rpe?: number | null
@@ -1067,6 +1287,20 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_logs_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_logs_program_period_id_fkey"
+            columns: ["program_period_id"]
+            isOneToOne: false
+            referencedRelation: "client_program_periods"
             referencedColumns: ["id"]
           },
         ]

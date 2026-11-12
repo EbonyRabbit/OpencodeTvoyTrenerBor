@@ -141,13 +141,37 @@ export interface Database {
           heart_rate: number | null;
           pace: string | null;
           comment: string | null;
+          program_id: string | null;
+          program_period_id: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["workout_logs"]["Row"], "id" | "created_at" | "updated_at"> & {
+        Insert: Omit<
+          Database["public"]["Tables"]["workout_logs"]["Row"],
+          "id" | "created_at" | "updated_at" | "program_id" | "program_period_id"
+        > & {
           id?: string;
+          program_id?: string | null;
+          program_period_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["workout_logs"]["Row"]>;
+        Relationships: [];
+      };
+      client_program_periods: {
+        Row: {
+          id: string;
+          client_id: string;
+          program_id: string | null;
+          started_at: string;
+          ended_at: string | null;
+          status: "active" | "completed";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["client_program_periods"]["Row"]> & {
+          client_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["client_program_periods"]["Row"]>;
         Relationships: [];
       };
       client_exercise_swaps: {
@@ -249,15 +273,24 @@ export interface Database {
           focus: string | null;
           status: string | null;
           training_days: number[] | null;
+          program_id: string | null;
+          program_period_id: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: Omit<
           Database["public"]["Tables"]["program_schedule"]["Row"],
-          "id" | "created_at" | "updated_at" | "training_days"
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "training_days"
+          | "program_id"
+          | "program_period_id"
         > & {
           id?: string;
           training_days?: number[] | null;
+          program_id?: string | null;
+          program_period_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["program_schedule"]["Row"]>;
         Relationships: [];
@@ -344,7 +377,7 @@ export interface Database {
           id: string;
           email: string | null;
           name: string;
-          role: "admin" | "coach";
+          role: "admin" | "coach" | "client";
           avatar_url: string | null;
           created_at: string;
           updated_at: string;
@@ -444,6 +477,69 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["bot_dedup"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["bot_dedup"]["Row"]>;
+        Relationships: [];
+      };
+      subscription_plans: {
+        Row: {
+          id: string;
+          code: string;
+          title: string;
+          price: number;
+          period_days: number;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["subscription_plans"]["Row"]> & {
+          code: string;
+          title: string;
+          price: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["subscription_plans"]["Row"]>;
+        Relationships: [];
+      };
+      subscriptions: {
+        Row: {
+          id: string;
+          client_id: string;
+          plan_id: string;
+          provider: "prodamus";
+          provider_subscription_id: string | null;
+          status: "pending" | "active" | "past_due" | "cancelled" | "expired";
+          current_period_start: string | null;
+          current_period_end: string | null;
+          cancel_at_period_end: boolean;
+          next_payment_at: string | null;
+          paid_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["subscriptions"]["Row"]> & {
+          client_id: string;
+          plan_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["subscriptions"]["Row"]>;
+        Relationships: [];
+      };
+      subscription_payments: {
+        Row: {
+          id: string;
+          subscription_id: string;
+          provider_payment_id: string | null;
+          order_id: string | null;
+          amount: number;
+          status: "pending" | "success" | "failed" | "cancelled" | "refunded";
+          paid_at: string | null;
+          period_start: string | null;
+          period_end: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["subscription_payments"]["Row"]> & {
+          subscription_id: string;
+          amount: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["subscription_payments"]["Row"]>;
         Relationships: [];
       };
     };

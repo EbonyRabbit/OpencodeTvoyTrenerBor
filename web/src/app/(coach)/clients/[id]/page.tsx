@@ -9,6 +9,7 @@ import { resolveWorkoutCount } from "@/lib/workout-stats";
 import { getNextWorkoutDay } from "@/lib/next-workout";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
+import { getActiveProgramPeriod, NIL_PERIOD_ID } from "@/lib/program-periods";
 // import { resolvePhotoUrls } from "@/lib/photos"; // DISABLED: photo storage removed
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
@@ -74,6 +75,10 @@ export default async function ClientProfilePage({
 
   const today = getTodayDateStr(typedClient.timezone || DEFAULT_TIMEZONE);
 
+  // 30.6: карточка клиента показывает активный период.
+  const activePeriod = await getActiveProgramPeriod(id);
+  const activePeriodId = activePeriod?.id ?? NIL_PERIOD_ID;
+
   const [
     latestCheckinResult,
     workoutCountResult,
@@ -98,7 +103,7 @@ export default async function ClientProfilePage({
       supabase.from("messages").select("*", { count: "exact", head: true }).eq("client_id", id),
     ),
     safeFetch(
-      supabase.from("program_schedule").select("id, week_number, focus, start_date, end_date, training_days").eq("client_id", id).order("week_number", { ascending: true }).limit(52),
+      supabase.from("program_schedule").select("id, week_number, focus, start_date, end_date, training_days").eq("client_id", id).eq("program_period_id", activePeriodId).order("week_number", { ascending: true }).limit(52),
       [],
     ),
     safeFetch(
@@ -110,7 +115,7 @@ export default async function ClientProfilePage({
       [],
     ),
     safeFetch(
-      supabase.from("workout_logs").select("date, exercise, week, day_order").eq("client_id", id),
+      supabase.from("workout_logs").select("date, exercise, week, day_order").eq("client_id", id).eq("program_period_id", activePeriodId),
       [],
     ),
     safeFetch(

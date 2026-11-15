@@ -8,6 +8,7 @@ import type { Database } from "@/types/supabase";
 import { calculateAdherence } from "@/lib/adherence";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
+import { getActiveProgramPeriod, NIL_PERIOD_ID } from "@/lib/program-periods";
 import { getActivePause } from "@/lib/plan-adjustment";
 import { WorkoutView } from "./_components/workout-view";
 
@@ -69,12 +70,17 @@ export default async function WorkoutsPage({
     }
   }
 
+  // 30.6: адхеренс считается по активному периоду.
+  const activePeriod = await getActiveProgramPeriod(id);
+
   const [{ data: schedule }, { data: workoutLogs }] = await Promise.all([
     safeFetch(
       supabase
         .from("program_schedule")
         .select("week_number, start_date, end_date, focus, status, training_days")
         .eq("client_id", id)
+        .eq("program_period_id", activePeriod?.id ?? NIL_PERIOD_ID)
+        .neq("status", "archived")
         .order("week_number", { ascending: true }),
       [],
     ),
@@ -83,6 +89,7 @@ export default async function WorkoutsPage({
         .from("workout_logs")
         .select("date, exercise, week, day_order")
         .eq("client_id", id)
+        .eq("program_period_id", activePeriod?.id ?? NIL_PERIOD_ID)
         .order("date", { ascending: false }),
       [],
     ),

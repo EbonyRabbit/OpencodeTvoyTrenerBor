@@ -64,6 +64,11 @@ function buildDb(rows: { schedule?: Row[]; program?: Row | null }): void {
         dbCalls.push({ table, method: "eq", args });
         return tbl;
       },
+      neq: (...args: unknown[]) => {
+        dbCalls.push({ table, method: "neq", args });
+        return tbl;
+      },
+      order: () => tbl,
       maybeSingle: vi.fn(() => Promise.resolve({ data: data(), error: null })),
       then: (onFulfilled: (v: unknown) => void) => onFulfilled({ data: data(), error: null }),
     };

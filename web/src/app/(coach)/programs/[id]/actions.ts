@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/dal";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { generateSchedule } from "@/lib/plan-adjustment";
+import { startProgramPeriod } from "@/lib/program-periods";
 import { validateProgramContent, type ParsedContent } from "@/lib/program-utils";
 import type { Database } from "@/types/supabase";
 
@@ -331,9 +331,9 @@ export async function assignToClient(
       return { error: `У клиента "${client.name}" уже есть программа. Сначала отключите текущую.` };
     }
 
-    const scheduleError = await generateSchedule(clientId, programId);
-    if (scheduleError.error) {
-      return { error: `Программа назначена, но не удалось создать расписание: ${scheduleError.error}` };
+    const periodError = await startProgramPeriod(clientId, programId);
+    if (periodError.error) {
+      return { error: `Не удалось назначить программу: ${periodError.error}` };
     }
 
     revalidatePath(`/clients/${clientId}`);

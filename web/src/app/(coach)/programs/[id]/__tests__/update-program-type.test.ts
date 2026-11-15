@@ -12,8 +12,8 @@ vi.mock("@/lib/supabase-admin", () => ({
   supabaseAdmin: { from: vi.fn() },
 }));
 
-vi.mock("@/lib/plan-adjustment", () => ({
-  generateSchedule: vi.fn(),
+vi.mock("@/lib/program-periods", () => ({
+  startProgramPeriod: vi.fn(),
 }));
 
 import { verifySession } from "@/lib/dal";

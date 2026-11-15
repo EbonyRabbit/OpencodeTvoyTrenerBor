@@ -5,6 +5,7 @@ import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { type Client } from "../lib/clients.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
+import { getActiveProgramPeriod } from "../lib/program-periods.js";
 import {
   parseScale1to10,
   parseHours,
@@ -286,10 +287,16 @@ async function getCurrentWeek(client: Client): Promise<number | null> {
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
 
+  // 30.6: неделя чек-ина — из активного периода.
+  const period = await getActiveProgramPeriod(client.id);
+  if (!period) return null;
+
   const { data } = await supabaseAdmin
     .from("program_schedule")
     .select("week_number")
     .eq("client_id", client.id)
+    .eq("program_period_id", period.id)
+    .neq("status", "archived")
     .lte("start_date", todayStr)
     .gte("end_date", todayStr)
     .limit(1)

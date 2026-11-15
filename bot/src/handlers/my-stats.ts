@@ -8,6 +8,7 @@ import {
   plannedDateForDay,
 } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
+import { getActiveProgramPeriod } from "../lib/program-periods.js";
 
 interface WorkoutLogRow {
   date: string;
@@ -40,12 +41,20 @@ export async function myStatsHandler(ctx: MyContext): Promise<void> {
   const monthLabel = todayStr.slice(0, 7);
 
   try {
-    const { data, error } = await supabaseAdmin
+    // 30.6: адхеренс месяца — логи и план активного периода.
+    const monthPeriod = await getActiveProgramPeriod(client.id);
+    if (!monthPeriod) {
+      await ctx.reply(t("mystats.no_data", lang));
+      return;
+    }
+    let statsQuery = supabaseAdmin
       .from("workout_logs")
       .select("date, exercise, week, day_order, rpe")
       .eq("client_id", client.id)
       .gte("date", monthStart)
       .lte("date", todayStr)
+      .eq("program_period_id", monthPeriod.id);
+    const { data, error } = await statsQuery
       .order("date", { ascending: true });
 
     if (error) {
@@ -107,11 +116,16 @@ async function getMonthWorkoutPlan(
 } | null> {
   if (!client.program_id) return null;
 
+  // 30.6: статистика прогресса — по активному периоду.
+  const period = await getActiveProgramPeriod(client.id);
+  if (!period) return null;
+
   const [{ data: schedule }, { data: program }] = await Promise.all([
     supabaseAdmin
       .from("program_schedule")
       .select("week_number, start_date, end_date, is_deload, focus, training_days")
-      .eq("client_id", client.id),
+      .eq("client_id", client.id)
+      .eq("program_period_id", period.id),
     supabaseAdmin
       .from("programs")
       .select("parsed_content")

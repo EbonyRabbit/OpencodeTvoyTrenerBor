@@ -10,6 +10,7 @@ import {
   formatDuration,
 } from "../lib/workout-utils.js";
 import { calculateE1rm, isAssistedExercise, parseRepsToSets } from "../lib/training-progress.js";
+import { getActiveProgramPeriod } from "../lib/program-periods.js";
 import { loadExerciseLibraryRows } from "./exercise-info.js";
 import { buildExerciseLibraryMap, findLibraryEntry } from "../lib/exercise-library.js";
 import {
@@ -643,6 +644,15 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
       pace: null,
       comment: data.comment || null,
     });
+  }
+
+  // 30.6: логи штампуются активным периодом — цели и подсказки по нему.
+  const period = await getActiveProgramPeriod(ctx.client.id);
+  if (period) {
+    for (const row of rows) {
+      row.program_id = period.program_id;
+      row.program_period_id = period.id;
+    }
   }
 
   const { error } = await supabaseAdmin.from("workout_logs").insert(rows);

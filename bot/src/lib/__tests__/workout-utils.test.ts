@@ -4,6 +4,14 @@ const mocks = vi.hoisted(() => ({
   mockFrom: vi.fn(),
 }));
 
+const periodMock = vi.hoisted(() => ({
+  getActiveProgramPeriod: vi.fn(),
+}));
+
+vi.mock("../program-periods.js", () => ({
+  getActiveProgramPeriod: periodMock.getActiveProgramPeriod,
+}));
+
 vi.mock("../../config.js", () => ({
   config: {
     telegram: { botToken: "test", webhookSecret: "test" },
@@ -19,6 +27,10 @@ vi.mock("../supabase-admin.js", () => ({
   supabaseAdmin: { from: mocks.mockFrom },
 }));
 
+beforeEach(() => {
+  periodMock.getActiveProgramPeriod.mockResolvedValue({ id: "period-1", program_id: "prog-1" });
+});
+
 import {
   truncateMessage,
   formatExercise,
@@ -27,6 +39,7 @@ import {
   getPreviousWorkoutLogs,
   getExerciseHistory,
   getBestE1rms,
+  getCurrentWeekRow,
   clearWorkoutLogsCache,
   pickBestHistoryEntry,
   formatTargetLine,
@@ -907,6 +920,47 @@ describe("history formatting", () => {
   });
 });
 
+describe("getCurrentWeekRow", () => {
+  const client = { id: "client-1", timezone: "Europe/Moscow" } as Parameters<typeof getCurrentWeekRow>[0];
+
+  function mockScheduleQuery(rows: Array<Record<string, unknown>>) {
+    const builder = {
+      select: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      neq: vi.fn(() => builder),
+      order: vi.fn(() => ({ data: rows, error: null })),
+    };
+    mocks.mockFrom.mockReturnValue(builder);
+    return builder;
+  }
+
+  it("returns null when the client has no active program period", async () => {
+    periodMock.getActiveProgramPeriod.mockResolvedValueOnce(null);
+    mocks.mockFrom.mockClear();
+    const result = await getCurrentWeekRow(client, "2026-11-14");
+    expect(result).toBeNull();
+    expect(mocks.mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("scopes the schedule query to the active period", async () => {
+    const builder = mockScheduleQuery([
+      {
+        id: "week-1",
+        week_number: 1,
+        start_date: "2026-11-09",
+        end_date: "2026-11-15",
+        is_deload: false,
+        focus: null,
+        training_days: null,
+      },
+    ]);
+    const result = await getCurrentWeekRow(client, "2026-11-14");
+    expect(result?.id).toBe("week-1");
+    expect(mocks.mockFrom).toHaveBeenCalledWith("program_schedule");
+    expect(builder.eq).toHaveBeenCalledWith("program_period_id", "period-1");
+  });
+});
+
 describe("isTodayWorkoutCompleted", () => {
   const client = {
     id: "client-1",
@@ -924,11 +978,12 @@ describe("isTodayWorkoutCompleted", () => {
   } as Parameters<typeof isTodayWorkoutCompleted>[1];
 
   function mockTodayLogs(rows: Array<{ exercise?: string | null }>, error: { message: string } | null = null) {
-    const eq2 = vi.fn(() => ({ data: rows, error }));
+    const eq3 = vi.fn(() => ({ data: rows, error }));
+    const eq2 = vi.fn(() => ({ eq: eq3 }));
     const eq1 = vi.fn(() => ({ eq: eq2 }));
     const select = vi.fn(() => ({ eq: eq1 }));
     mocks.mockFrom.mockReturnValue({ select });
-    return { select, eq1, eq2 };
+    return { select, eq1, eq2, eq3 };
   }
 
   it("returns false when only some exercises are logged", async () => {
@@ -969,11 +1024,12 @@ describe("isTodayWorkoutCompleted", () => {
     expect(await isTodayWorkoutCompleted({ ...client, program_id: null }, workout)).toBe(false);
   });
 
-  it("filters today's logs by client and date", async () => {
-    const { eq1, eq2 } = mockTodayLogs([]);
+  it("filters today's logs by client, date and active period", async () => {
+    const { eq1, eq2, eq3 } = mockTodayLogs([]);
     await isTodayWorkoutCompleted(client, workout);
     expect(eq1).toHaveBeenCalledWith("client_id", "client-1");
     expect(eq2).toHaveBeenCalledWith("date", expect.any(String));
+    expect(eq3).toHaveBeenCalledWith("program_period_id", "period-1");
   });
 });
 

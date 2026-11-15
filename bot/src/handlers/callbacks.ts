@@ -44,6 +44,7 @@ import { handleExerciseHistory } from "./exercise-history.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getCompositeLetters, isWarmCool, type ParsedExercise } from "../lib/program-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
+import { getActiveProgramPeriod } from "../lib/program-periods.js";
 import { markAsSent } from "../cron/dedup.js";
 import { SKIP_MARKER } from "../lib/log-markers.js";
 
@@ -439,8 +440,11 @@ export async function handleExerciseDoneSimple(ctx: MyContext, params: string): 
   }
 
   const tz = ctx.client.timezone || DEFAULT_TIMEZONE;
+  const period = await getActiveProgramPeriod(ctx.client.id);
   const { error } = await supabaseAdmin.from("workout_logs").insert({
     client_id: ctx.client.id,
+    program_id: period?.program_id ?? null,
+    program_period_id: period?.id ?? null,
     date: getTodayDateStr(tz),
     week: workout?.week_number ?? null,
     day_order: workout?.day_order ?? null,
@@ -537,8 +541,11 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
 
   const todayWorkout = await getTodayWorkout(ctx.client);
 
+  const skipPeriod = await getActiveProgramPeriod(ctx.client.id);
   const { error } = await supabaseAdmin.from("workout_logs").insert({
     client_id: ctx.client.id,
+    program_id: skipPeriod?.program_id ?? null,
+    program_period_id: skipPeriod?.id ?? null,
     date: todayStr,
     week: todayWorkout?.week_number ?? null,
     day_order: todayWorkout?.day_order ?? null,

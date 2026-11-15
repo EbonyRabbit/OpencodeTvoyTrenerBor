@@ -17,7 +17,7 @@ import {
 } from "@/lib/client-token";
 import { deleteClientPhotoStorage } from "@/lib/client-storage";
 import {
-  resetPlanAssignments,
+  archivePlanAssignments,
   assignProgramAndNotify,
   notifyClientForProgram,
   generateConnectCodeFor,
@@ -472,11 +472,21 @@ export async function disableClient(
       .eq("id", clientId);
     if (error) return { error: error.message };
 
-    const resetError = await resetPlanAssignments(clientId);
-    if (resetError.error) {
+    const archiveError = await archivePlanAssignments(clientId);
+    if (archiveError.error) {
       revalidatePath(`/clients/${clientId}`);
       revalidatePath("/clients");
-      return { error: resetError.error };
+      return { error: archiveError.error };
+    }
+
+    // Хвост 30.5: отключение клиента закрывает его активный период.
+    const { error: periodCloseError } = await supabaseAdmin
+      .from("client_program_periods")
+      .update({ status: "completed", ended_at: new Date().toISOString() })
+      .eq("client_id", clientId)
+      .eq("status", "active");
+    if (periodCloseError) {
+      console.error("[DISABLE] Period close failed:", periodCloseError.message);
     }
 
     revalidatePath(`/clients/${clientId}`);
@@ -1145,7 +1155,8 @@ export async function updateClient(
       const { error: scheduleError } = await supabaseAdmin
         .from("program_schedule")
         .update({ training_days: update.training_days })
-        .eq("client_id", clientId);
+        .eq("client_id", clientId)
+        .neq("status", "archived");
 
       if (scheduleError) return { error: scheduleError.message };
     }

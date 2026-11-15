@@ -11,3 +11,5 @@ node_modules/
 dist/
 
 .test-db.lock
+
+supabase/backup/

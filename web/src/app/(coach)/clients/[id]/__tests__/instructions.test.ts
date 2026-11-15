@@ -16,14 +16,14 @@ vi.mock("@/lib/telegram", () => ({
   sendTelegramMessage: vi.fn(),
 }));
 
-vi.mock("@/lib/plan-adjustment", () => ({
-  generateSchedule: vi.fn().mockResolvedValue({ error: null }),
+vi.mock("@/lib/program-periods", () => ({
+  startProgramPeriod: vi.fn().mockResolvedValue({}),
 }));
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { verifySession } from "@/lib/dal";
-import { generateSchedule } from "@/lib/plan-adjustment";
+import { startProgramPeriod } from "@/lib/program-periods";
 import { activateProgram, generateConnectCode, markPurchased, sendProgramInstructions } from "../actions";
 
 const CLIENT_ID = "11111111-2222-3333-4444-555555555555";
@@ -84,8 +84,8 @@ beforeEach(() => {
     profile: { id: COACH_ID, role: "admin" },
   });
   (sendTelegramMessage as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-  (generateSchedule as unknown as ReturnType<typeof vi.fn>).mockReset();
-  (generateSchedule as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ error: null });
+  (startProgramPeriod as unknown as ReturnType<typeof vi.fn>).mockReset();
+  (startProgramPeriod as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({});
 });
 
 describe("markPurchased", () => {
@@ -224,12 +224,12 @@ describe("markPurchased", () => {
       };
       return chain;
     });
-    (generateSchedule as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      error: "boom",
+    (startProgramPeriod as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      error: "Не удалось назначить программу и расписание.",
     });
 
     const result = await markPurchased(CLIENT_ID, PROGRAM_ID);
-    expect(result.error).toContain("не удалось создать расписание");
+    expect(result.error).toBe("Не удалось назначить программу и расписание.");
     expect(result.programAssigned).toBe(true);
     expect(result.connectCode).toBeUndefined();
     expect(
@@ -239,7 +239,7 @@ describe("markPurchased", () => {
     ).toBe(false);
   });
 
-  it("clears the old schedule and pauses when reassigning even if program_id is null", async () => {
+  it("runs the period switch when reassigning even if program_id is null", async () => {
     const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     const deletedTables: string[] = [];
     fake.from.mockImplementation((table: string) => {
@@ -264,15 +264,15 @@ describe("markPurchased", () => {
       };
       return chain;
     });
-    (generateSchedule as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ error: null });
 
     const result = await markPurchased(CLIENT_ID, PROGRAM_ID);
     expect(result.error).toBeUndefined();
-    expect(deletedTables).toContain("program_schedule");
-    expect(deletedTables).toContain("plan_pauses");
+    expect(startProgramPeriod).toHaveBeenCalledWith(CLIENT_ID, PROGRAM_ID);
+    expect(deletedTables).not.toContain("program_schedule");
+    expect(deletedTables).not.toContain("plan_pauses");
   });
 
-  it("reports programAssigned when the schedule reset fails", async () => {
+  it("reports programAssigned when the period switch fails", async () => {
     const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     fake.from.mockImplementation((table: string) => {
       const chain = {
@@ -286,49 +286,20 @@ describe("markPurchased", () => {
           }),
         ),
         update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
-        delete: vi.fn(() => {
-          if (table === "program_schedule") {
-            return { eq: vi.fn(() => Promise.resolve({ error: { message: "boom" } })) };
-          }
-          return { eq: vi.fn(() => Promise.resolve({ error: null })) };
-        }),
+        delete: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({ error: null })),
+        })),
         insert: vi.fn(() => Promise.resolve({ error: null })),
       };
       return chain;
     });
 
-    const result = await markPurchased(CLIENT_ID, PROGRAM_ID);
-    expect(result.error).toContain("сбросить старое расписание");
-    expect(result.programAssigned).toBe(true);
-  });
-
-  it("reports a partial reset failure when only plan_pauses deletion fails", async () => {
-    const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
-    fake.from.mockImplementation((table: string) => {
-      const chain = {
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        maybeSingle: vi.fn(() =>
-          Promise.resolve({
-            data:
-              table === "clients" ? { ...baseClient, program_id: null } : baseProgram,
-            error: null,
-          }),
-        ),
-        update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
-        delete: vi.fn(() => {
-          if (table === "plan_pauses") {
-            return { eq: vi.fn(() => Promise.resolve({ error: { message: "boom" } })) };
-          }
-          return { eq: vi.fn(() => Promise.resolve({ error: null })) };
-        }),
-        insert: vi.fn(() => Promise.resolve({ error: null })),
-      };
-      return chain;
+    (startProgramPeriod as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      error: "Не удалось назначить программу и расписание.",
     });
 
     const result = await markPurchased(CLIENT_ID, PROGRAM_ID);
-    expect(result.error).toContain("сбросить паузы плана");
+    expect(result.error).toBe("Не удалось назначить программу и расписание.");
     expect(result.programAssigned).toBe(true);
   });
 
@@ -366,14 +337,14 @@ describe("activateProgram", () => {
     expect(result.error).toBe("Нет прав");
   });
 
-  it("returns programAssigned when the schedule creation fails", async () => {
+  it("returns programAssigned when the period switch fails", async () => {
     mockDb({ client: { ...baseClient, payment_status: "paid" }, program: baseProgram });
-    (generateSchedule as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      error: "boom",
+    (startProgramPeriod as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      error: "Не удалось назначить программу и расписание.",
     });
 
     const result = await activateProgram(CLIENT_ID, PROGRAM_ID);
-    expect(result.error).toContain("не удалось создать расписание");
+    expect(result.error).toBe("Не удалось назначить программу и расписание.");
     expect(result.programAssigned).toBe(true);
     expect(result.connectCode).toBeUndefined();
     expect(sendTelegramMessage).not.toHaveBeenCalled();
@@ -393,7 +364,7 @@ describe("activateProgram", () => {
     expect(result.error).toBe("Программа не найдена");
   });
 
-  it("deletes the old schedule when a program is reassigned", async () => {
+  it("runs the period switch instead of deleting the old schedule when reassigning", async () => {
     const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     const deletedTables: string[] = [];
     fake.from.mockImplementation((table: string) => {
@@ -421,7 +392,8 @@ describe("activateProgram", () => {
 
     const result = await activateProgram(CLIENT_ID, PROGRAM_ID);
     expect(result.error).toBeUndefined();
-    expect(deletedTables).toContain("program_schedule");
+    expect(startProgramPeriod).toHaveBeenCalledWith(CLIENT_ID, PROGRAM_ID);
+    expect(deletedTables).not.toContain("program_schedule");
   });
 
   it("sends instructions to a connected client on a successful activation", async () => {

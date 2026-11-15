@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent, flattenLoggableExercises, type ParsedDay } from "@/lib/program-utils";
+import { getActiveProgramPeriod } from "@/lib/program-periods";
 import type { ExerciseLibraryRow } from "@/lib/exercise-library";
 import type { ClientRow } from "@/lib/clients";
 import { getTodayDateStr } from "@/lib/date-utils";
@@ -106,10 +107,17 @@ export default async function WorkoutPage() {
   const todayName = getTodayDayName(tz);
   const todayISODay = getTodayISODay(tz);
 
-  const { data: schedule } = await supabaseAdmin
+  // 30.6: сегодняшняя тренировка портала — из активного периода.
+  const activePeriod = await getActiveProgramPeriod(clientId);
+
+  const scheduleQuery = supabaseAdmin
     .from("program_schedule")
     .select("week_number, start_date, end_date, training_days")
     .eq("client_id", clientId);
+  const { data: schedule } = await (activePeriod
+    ? scheduleQuery.eq("program_period_id", activePeriod.id)
+    : scheduleQuery
+  );
 
   const currentWeek = (schedule ?? []).find((w) => {
     if (!w.start_date || !w.end_date) return false;
@@ -200,11 +208,13 @@ export default async function WorkoutPage() {
     ? capitalize(todayName)
     : matchedDay.day_name;
 
-  const { data: logs, error: logsError } = await supabaseAdmin
+  let logsQuery = supabaseAdmin
     .from("workout_logs")
     .select("exercise")
     .eq("client_id", clientId)
     .eq("date", todayStr);
+  if (activePeriod) logsQuery = logsQuery.eq("program_period_id", activePeriod.id);
+  const { data: logs, error: logsError } = await logsQuery;
   if (logsError) {
     console.error(`[WORKOUT] Logs query failed for ${clientId}:`, logsError.message);
   }

@@ -8,6 +8,7 @@ import { getNextWorkoutDay, hasTrainedOnDate } from "@/lib/next-workout";
 import { safeFetch } from "@/lib/safe-fetch";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
+import { getActiveProgramPeriod } from "@/lib/program-periods";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Database } from "@/types/supabase";
 
@@ -48,6 +49,8 @@ export default async function ClientHomePage({
 
   const today = getTodayDateStr(client.timezone || DEFAULT_TIMEZONE);
 
+  const activePeriod = await getActiveProgramPeriod(clientId);
+
   const [programResult, scheduleResult, workoutResult, checkinResult] = await Promise.all([
     client.program_id
       ? safeFetch(
@@ -59,23 +62,29 @@ export default async function ClientHomePage({
           null,
         )
       : Promise.resolve({ data: null }),
-    client.program_id
+    // 30.6: неделя и адхеренс портала — по активному периоду.
+    activePeriod
       ? safeFetch(
           supabaseAdmin
             .from("program_schedule")
             .select("week_number, start_date, end_date, focus, is_deload, status, training_days")
             .eq("client_id", clientId)
+            .eq("program_period_id", activePeriod.id)
+            .neq("status", "archived")
             .order("week_number"),
           [] as ScheduleRow[],
         )
       : Promise.resolve({ data: [] as ScheduleRow[] }),
-    safeFetch(
-      supabaseAdmin
-        .from("workout_logs")
-        .select("date, exercise, week, day_order")
-        .eq("client_id", clientId),
-      [] as { date: string; exercise?: string | null; week?: number | null; day_order?: number | null }[],
-    ),
+    activePeriod
+      ? safeFetch(
+          supabaseAdmin
+            .from("workout_logs")
+            .select("date, exercise, week, day_order")
+            .eq("client_id", clientId)
+            .eq("program_period_id", activePeriod.id),
+          [] as { date: string; exercise?: string | null; week?: number | null; day_order?: number | null }[],
+        )
+      : Promise.resolve({ data: [] as { date: string; exercise?: string | null; week?: number | null; day_order?: number | null }[] }),
     safeFetch(
       supabaseAdmin
         .from("checkins")

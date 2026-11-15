@@ -24,6 +24,10 @@ vi.mock("../guards.js", () => ({
   guardActiveClient: vi.fn(),
 }));
 
+vi.mock("../../lib/program-periods.js", () => ({
+  getActiveProgramPeriod: vi.fn().mockResolvedValue({ id: "period-1", program_id: "p-1" }),
+}));
+
 const CLIENT = {
   id: "c-1",
   program_id: "p-1",
@@ -49,6 +53,7 @@ function mockQueries(programData: Record<string, unknown> | null) {
       const link = (..._a: unknown[]) => chain;
       chain.select = link;
       chain.eq = link;
+      chain.neq = link;
       chain.order = link;
       chain.then = (onFulfilled: (v: unknown) => unknown) =>
         Promise.resolve({ data: [], error: null }).then(onFulfilled);

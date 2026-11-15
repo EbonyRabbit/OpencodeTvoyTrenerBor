@@ -7,6 +7,7 @@ import { getTodayDateStr } from "@/lib/date-utils";
 import { weekdayDateInWeek } from "@/lib/week-days";
 import { weekdayIsoFromName } from "@/lib/day-names";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
+import { getActiveProgramPeriod } from "@/lib/program-periods";
 import { Card, CardContent } from "@/components/ui/card";
 import { HistoryGrid } from "./history-grid";
 
@@ -134,17 +135,28 @@ export default async function HistoryPage() {
     );
   }
 
-  const { data: schedule } = await supabaseAdmin
+  // 30.6: сетка истории строится по активному периоду, чтобы логи прошлых
+  // программ не смешивались с текущей сеткой недель. Общая история упражнения
+  // в боте показывает все периоды.
+  const activePeriod = await getActiveProgramPeriod(clientId);
+
+  const historyScheduleQuery = supabaseAdmin
     .from("program_schedule")
     .select("week_number, start_date, end_date, training_days")
     .eq("client_id", clientId);
+  const { data: schedule } = await (activePeriod
+    ? historyScheduleQuery.eq("program_period_id", activePeriod.id)
+    : historyScheduleQuery
+  );
   const scheduleRows = (schedule ?? []) as ScheduleRow[];
   const trainingDays = client.training_days ?? [];
 
-  const { data: logs, error: logsError } = await supabaseAdmin
+  let historyLogsQuery = supabaseAdmin
     .from("workout_logs")
     .select("date, week, day_order, exercise, sets, reps, weight, rpe, rounds, distance_km, duration_sec, heart_rate, pace, comment")
-    .eq("client_id", clientId)
+    .eq("client_id", clientId);
+  if (activePeriod) historyLogsQuery = historyLogsQuery.eq("program_period_id", activePeriod.id);
+  const { data: logs, error: logsError } = await historyLogsQuery
     .order("date", { ascending: true })
     .order("created_at", { ascending: true });
   if (logsError) {

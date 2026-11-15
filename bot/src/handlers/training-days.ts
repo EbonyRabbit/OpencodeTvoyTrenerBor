@@ -117,7 +117,8 @@ async function saveSchedule(ctx: MyContext, trainingDays: number[]): Promise<boo
   const scheduleUpdate = supabaseAdmin
     .from("program_schedule")
     .update({ training_days: trainingDays, updated_at: now })
-    .eq("client_id", ctx.client.id);
+    .eq("client_id", ctx.client.id)
+    .neq("status", "archived");
 
   const [clientResult, scheduleResult] = await Promise.all([clientUpdate, scheduleUpdate]);
 

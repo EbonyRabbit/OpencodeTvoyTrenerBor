@@ -6,12 +6,12 @@ import { resetDb } from "@/test/integration/db";
 import type { Database } from "@/types/supabase";
 
 const mocks = vi.hoisted(() => ({
-  generateSchedule: vi.fn(),
+  startProgramPeriod: vi.fn(),
   sendTelegramMessage: vi.fn(),
 }));
 
-vi.mock("@/lib/plan-adjustment", () => ({
-  generateSchedule: mocks.generateSchedule,
+vi.mock("@/lib/program-periods", () => ({
+  startProgramPeriod: mocks.startProgramPeriod,
 }));
 
 vi.mock("@/lib/telegram", () => ({
@@ -145,7 +145,7 @@ afterEach(() => {
 beforeEach(() => {
   resetDb();
   vi.clearAllMocks();
-  mocks.generateSchedule.mockResolvedValue({});
+  mocks.startProgramPeriod.mockResolvedValue({});
   mocks.sendTelegramMessage.mockResolvedValue(true);
 });
 
@@ -194,7 +194,7 @@ describe("activatePurchaseByOrder on real data", () => {
       direction: "to_client",
     });
 
-    expect(mocks.generateSchedule).toHaveBeenCalledWith(
+    expect(mocks.startProgramPeriod).toHaveBeenCalledWith(
       result.clientId,
       programId,
     );
@@ -274,8 +274,12 @@ describe("activatePurchaseByOrder on real data", () => {
     expect(first.clientId).toBeTruthy();
 
     const { error: scheduleError } = await supabaseAdmin
-      .from("program_schedule")
-      .insert({ client_id: first.clientId as string, week_number: 1 });
+      .from("client_program_periods")
+      .insert({
+        client_id: first.clientId as string,
+        program_id: programId,
+        status: "active",
+      });
     if (scheduleError) throw scheduleError;
 
     const second = await activatePurchaseByOrder({
@@ -570,8 +574,12 @@ describe("activatePurchaseByOrder on real data", () => {
     });
     expect(first.error).toBeUndefined();
     const { error: scheduleError } = await supabaseAdmin
-      .from("program_schedule")
-      .insert({ client_id: first.clientId as string, week_number: 1 });
+      .from("client_program_periods")
+      .insert({
+        client_id: first.clientId as string,
+        program_id: programId,
+        status: "active",
+      });
     if (scheduleError) throw scheduleError;
     const { error: updateError } = await supabaseAdmin
       .from("purchase_requests")
@@ -661,7 +669,7 @@ describe("activatePurchaseByOrder on real data", () => {
     const programId = await seedProgram();
     const requestId = await seedRequest({ programId });
     const orderId = await orderIdFor(requestId);
-    mocks.generateSchedule.mockResolvedValueOnce({ error: "boom" });
+    mocks.startProgramPeriod.mockResolvedValueOnce({ error: "boom" });
 
     const result = await activatePurchaseByOrder({
       orderId,

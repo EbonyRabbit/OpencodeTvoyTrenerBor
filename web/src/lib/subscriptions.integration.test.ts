@@ -195,6 +195,20 @@ describe("subscription schema", () => {
     expect(insertError).toBeNull();
   });
 
+  it("rejects a live subscription without a period end", async () => {
+    const clientId = await seedClient();
+    const plan = await getSeededPlan();
+
+    const { error } = await supabaseAdmin
+      .from("subscriptions")
+      .insert({
+        client_id: clientId,
+        plan_id: plan.id,
+        status: "active",
+      });
+    expect(error?.code).toBe("23514");
+  });
+
   it("deletes subscription payments with the subscription", async () => {
     const clientId = await seedClient();
     const plan = await getSeededPlan();

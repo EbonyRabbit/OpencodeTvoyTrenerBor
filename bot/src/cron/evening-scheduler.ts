@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { findClientByTelegramId } from "../lib/clients.js";
 import { t, type Language } from "../i18n/index.js";
 import { getTodayWorkout, getTodayDateStr } from "../lib/workout-utils.js";
+import { getActiveProgramPeriod } from "../lib/program-periods.js";
 import { markAsSent } from "./dedup.js";
 import { logBotEvent } from "./logger.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
@@ -112,11 +113,14 @@ export async function runEveningPoll(bot: Bot<MyContext>): Promise<void> {
 
         const todayStr = getTodayDateStr(tz);
 
-        const { data: existingLogs } = await supabaseAdmin
+        const schedPeriod = await getActiveProgramPeriod(client.id);
+        let existingQuery = supabaseAdmin
           .from("workout_logs")
           .select("exercise")
           .eq("client_id", client.id)
           .eq("date", todayStr);
+        if (schedPeriod) existingQuery = existingQuery.eq("program_period_id", schedPeriod.id);
+        const { data: existingLogs } = await existingQuery;
 
         const hasCompletion = hasCompletionLogs(existingLogs ?? []);
         if (hasCompletion) continue;

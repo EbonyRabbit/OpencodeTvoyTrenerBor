@@ -2,6 +2,7 @@ import type { MyContext } from "../bot.js";
 import { t, type Language } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { getTodayWorkout, getTodayDateStr, getTodayISODay, getCurrentWeekRow, getOccupiedDaysForWeek } from "../lib/workout-utils.js";
+import { getActiveProgramPeriod } from "../lib/program-periods.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
 import {
   availablePostponeDays,
@@ -35,8 +36,11 @@ async function handleEveningResponse(
     return true;
   }
 
+  const pollPeriod = await getActiveProgramPeriod(client.id);
   const logEntry = {
     client_id: client.id,
+    program_id: pollPeriod?.program_id ?? null,
+    program_period_id: pollPeriod?.id ?? null,
     date: todayStr,
     week: workout.week_number,
     day_order: workout.day_order,
@@ -230,8 +234,11 @@ export async function handlePostponeMove(ctx: MyContext, params: string): Promis
     return false;
   }
 
+  const postponePeriod = await getActiveProgramPeriod(client.id);
   const postponeLog = {
     client_id: client.id,
+    program_id: postponePeriod?.program_id ?? null,
+    program_period_id: postponePeriod?.id ?? null,
     date: todayStr,
     week: weekRow.week_number,
     day_order: null,

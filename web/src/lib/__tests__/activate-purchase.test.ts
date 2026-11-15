@@ -8,8 +8,8 @@ vi.mock("@/lib/telegram", () => ({
   sendTelegramMessage: vi.fn(),
 }));
 
-vi.mock("@/lib/plan-adjustment", () => ({
-  generateSchedule: vi.fn(),
+vi.mock("@/lib/program-periods", () => ({
+  startProgramPeriod: vi.fn().mockResolvedValue({}),
 }));
 
 import {

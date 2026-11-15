@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Database } from "@/types/supabase";
-import { generateSchedule } from "@/lib/plan-adjustment";
+import { startProgramPeriod } from "@/lib/program-periods";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { sendCoachAlertOnce } from "@/lib/coach-alert";
 import { buildProgramInstructions } from "@/lib/program-instructions";
@@ -38,27 +38,42 @@ function resolveConnectCode(client: {
   return client.connect_code;
 }
 
-export async function resetPlanAssignments(
+// Used only by disableClient: archive instead of delete, history stays.
+export async function archivePlanAssignments(
   clientId: string,
 ): Promise<{ error?: string }> {
   const { error: scheduleError } = await supabaseAdmin
     .from("program_schedule")
-    .delete()
-    .eq("client_id", clientId);
+    .update({ status: "archived" })
+    .eq("client_id", clientId)
+    .neq("status", "archived");
   if (scheduleError) {
-    console.error("[ACTIVATION] schedule reset failed:", scheduleError.message);
-    return { error: "Не удалось сбросить старое расписание." };
+    console.error("[ACTIVATION] schedule archive failed:", scheduleError.message);
+    return { error: "Не удалось архивировать расписание." };
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  // Хвост 30.5: закрываем и resuming-паузы, не только active.
+  const { error: openEndError } = await supabaseAdmin
+    .from("plan_pauses")
+    .update({ status: "completed", pause_end: today })
+    .eq("client_id", clientId)
+    .in("status", ["active", "resuming"])
+    .is("pause_end", null);
+  if (openEndError) {
+    console.error("[ACTIVATION] open pauses close failed:", openEndError.message);
+    return { error: "Не удалось закрыть паузы плана." };
   }
   const { error: pausesError } = await supabaseAdmin
     .from("plan_pauses")
-    .delete()
-    .eq("client_id", clientId);
+    .update({ status: "completed" })
+    .eq("client_id", clientId)
+    .in("status", ["active", "resuming"]);
   if (pausesError) {
     console.error(
-      "[ACTIVATION] plan pauses reset failed:",
+      "[ACTIVATION] plan pauses close failed:",
       pausesError.message,
     );
-    return { error: "Не удалось сбросить паузы плана." };
+    return { error: "Не удалось закрыть паузы плана." };
   }
   return {};
 }
@@ -92,23 +107,13 @@ export async function assignProgramAndNotify(
   programAssigned?: boolean;
   retryable?: boolean;
 }> {
-  const resetError = await resetPlanAssignments(input.clientId);
-  if (resetError.error) {
+  // Atomic switch: closes the old period, archives the old schedule, closes
+  // pauses and inserts the new period + schedule. Nothing is deleted.
+  const periodError = await startProgramPeriod(input.clientId, input.programId);
+  if (periodError.error) {
+    console.error("[ACTIVATION] period switch failed:", periodError.error);
     return {
-      error: resetError.error,
-      programAssigned: true,
-      retryable: true,
-    };
-  }
-
-  const scheduleError = await generateSchedule(input.clientId, input.programId);
-  if (scheduleError.error) {
-    console.error(
-      "[ACTIVATION] schedule generation failed:",
-      scheduleError.error,
-    );
-    return {
-      error: "Программа назначена, но не удалось создать расписание.",
+      error: periodError.error,
       programAssigned: true,
       retryable: true,
     };
@@ -913,15 +918,18 @@ async function loadClientForInstructions(
   return { ok: true, client: data as ClientForInstructions };
 }
 
+// «Уже активирован» = есть ЛЮБОЙ активный период: клиент живёт в другой
+// программе — перезаписывать её повторной активацией старой покупки нельзя.
 async function hasScheduleFor(clientId: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin
-    .from("program_schedule")
+    .from("client_program_periods")
     .select("id")
     .eq("client_id", clientId)
+    .eq("status", "active")
     .limit(1)
     .maybeSingle();
   if (error) {
-    console.error("[ACTIVATION] Schedule lookup error:", error.message);
+    console.error("[ACTIVATION] Active period lookup error:", error.message);
     return false;
   }
   return data !== null;

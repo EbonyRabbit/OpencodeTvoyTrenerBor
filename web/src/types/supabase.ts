@@ -1310,6 +1310,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      start_program_period: {
+        Args: {
+          p_client_id: string
+          p_program_id: string
+          p_schedule?: Json
+        }
+        Returns: string
+      }
       create_client_token: {
         Args: {
           p_client_id: string

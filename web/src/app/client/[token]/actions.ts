@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getActiveProgramPeriod } from "@/lib/program-periods";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { TIMEZONE_LIST, LANGUAGE_LABELS, isQuarterTime } from "@/lib/clients";
 import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
@@ -84,7 +85,7 @@ export async function logWorkoutFromWeb(
     if (exercises.length > 100 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return { error: "Некорректные данные тренировки" };
     }
-    if (week !== null && (!Number.isInteger(week) || week < 1 || week > 1000)) {
+    if (week !== null && (!Number.isInteger(week) || week < 0 || week > 1000)) {
       return { error: "Некорректный номер недели" };
     }
     if (dayOrder !== null && (!Number.isInteger(dayOrder) || dayOrder < 1 || dayOrder > 7)) {
@@ -95,8 +96,14 @@ export async function logWorkoutFromWeb(
       if (validationError) return { error: validationError };
     }
 
+    // 30.6: логи портала штампуются активным периодом — иначе они невидимы
+    // для период-скоупнутых чтений (завершённость, адхеренс, история).
+    const period = await getActiveProgramPeriod(clientId);
+
     const rows = exercises.map((ex) => ({
       client_id: clientId,
+      program_id: period?.program_id ?? null,
+      program_period_id: period?.id ?? null,
       date,
       week,
       day_order: dayOrder,
@@ -345,6 +352,7 @@ export async function saveCheckin(
         .from("program_schedule")
         .select("week_number, start_date, end_date")
         .eq("client_id", clientId)
+        .neq("status", "archived")
         .order("week_number", { ascending: true });
 
       for (const week of schedule ?? []) {
@@ -468,7 +476,8 @@ export async function updateClientSettings(
     const { error: scheduleError } = await supabaseAdmin
       .from("program_schedule")
       .update({ training_days: data.training_days ?? null })
-      .eq("client_id", clientId);
+      .eq("client_id", clientId)
+      .neq("status", "archived");
 
     if (scheduleError) return { error: scheduleError.message };
 

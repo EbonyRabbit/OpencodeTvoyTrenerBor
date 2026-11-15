@@ -70,6 +70,7 @@ export async function adminDebugToday(ctx: MyContext): Promise<void> {
       .from("program_schedule")
       .select("client_id, week_number, is_deload, focus, start_date, end_date")
       .in("client_id", clientIds)
+      .neq("status", "archived")
       .lte("start_date", todayStr)
       .gte("end_date", todayStr);
 
@@ -177,6 +178,7 @@ export async function adminRecalcSchedule(ctx: MyContext): Promise<void> {
         .from("program_schedule")
         .select("id, week_number, start_date, end_date")
         .eq("client_id", client.id)
+        .neq("status", "archived")
         .order("week_number");
 
       if (!existingSchedule || existingSchedule.length === 0) continue;

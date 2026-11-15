@@ -1,20 +1,12 @@
 import { supabaseAdmin } from "./supabase-admin";
 import { getParsedContent } from "./program-utils";
+import { getActiveProgramPeriod } from "./program-periods";
 import type { Database } from "@/types/supabase";
 import type { PauseReason, ResumeStrategy } from "@/types/supabase";
 
 export type { PauseReason, ResumeStrategy };
 
 export type PlanPause = Database["public"]["Tables"]["plan_pauses"]["Row"];
-
-export type ScheduleWeek = Pick<
-  Database["public"]["Tables"]["program_schedule"]["Row"],
-  "id" | "client_id" | "week_number" | "start_date" | "end_date" | "original_start_date" | "original_end_date" | "focus" | "status"
->;
-
-export type EffectiveWeek = ScheduleWeek & {
-  is_paused: boolean;
-};
 
 function daysBetween(a: string, b: string): number {
   const d1 = new Date(a + "T12:00:00Z");
@@ -176,10 +168,15 @@ export async function resumePlan(
 }
 
 async function ensureOriginalDates(clientId: string): Promise<void> {
+  // 30.6: касаемся только недель активного периода.
+  const period = await getActiveProgramPeriod(clientId);
+  if (!period) return;
+
   const { data: schedule } = await supabaseAdmin
     .from("program_schedule")
     .select("id, start_date, end_date, original_start_date, original_end_date")
     .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
     .is("original_start_date", null);
 
   if (!schedule || schedule.length === 0) return;
@@ -204,12 +201,18 @@ async function applyShift(
 ): Promise<{ error?: string }> {
   await ensureOriginalDates(clientId);
 
+  // 30.6: сдвиг будущих недель — внутри активного периода.
+  const period = await getActiveProgramPeriod(clientId);
+  if (!period) return {};
+
   const duration = daysBetween(pause.pause_start, resumeDate);
 
   const { data: weeks, error: fetchErr } = await supabaseAdmin
     .from("program_schedule")
     .select("id, start_date, end_date")
     .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
+    .neq("status", "archived")
     .gte("start_date", pause.pause_start);
 
   if (fetchErr) return { error: fetchErr.message };
@@ -252,12 +255,18 @@ async function applyDeload(
 ): Promise<{ error?: string }> {
   await ensureOriginalDates(clientId);
 
+  // 30.6: разгрузка ставится внутри активного периода.
+  const period = await getActiveProgramPeriod(clientId);
+  if (!period) return {};
+
   const duration = daysBetween(pause.pause_start, resumeDate);
 
   const { data: futureWeeks, error: fetchErr } = await supabaseAdmin
     .from("program_schedule")
     .select("*")
     .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
+    .neq("status", "archived")
     .gte("start_date", pause.pause_start)
     .order("week_number", { ascending: true });
 
@@ -269,8 +278,21 @@ async function applyDeload(
   const deloadStart = resumeDate;
   const deloadEnd = addDays(resumeDate, 6);
 
+  // Хвост 30.5: архивируем живую W0 от прошлого отката, иначе повторная
+  // разгрузка создаст дубль недели 0.
+  const { error: w0ArchiveErr } = await supabaseAdmin
+    .from("program_schedule")
+    .update({ status: "archived" })
+    .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
+    .eq("week_number", 0)
+    .neq("status", "archived");
+  if (w0ArchiveErr) return { error: w0ArchiveErr.message };
+
   const { error: insertErr } = await supabaseAdmin.from("program_schedule").insert({
     client_id: clientId,
+    program_id: period.program_id,
+    program_period_id: period.id,
     week_number: 0,
     sheet_name: "DELOAD",
     is_deload: true,
@@ -315,23 +337,31 @@ async function applyRollback(
 ): Promise<{ error?: string }> {
   await ensureOriginalDates(clientId);
 
+  // 30.6: откат живёт внутри активного периода.
+  const period = await getActiveProgramPeriod(clientId);
+  if (!period) return {};
+
   const { data: lastWorkout } = await supabaseAdmin
     .from("workout_logs")
     .select("date, week")
     .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
     .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   const rollbackWeekNumber = lastWorkout?.week ?? 1;
 
-  const { data: rollbackWeek } = await supabaseAdmin
+  const { data: rollbackWeek, error: rollbackWeekErr } = await supabaseAdmin
     .from("program_schedule")
     .select("*")
     .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
+    .neq("status", "archived")
     .eq("week_number", rollbackWeekNumber)
     .maybeSingle();
 
+  if (rollbackWeekErr) return { error: rollbackWeekErr.message };
   if (!rollbackWeek) {
     return {};
   }
@@ -343,10 +373,23 @@ async function applyRollback(
   const repeatStart = resumeDate;
   const repeatEnd = addDays(resumeDate, weekDuration - 1);
 
+  const { error: archiveOriginalError } = await supabaseAdmin
+    .from("program_schedule")
+    .update({ status: "archived" })
+    .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
+    .eq("week_number", rollbackWeekNumber)
+    .neq("status", "archived");
+  if (archiveOriginalError) return { error: archiveOriginalError.message };
+
+  // Архивируем до выборки futureWeeks, чтобы свежезархивированный оригинал
+  // недели не попал в сдвиг и его даты не поехали.
   const { data: futureWeeks, error: fetchErr } = await supabaseAdmin
     .from("program_schedule")
     .select("id, start_date, end_date, week_number")
     .eq("client_id", clientId)
+    .eq("program_period_id", period.id)
+    .neq("status", "archived")
     .gte("start_date", pause.pause_start)
     .order("week_number", { ascending: true });
 
@@ -354,6 +397,8 @@ async function applyRollback(
 
   const { error: insertErr } = await supabaseAdmin.from("program_schedule").insert({
     client_id: clientId,
+    program_id: period.program_id,
+    program_period_id: period.id,
     week_number: rollbackWeekNumber,
     sheet_name: rollbackWeek.sheet_name ? `${rollbackWeek.sheet_name}_REPEAT` : null,
     is_deload: false,
@@ -392,86 +437,38 @@ async function applyRollback(
   return {};
 }
 
-export async function getEffectiveSchedule(clientId: string): Promise<EffectiveWeek[]> {
-  const activePause = await getActivePause(clientId);
+export type ScheduleEntry = Omit<
+  Database["public"]["Tables"]["program_schedule"]["Insert"],
+  "id" | "created_at" | "updated_at" | "client_id" | "program_id" | "program_period_id"
+>;
 
-  const { data: schedule } = await supabaseAdmin
-    .from("program_schedule")
-    .select("*")
-    .eq("client_id", clientId)
-    .order("week_number", { ascending: true });
-
-  if (!schedule) return [];
-
-  return schedule.map((week) => {
-    const isPaused =
-      activePause !== null &&
-      week.start_date !== null &&
-      week.start_date >= activePause.pause_start &&
-      (activePause.pause_end === null || week.start_date <= activePause.pause_end);
-
-    return {
-      ...week,
-      is_paused: isPaused,
-    };
-  });
-}
-
-export async function generateSchedule(
-  clientId: string,
-  programId: string,
-): Promise<{ error?: string }> {
-  const { data: existing } = await supabaseAdmin
-    .from("program_schedule")
-    .select("id")
-    .eq("client_id", clientId)
-    .limit(1);
-
-  if (existing && existing.length > 0) {
-    return {};
-  }
-
-  const { data: program } = await supabaseAdmin
-    .from("programs")
-    .select("*")
-    .eq("id", programId)
-    .maybeSingle();
-
-  if (!program) {
-    return { error: "Программа не найдена" };
-  }
-
-  const programRow = program as Database["public"]["Tables"]["programs"]["Row"];
-  const parsed = getParsedContent(programRow);
+export function buildScheduleEntries(
+  program: Database["public"]["Tables"]["programs"]["Row"],
+): { entries?: ScheduleEntry[]; error?: string } {
+  const parsed = getParsedContent(program);
 
   if (!parsed?.weeks || parsed.weeks.length === 0) {
     return { error: "В программе нет недель для генерации расписания" };
   }
 
   const today = todayStr();
-  const scheduleEntries = parsed.weeks.map((week) => {
-    const weekOffset = (week.week_number - 1) * 7;
-    const startDate = addDays(today, weekOffset);
-    const endDate = addDays(today, weekOffset + 6);
+  return {
+    entries: parsed.weeks.map((week) => {
+      const weekOffset = (week.week_number - 1) * 7;
+      const startDate = addDays(today, weekOffset);
+      const endDate = addDays(today, weekOffset + 6);
 
-    return {
-      client_id: clientId,
-      week_number: week.week_number,
-      sheet_name: `W${week.week_number}`,
-      is_deload: week.is_deload ?? false,
-      start_date: startDate,
-      end_date: endDate,
-      original_start_date: startDate,
-      original_end_date: endDate,
-      focus: week.week_label ?? null,
-      status: "active",
-    };
-  });
-
-  const { error } = await supabaseAdmin
-    .from("program_schedule")
-    .insert(scheduleEntries);
-
-  if (error) return { error: error.message };
-  return {};
+      return {
+        week_number: week.week_number,
+        sheet_name: `W${week.week_number}`,
+        is_deload: week.is_deload ?? false,
+        start_date: startDate,
+        end_date: endDate,
+        original_start_date: startDate,
+        original_end_date: endDate,
+        focus: week.week_label ?? null,
+        status: "active",
+      };
+    }),
+  };
 }

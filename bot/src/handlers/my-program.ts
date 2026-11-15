@@ -12,6 +12,7 @@ import { formatSchedule } from "./training-days.js";
 import { guardActiveClient } from "./guards.js";
 import { getTodayDateStr } from "../lib/workout-utils.js";
 import { DEFAULT_TIMEZONE } from "../lib/constants.js";
+import { getActiveProgramPeriod, NIL_PERIOD_ID } from "../lib/program-periods.js";
 
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
@@ -62,10 +63,14 @@ export async function myProgramHandler(ctx: MyContext): Promise<void> {
       return;
     }
 
+    // 30.6: показываем недели активного периода.
+    const period = await getActiveProgramPeriod(client.id);
     const { data: schedule, error: scheduleError } = await supabaseAdmin
       .from("program_schedule")
       .select("week_number, start_date, end_date, is_deload, focus, training_days")
       .eq("client_id", client.id)
+      .eq("program_period_id", period?.id ?? NIL_PERIOD_ID)
+      .neq("status", "archived")
       .order("week_number");
 
     if (scheduleError) {

@@ -7,6 +7,7 @@ import { DEFAULT_TIMEZONE } from "./constants.js";
 import { isPseudoExercise } from "./log-markers.js";
 import { getClientSwaps, applySwapsToExercises } from "./exercise-swaps.js";
 import { calculateE1rm, isAssistedExercise, parseRepsToSets } from "./training-progress.js";
+import { getActiveProgramPeriod } from "./program-periods.js";
 import type { ExerciseTarget } from "./training-progress.js";
 
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
@@ -79,10 +80,17 @@ export async function getCurrentWeekRow(
   client: Client,
   todayStr: string,
 ): Promise<CurrentWeekRow | null> {
+  // 30.6: «текущая неделя» живёт в активном периоде; без него тренировок нет.
+  const period = await getActiveProgramPeriod(client.id);
+  if (!period) return null;
+
   const { data, error } = await supabaseAdmin
     .from("program_schedule")
     .select("id, week_number, start_date, end_date, is_deload, focus, training_days")
-    .eq("client_id", client.id);
+    .eq("client_id", client.id)
+    .eq("program_period_id", period.id)
+    .neq("status", "archived")
+    .order("week_number", { ascending: true });
 
   if (error) {
     console.error(`[WORKOUT] Schedule query error for ${client.id}:`, error.message);
@@ -126,12 +134,17 @@ export async function getWorkoutPlan(
   let scheduleData = scheduleContext;
 
   if (!scheduleData) {
-    const { data, error } = await supabaseAdmin
+    // 30.6: фолбэк-лукап недели тоже скоупится активным периодом.
+    const period = await getActiveProgramPeriod(client.id);
+    let query = supabaseAdmin
       .from("program_schedule")
       .select("is_deload, focus")
       .eq("client_id", client.id)
-      .eq("week_number", scheduleWeek)
-      .maybeSingle();
+      .neq("status", "archived")
+      .eq("week_number", scheduleWeek);
+    if (period) query = query.eq("program_period_id", period.id);
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       console.error(`[WORKOUT] Schedule query error for ${client.id}:`, error.message);
@@ -395,8 +408,8 @@ const LAST_LOGS_CACHE_TTL_MS = 30_000;
 const LAST_LOGS_CACHE_MAX_SIZE = 100;
 const lastLogsCache = new Map<string, { at: number; value: Map<string, PreviousLog> }>();
 
-function cacheKey(clientId: string, names: string[]): string {
-  return `${clientId}:${[...names].sort().join("|")}`;
+function cacheKey(clientId: string, periodId: string | null, names: string[]): string {
+  return `${clientId}:${periodId ?? "all"}:${[...names].sort().join("|")}`;
 }
 
 function cacheSet(key: string, value: Map<string, PreviousLog>): void {
@@ -421,7 +434,9 @@ export async function getPreviousWorkoutLogs(
   );
   if (wanted.size === 0) return result;
 
-  const key = cacheKey(client.id, Array.from(wanted));
+  // 30.6: подсказка последнего веса — только по активному периоду.
+  const period = await getActiveProgramPeriod(client.id);
+  const key = cacheKey(client.id, period?.id ?? null, Array.from(wanted));
   const cached = lastLogsCache.get(key);
   if (cached && Date.now() - cached.at < LAST_LOGS_CACHE_TTL_MS) {
     return cached.value;
@@ -432,11 +447,14 @@ export async function getPreviousWorkoutLogs(
 
   const orFilter = Array.from(wanted).map(postgrestValue).map((n) => `exercise.ilike.${n}`).join(",");
 
-  const { data, error } = await supabaseAdmin
+  let logsQuery = supabaseAdmin
     .from("workout_logs")
     .select("exercise, date, sets, reps, weight, rounds, duration_sec, distance_km, pace, heart_rate")
     .eq("client_id", client.id)
-    .lt("date", todayStr)
+    .lt("date", todayStr);
+  if (period) logsQuery = logsQuery.eq("program_period_id", period.id);
+
+  const { data, error } = await logsQuery
     .or(orFilter)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -532,12 +550,17 @@ export async function getBestE1rms(
 
   const pageSize = 1000;
   let offset = 0;
+  // 30.6: цель на сегодня считается только по активному периоду.
+  const period = await getActiveProgramPeriod(client.id);
   while (true) {
-    const { data, error } = await supabaseAdmin
+    let bestQuery = supabaseAdmin
       .from("workout_logs")
       .select("exercise, weight, reps")
       .eq("client_id", client.id)
-      .lt("date", todayStr)
+      .lt("date", todayStr);
+    if (period) bestQuery = bestQuery.eq("program_period_id", period.id);
+
+    const { data, error } = await bestQuery
       .or(orFilter)
       .order("date", { ascending: false })
       .order("created_at", { ascending: false })
@@ -1052,11 +1075,17 @@ export async function isTodayWorkoutCompleted(
   const tz = client.timezone || DEFAULT_TIMEZONE;
   const todayStr = getTodayDateStr(tz);
 
-  const { data: logs, error } = await supabaseAdmin
+  // 30.6: завершённость — по логам активного периода, чтобы старые записи
+  // другой программы не закрывали новую тренировку.
+  const period = await getActiveProgramPeriod(client.id);
+  let logsQuery = supabaseAdmin
     .from("workout_logs")
     .select("exercise")
     .eq("client_id", client.id)
     .eq("date", todayStr);
+  if (period) logsQuery = logsQuery.eq("program_period_id", period.id);
+
+  const { data: logs, error } = await logsQuery;
 
   if (error) {
     console.error(`[WORKOUT] Completion query error for ${client.id}:`, error.message);

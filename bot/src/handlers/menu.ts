@@ -30,6 +30,7 @@ export async function menuHandler(ctx: MyContext): Promise<void> {
       t("menu.progress", ctx.language),
       t("menu.checkin", ctx.language),
       t("menu.myprogram", ctx.language),
+      t("menu.mystats", ctx.language),
       t("menu.programs", ctx.language),
       t("menu.pause", ctx.language),
       t("menu.resume", ctx.language),

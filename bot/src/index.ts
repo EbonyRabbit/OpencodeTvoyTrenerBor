@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { bot } from "./bot.js";
 import { startScheduler, stopScheduler } from "./cron/scheduler.js";
 import { startupWarnings } from "./startup-warnings.js";
+import { syncBotCommands } from "./lib/bot-commands.js";
 
 const { server } = createApp({
   bot,
@@ -19,6 +20,8 @@ server.on("error", (err) => {
 async function main(): Promise<void> {
   await bot.init();
   console.log(`Bot initialized: @${bot.botInfo.username}`);
+
+  await syncBotCommands(bot);
 
   startScheduler(bot);
 

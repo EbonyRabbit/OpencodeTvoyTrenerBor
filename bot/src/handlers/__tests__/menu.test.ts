@@ -70,6 +70,7 @@ describe("menuHandler", () => {
 
     const text = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(text).toContain("Доступные команды:");
+    expect(text).toContain("/mystats - статистика за месяц");
     const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
       reply_markup?: unknown;
     };

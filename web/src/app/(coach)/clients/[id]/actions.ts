@@ -18,13 +18,13 @@ import {
 import { deleteClientPhotoStorage } from "@/lib/client-storage";
 import {
   archivePlanAssignments,
-  assignProgramAndNotify,
   notifyClientForProgram,
   generateConnectCodeFor,
   applyProgramActivation,
   toFiniteNumber,
   type ClientForInstructions,
 } from "@/lib/activate-purchase";
+import { startProgramPeriod } from "@/lib/program-periods";
 import type { ActivityEvent } from "./activity-types";
 import { ACTIVITY_PAGE_SIZE } from "./activity-types";
 
@@ -296,11 +296,23 @@ export async function activateProgram(
       now.getTime() + program.duration_weeks * 7 * 24 * 60 * 60 * 1000,
     );
 
+    // Хвост 30.6-5: период и расписание переключает RPC; только после
+    // успешного RPC обновляем строку клиента, иначе ошибка RPC оставила бы
+    // program_id без периода. Уведомление отправляем последним: клиент не
+    // должен получить сообщение о датах, которых нет в базе.
+    const periodResult = await startProgramPeriod(clientId, programId);
+    if (periodResult.error) {
+      console.error(
+        "[ASSIGN_PROGRAM] period switch failed:",
+        periodResult.error,
+      );
+      return { error: periodResult.error, programAssigned: true };
+    }
+
     const { error } = await supabaseAdmin
       .from("clients")
       .update({
         program_id: programId,
-        purchased_program_id: programId,
         purchase_date: now.toISOString(),
         status: "active",
         access_start_date: now.toISOString(),
@@ -309,14 +321,13 @@ export async function activateProgram(
       .eq("id", clientId);
     if (error) return { error: error.message };
 
-    const assignment = await assignProgramAndNotify({
+    const assignment = await notifyClientForProgram(
       clientId,
       client,
-      programId,
-      programTitle: program.title,
-      accessEndDate: endDate.toISOString(),
-      coachId: profile.id,
-    });
+      program.title,
+      endDate.toISOString(),
+      profile.id,
+    );
 
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/clients");
@@ -464,7 +475,6 @@ export async function disableClient(
       .update({
         status: "inactive",
         program_id: null,
-        purchased_program_id: null,
         purchase_date: null,
         access_start_date: null,
         access_end_date: null,
@@ -479,12 +489,12 @@ export async function disableClient(
       return { error: archiveError.error };
     }
 
-    // Хвост 30.5: отключение клиента закрывает его активный период.
-    const { error: periodCloseError } = await supabaseAdmin
-      .from("client_program_periods")
-      .update({ status: "completed", ended_at: new Date().toISOString() })
-      .eq("client_id", clientId)
-      .eq("status", "active");
+    // Хвост 30.5 + 30.6-2: отключение закрывает активный период SQL-функцией
+    // (ended_at считает БД, а не часы приложения).
+    const { error: periodCloseError } = await supabaseAdmin.rpc(
+      "close_active_period",
+      { p_client_id: clientId },
+    );
     if (periodCloseError) {
       console.error("[DISABLE] Period close failed:", periodCloseError.message);
     }

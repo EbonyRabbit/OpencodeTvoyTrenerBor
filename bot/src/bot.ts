@@ -14,12 +14,12 @@ import { startPause, handlePauseInput } from "./handlers/pause.js";
 import { startResume, handleResumeCallback } from "./handlers/resume.js";
 import { programsHandler, handleProgramDetailsCallback } from "./handlers/programs.js";
 import {
-  startPurchase,
-  handleConsentPurchase,
-  resendPaymentLink,
+  startProgramChoice,
+  handleSubscribeConfirm,
+  handleSubscribeCancel,
   startCoachRequest,
   handleConsentCoachRequest,
-} from "./handlers/purchase.js";
+} from "./handlers/subscribe.js";
 import { myStatsHandler } from "./handlers/my-stats.js";
 import { myWebHandler } from "./handlers/my-web.js";
 import { exerciseHandler } from "./handlers/exercise.js";
@@ -255,21 +255,29 @@ bot.on("callback_query:data", async (ctx, next) => {
     await programsHandler(ctx, sport === "all" ? null : sport);
     return;
   }
-  // purchase flow must bypass guardActiveClient: buyers may not be linked to a
-  // client yet (pending payment / no program assigned).
-  if (data?.startsWith("purchase_start:")) {
-    const programId = data.slice("purchase_start:".length);
-    await startPurchase(ctx, programId);
+  // subscribe flow must bypass guardActiveClient: the catalog is open to
+  // everyone, the handler itself decides between placeholder and switching.
+  // Legacy purchase_start buttons from old catalog messages route to the
+  // same choice flow.
+  if (
+    data?.startsWith("subscribe_start:") ||
+    data?.startsWith("purchase_start:")
+  ) {
+    const programId = data.slice(
+      data.startsWith("subscribe_start:")
+        ? "subscribe_start:".length
+        : "purchase_start:".length,
+    );
+    await startProgramChoice(ctx, programId);
     return;
   }
-  if (data?.startsWith("consent_purchase:")) {
-    const requestId = data.slice("consent_purchase:".length);
-    await handleConsentPurchase(ctx, requestId);
+  if (data?.startsWith("subscribe_confirm:")) {
+    const programId = data.slice("subscribe_confirm:".length);
+    await handleSubscribeConfirm(ctx, programId);
     return;
   }
-  if (data?.startsWith("resend_payment_link:")) {
-    const requestId = data.slice("resend_payment_link:".length);
-    await resendPaymentLink(ctx, requestId);
+  if (data === "subscribe_cancel") {
+    await handleSubscribeCancel(ctx);
     return;
   }
   // coach_request must bypass guardActiveClient: new users (no clients row)

@@ -220,7 +220,6 @@ export function ClientProfile({
   initialActivityEvents,
   loadMoreActivity,
   // latestPhotos, // DISABLED: photo storage removed
-  purchasedProgramName,
   purchaseRequests,
 }: {
   client: ClientRow;
@@ -237,7 +236,6 @@ export function ClientProfile({
   initialActivityEvents: ActivityEvent[];
   loadMoreActivity: (offset: number) => Promise<ActivityEvent[] | { error: string }>;
   // latestPhotos: PhotoRow[]; // DISABLED: photo storage removed
-  purchasedProgramName: string | null;
   purchaseRequests: PurchaseRequestRow[];
 }) {
   const accessDays = daysSince(client.access_start_date);
@@ -380,12 +378,6 @@ export function ClientProfile({
             <InfoRow
               label="Дата покупки"
               value={formatDate(client.purchase_date)}
-            />
-          )}
-          {purchasedProgramName && (
-            <InfoRow
-              label="Купленная программа"
-              value={purchasedProgramName}
             />
           )}
         </SectionCard>

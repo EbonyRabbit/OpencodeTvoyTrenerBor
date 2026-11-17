@@ -25,7 +25,7 @@ vi.mock("../../lib/supabase-admin.js", () => ({
 
 import { supabaseAdmin } from "../../lib/supabase-admin.js";
 import { findClientByTelegramId } from "../../lib/clients.js";
-import { startCoachRequest, startPurchase } from "../purchase.js";
+import { startCoachRequest, startProgramChoice } from "../subscribe.js";
 import type { MyContext } from "../../bot.js";
 
 function makeCtx(): MyContext {
@@ -43,76 +43,69 @@ function programChain() {
     eq: vi.fn(() => chain),
     is: vi.fn(() => chain),
     maybeSingle: vi.fn(async () => ({
-      data: { id: randomUUID(), title: "Сила", price: 5900 },
+      data: { id: randomUUID(), title: "Сила", parsed_content: null },
       error: null,
     })),
   };
   return chain;
 }
 
-const insertCalls: ReturnType<typeof vi.fn>[] = [];
-
-function failingPurchaseChain() {
-  let headRequest = false;
-  const insert = vi.fn(() => {
-    throw new Error("insert must not run");
-  });
-  insertCalls.push(insert);
+function subscriptionChain(error: { message: string } | null) {
   const chain = {
-    insert,
-    select: vi.fn((_columns: unknown, options?: { head?: boolean }) => {
-      headRequest = options?.head === true;
-      return chain;
-    }),
+    select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
-    is: vi.fn(() => chain),
-    order: vi.fn(() => chain),
+    in: vi.fn(() => chain),
     limit: vi.fn(() => chain),
-    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-    then: (resolve: (value: unknown) => unknown) =>
-      Promise.resolve(
-        headRequest
-          ? { count: null, error: { message: "count failed" } }
-          : { data: null, error: null },
-      ).then(resolve),
+    maybeSingle: vi.fn(async () => ({ data: null, error })),
   };
   return chain;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  insertCalls.length = 0;
   const from = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   from.from.mockImplementation((table: string) =>
-    table === "programs" ? programChain() : failingPurchaseChain(),
+    table === "programs"
+      ? programChain()
+      : table === "subscriptions"
+        ? subscriptionChain(null)
+        : (() => {
+            throw new Error(`Unexpected table: ${table}`);
+          })(),
   );
 });
 
-describe("purchase fail-closed paths", () => {
-  it("does not create a request when the client lookup fails", async () => {
+describe("subscribe fail-closed paths", () => {
+  it("does not check subscriptions when the client lookup fails", async () => {
     vi.mocked(findClientByTelegramId).mockRejectedValueOnce(
       new Error("db down"),
     );
     const ctx = makeCtx();
 
-    await startPurchase(ctx, randomUUID());
+    await startProgramChoice(ctx, randomUUID());
 
     expect(ctx.reply).toHaveBeenCalled();
     expect(
       (supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> }).from,
-    ).not.toHaveBeenCalledWith("purchase_requests");
+    ).not.toHaveBeenCalledWith("subscriptions");
   });
 
-  it("does not create a request when the pending counter fails", async () => {
-    vi.mocked(findClientByTelegramId).mockResolvedValueOnce(null);
+  it("replies with an error when the subscription check fails", async () => {
+    vi.mocked(findClientByTelegramId).mockResolvedValueOnce({
+      id: "c-1",
+      language: "ru",
+    } as unknown as Awaited<ReturnType<typeof findClientByTelegramId>>);
+    const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fake.from.mockImplementation((table: string) =>
+      table === "programs"
+        ? programChain()
+        : subscriptionChain({ message: "count failed" }),
+    );
     const ctx = makeCtx();
 
-    await startPurchase(ctx, randomUUID());
+    await startProgramChoice(ctx, randomUUID());
 
     expect(ctx.reply).toHaveBeenCalled();
-    expect(insertCalls.every((insert) => insert.mock.calls.length === 0)).toBe(
-      true,
-    );
   });
 
   it("reports a client lookup error instead of showing the coach request form", async () => {

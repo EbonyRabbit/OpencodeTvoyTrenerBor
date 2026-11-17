@@ -171,7 +171,6 @@ describe("activatePurchaseByOrder on real data", () => {
       id: result.clientId,
       telegram_id: TELEGRAM_ID,
       program_id: programId,
-      purchased_program_id: programId,
       payment_status: "paid",
       status: "active",
     });

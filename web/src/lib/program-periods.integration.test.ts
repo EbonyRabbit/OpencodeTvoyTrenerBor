@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { startProgramPeriod, getActiveProgramPeriod } from "@/lib/program-periods";
-import { resetDb } from "@/test/integration/db";
+import { dbDate, resetDb } from "@/test/integration/db";
 import type { Database } from "@/types/supabase";
 
 type PeriodRow =
@@ -178,7 +178,7 @@ describe("start_program_period on real data", () => {
       .eq("client_id", clientId);
     expect(pauses).toHaveLength(1);
     expect(pauses?.[0]?.status).toBe("completed");
-    expect(pauses?.[0]?.pause_end).toBe(new Date().toISOString().slice(0, 10));
+    expect(pauses?.[0]?.pause_end).toBe(dbDate());
   });
 
   it("keeps old logs and re-stamps pre-period logs onto the closing period", async () => {
@@ -308,7 +308,7 @@ describe("start_program_period on real data", () => {
       .eq("client_id", clientId);
     expect(pauses).toHaveLength(1);
     expect(pauses?.[0]?.status).toBe("completed");
-    expect(pauses?.[0]?.pause_end).toBe(new Date().toISOString().slice(0, 10));
+    expect(pauses?.[0]?.pause_end).toBe(dbDate());
   });
 });
 

@@ -108,7 +108,7 @@ describe("programsHandler catalog query", () => {
     expect(JSON.stringify(options[1]?.reply_markup ?? [])).toContain("coach_request");
   });
 
-  it("adds a purchase_start button only for priced programs", async () => {
+  it("adds a choose button for every program regardless of price", async () => {
     mockProgramsQuery([
       {
         id: "tpl-buy",
@@ -135,9 +135,10 @@ describe("programsHandler catalog query", () => {
       reply_markup?: unknown;
     };
     const keyboard = JSON.stringify(options.reply_markup ?? []);
-    expect(keyboard).toContain("purchase_start:tpl-buy");
-    expect(keyboard).not.toContain("purchase_start:tpl-free");
-    // у каждой программы есть кнопка «Подробнее», но НЕТ пер-программной кнопки запроса
+    // 30.7: подписка открывает все программы, кнопка «Выбрать» у каждой
+    expect(keyboard).toContain("subscribe_start:tpl-buy");
+    expect(keyboard).toContain("subscribe_start:tpl-free");
+    expect(keyboard).not.toContain("purchase_start:");
     expect(keyboard).toContain("program_details:tpl-buy");
     expect(keyboard).toContain("program_details:tpl-free");
     expect(keyboard).not.toContain("program_request:");
@@ -167,7 +168,7 @@ describe("programsHandler catalog query", () => {
     // короткие подписи без дублирования названия и без обрезки «…»;
     // программа одна → кнопки без номеров
     expect(keyboard).toContain("ℹ️ Подробнее");
-    expect(keyboard).toContain("💳 Купить");
+    expect(keyboard).toContain("✅ Выбрать");
     expect(keyboard).not.toContain("📩 Запросить");
     expect(keyboard).not.toContain("program_request:");
     expect(keyboard).not.toContain("- HYROX");
@@ -202,34 +203,28 @@ describe("programsHandler catalog query", () => {
     };
     const keyboard = JSON.stringify(options.reply_markup ?? []);
     expect(keyboard).toContain("ℹ️ Подробнее 1");
-    expect(keyboard).toContain("💳 Купить 2");
+    expect(keyboard).toContain("✅ Выбрать 2");
     expect(keyboard).not.toContain("📩 Запросить");
   });
 
-  it("hides the buy button for a program the client already owns", async () => {
-    mockProgramsQuery(
-      [
-        {
-          id: "tpl-buy",
-          title: "Платная",
-          type: "template",
-          description: null,
-          duration_weeks: 12,
-          price: 9900,
-        },
-      ],
-      { id: "c-1", program_id: "tpl-buy", language: "ru" },
-    );
+  it("does not query the clients table for owned-program gating", async () => {
+    const calls = mockProgramsQuery([
+      {
+        id: "tpl-buy",
+        title: "Платная",
+        type: "template",
+        description: null,
+        duration_weeks: 12,
+        price: 9900,
+      },
+    ]);
     const ctx = makeCtx();
 
     await programsHandler(ctx);
 
-    const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
-      reply_markup?: unknown;
-    };
-    const keyboard = JSON.stringify(options.reply_markup ?? []);
-    expect(keyboard).not.toContain("purchase_start:tpl-buy");
-    expect(keyboard).not.toContain("program_request:");
+    // 30.7: каталог один для всех, подписку проверяет обработчик выбора
+    expect(calls.filter((c) => c.method === "select").length).toBe(1);
+    expect(JSON.stringify(calls)).not.toContain("clients");
   });
 
   it("adds a coach_request button at the bottom of the catalog", async () => {
@@ -323,32 +318,8 @@ describe("handleProgramDetailsCallback", () => {
       reply_markup?: unknown;
     };
     expect(JSON.stringify(options.reply_markup ?? [])).toContain(
-      `purchase_start:${DETAILS_ID}`,
+      `subscribe_start:${DETAILS_ID}`,
     );
-  });
-
-  it("скрывает кнопку «Купить» для владельца программы", async () => {
-    mockDetailsQuery(
-      {
-        id: DETAILS_ID,
-        title: "HYROX",
-        type: "template",
-        description: "desc",
-        duration_weeks: 12,
-        price: 7770,
-      },
-      { id: "c-9", program_id: DETAILS_ID, language: "ru" },
-    );
-    const ctx = makeCtx();
-
-    await handleProgramDetailsCallback(ctx, DETAILS_ID);
-
-    const options = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
-      reply_markup?: unknown;
-    };
-    const keyboard = JSON.stringify(options.reply_markup ?? []);
-    expect(keyboard).not.toContain(`purchase_start:${DETAILS_ID}`);
-    expect(keyboard).not.toContain(`program_request:${DETAILS_ID}`);
   });
 
   it("сообщает not_found для скрытой/удалённой программы", async () => {

@@ -16,7 +16,6 @@ interface Program {
   sport: string | null;
   description: string | null;
   duration_weeks: number | null;
-  price: number | null;
 }
 
 const BOT_SPORT_FILTERS: { label: string; value: string | null }[] = [
@@ -53,18 +52,12 @@ export function truncateButtonLabel(label: string, maxBytes = TELEGRAM_BUTTON_MA
   return ELLIPSIS;
 }
 
-function formatPrice(price: number | null): string {
-  if (price === null || !Number.isFinite(price)) return "";
-  return `${price.toLocaleString("ru-RU")} ₽`;
-}
-
 function formatProgram(index: number, program: Program, lang: Language): string {
   const type = program.type || "-";
   const sport = program.sport ? (BOT_SPORT_LABELS[program.sport] ?? program.sport) : "";
   const weeks = program.duration_weeks ?? 12;
-  const priceLine = program.price != null
-    ? t("programs.price_line", lang, { price: formatPrice(program.price) })
-    : "";
+  // 30.7: цену программы не показываем - доступ открывает подписка,
+  // цена подписки живёт в subscription_plans, не в programs.price.
   const descriptionLine = program.description
     ? t("programs.description_line", lang, { description: program.description.slice(0, 100) })
     : "";
@@ -77,7 +70,6 @@ function formatProgram(index: number, program: Program, lang: Language): string 
       title: program.title,
       type,
       weeks,
-      price_line: priceLine,
       description_line: descriptionLine,
     })
   );
@@ -97,7 +89,7 @@ export async function programsHandler(
   try {
     let query = supabaseAdmin
       .from("programs")
-      .select("id, title, type, sport, description, duration_weeks, price")
+      .select("id, title, type, sport, description, duration_weeks")
       .eq("active", true)
       .eq("type", "template")
       .is("client_id", null);
@@ -124,16 +116,6 @@ export async function programsHandler(
       return;
     }
 
-    // программы, которыми пользователь уже владеет, не предлагаем к покупке
-    let ownedProgramIds = new Set<string>();
-    try {
-      const { findClientByTelegramId } = await import("../lib/clients.js");
-      const client = await findClientByTelegramId(ctx.from.id);
-      if (client?.program_id) ownedProgramIds = new Set([client.program_id]);
-    } catch (err) {
-      console.warn(`[PROGRAMS] Client lookup failed for ${ctx.from.id}:`, err);
-    }
-
     const lines: string[] = [t("programs.title", lang), ""];
     const keyboard = new InlineKeyboard();
 
@@ -155,17 +137,12 @@ export async function programsHandler(
       // Короткие подписи: полное название программы уже в тексте блока выше,
       // а лимит Telegram - 64 байта на надпись кнопки.
       const num = numbered ? ` ${i + 1}` : "";
-      const buyable =
-        program.price != null && program.price > 0 && !ownedProgramIds.has(program.id);
-      const row = keyboard
-        .text(
-          t("programs.details_button", lang) + num,
-          `program_details:${program.id}`,
-        );
-      if (buyable) {
-        row.text(t("programs.buy_button", lang) + num, `purchase_start:${program.id}`);
-      }
-      keyboard.row();
+      // 30.7: каталог показывает все активные программы, кнопка «Выбрать»
+      // есть у каждой - наличие подписки проверяет обработчик.
+      keyboard
+        .row()
+        .text(t("programs.details_button", lang) + num, `program_details:${program.id}`)
+        .text(t("programs.choose_button", lang) + num, `subscribe_start:${program.id}`);
     });
 
     // отдельная строка внизу каталога: заявка на индивидуальное ведение
@@ -186,7 +163,7 @@ export async function programsHandler(
 
 
 // ℹ️ Подробнее: полное описание программы отдельным сообщением.
-// Доступно всем (в т.ч. не-клиентам) - покупка начинается отсюда.
+// Доступно всем (в т.ч. не-клиентам) - выбор программы начинается отсюда.
 export async function handleProgramDetailsCallback(ctx: MyContext, programId: string): Promise<void> {
   if (!ctx.from?.id) {
     await ctx.answerCallbackQuery();
@@ -205,7 +182,7 @@ export async function handleProgramDetailsCallback(ctx: MyContext, programId: st
   try {
     const { data: program, error } = await supabaseAdmin
       .from("programs")
-      .select("id, title, type, description, duration_weeks, price")
+      .select("id, title, type, description, duration_weeks")
       .eq("id", programId)
       .eq("active", true)
       .eq("type", "template")
@@ -222,24 +199,10 @@ export async function handleProgramDetailsCallback(ctx: MyContext, programId: st
       return;
     }
 
-    // владелец программы не видит кнопку «Купить»
-    let owned = false;
-    try {
-      const { findClientByTelegramId } = await import("../lib/clients.js");
-      const client = await findClientByTelegramId(ctx.from.id);
-      owned = client?.program_id === program.id;
-    } catch (err) {
-      console.warn(`[PROGRAMS] Client lookup failed for ${ctx.from.id}:`, err);
-    }
-
-    const priceLine = program.price != null
-      ? t("programs.price_line", lang, { price: formatPrice(program.price) })
-      : "";
     const lines: string[] = [
       program.title,
       `${t("programs.item_type_label", lang)} ${program.type || "-"}`,
       `${t("programs.item_weeks_label", lang)} ${program.duration_weeks ?? 12}`,
-      priceLine,
     ].filter((line) => line.trim() !== "");
     if (program.description) {
       lines.push("");
@@ -250,12 +213,11 @@ export async function handleProgramDetailsCallback(ctx: MyContext, programId: st
       t("program.truncation_suffix", lang),
     );
 
-    const keyboard = new InlineKeyboard();
-    const buyable =
-      program.price != null && program.price > 0 && !owned;
-    if (buyable) {
-      keyboard.text(t("programs.buy_button", lang), `purchase_start:${program.id}`);
-    }
+    // 30.7: кнопку «Выбрать» видят все - наличие подписки проверяет обработчик.
+    const keyboard = new InlineKeyboard().text(
+      t("programs.choose_button", lang),
+      `subscribe_start:${program.id}`,
+    );
 
     await ctx.reply(message, { reply_markup: keyboard });
   } catch (err) {

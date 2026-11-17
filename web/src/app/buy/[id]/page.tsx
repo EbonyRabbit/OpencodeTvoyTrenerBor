@@ -2,8 +2,15 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { UUID_REGEX } from "@/lib/validation";
-import { parseBuyParams } from "@/lib/purchase";
-import { BuyForm, type BuyProgram } from "./buy-form";
+import { ProgramCardPage, type BuyProgram } from "./program-card";
+
+function buildBotDeepLink(): string {
+  const raw = process.env.TELEGRAM_BOT_USERNAME?.trim() ?? "";
+  if (!raw) return "";
+  const username = raw.replace(/^@/, "").replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9_]{4,64}$/.test(username)) return "";
+  return `https://t.me/${username}/programs`;
+}
 
 export async function generateMetadata({
   params,
@@ -22,18 +29,15 @@ export async function generateMetadata({
     .is("client_id", null)
     .maybeSingle<{ title: string }>();
 
-  return { title: data?.title ? `Купить: ${data.title}` : "Программа" };
+  return { title: data?.title ? `Программа: ${data.title}` : "Программа" };
 }
 
 export default async function BuyPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tg?: string | string[]; u?: string | string[] }>;
 }) {
   const { id } = await params;
-  const { tg, u } = await searchParams;
 
   if (!UUID_REGEX.test(id)) {
     notFound();
@@ -55,21 +59,10 @@ export default async function BuyPage({
     notFound();
   }
 
-  const buyParams = parseBuyParams(
-    typeof tg === "string" ? tg : "",
-    typeof u === "string" ? u : "",
-  );
-  const initialContact = buyParams.telegramUsername ?? "";
-
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-4 py-10">
-        <BuyForm
-          program={program}
-          initialContact={initialContact}
-          telegramId={buyParams.telegramId}
-          telegramUsername={buyParams.telegramUsername}
-        />
+        <ProgramCardPage program={program} botDeepLink={buildBotDeepLink()} />
       </main>
     </div>
   );

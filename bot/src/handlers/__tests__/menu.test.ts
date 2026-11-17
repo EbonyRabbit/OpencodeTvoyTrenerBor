@@ -43,7 +43,6 @@ function mockActiveClient() {
               status: "active",
               payment_status: "paid",
               program_id: "prog-1",
-              purchased_program_id: null,
               language: "ru",
               client_consent_given: true,
             },

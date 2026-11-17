@@ -4,9 +4,7 @@ import { headers } from "next/headers";
 import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
-import { formatPrice } from "@/lib/format-price";
 import {
-  UUID_REGEX,
   sanitizeText,
   isValidContact,
   formatContact,
@@ -15,13 +13,9 @@ import {
 import {
   DEDUP_ERROR_MESSAGE,
   COACH_REQUEST_ALREADY_SENT_MESSAGE,
-  parseTelegramId,
-  buildPurchaseCoachMessage,
   buildCoachRequestCoachMessage,
-  TELEGRAM_USERNAME_REGEX,
 } from "@/lib/purchase";
 import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
-import type { BuyProgram } from "./buy-form";
 
 const NAME_MAX_LENGTH = 200;
 const CONTACT_MAX_LENGTH = 120;
@@ -94,172 +88,6 @@ async function deleteDedupKey(key: string): Promise<void> {
 }
 
 const GENERIC_ERROR_MESSAGE = "Произошла ошибка. Попробуйте позже.";
-
-export type PurchaseRequestInput = {
-  programId: string;
-  name: string;
-  contact: string;
-  telegramId?: string | null;
-  telegramUsername?: string | null;
-};
-
-export async function createPurchaseRequest(
-  input: PurchaseRequestInput,
-): Promise<{ error?: string }> {
-  let dedupKey = "";
-  let dbDedupKey = "";
-  try {
-    const h = await headers();
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-    if (isRateLimited(ip)) {
-      return { error: "Слишком много заявок. Попробуйте позже." };
-    }
-
-    const programId = input.programId.trim();
-    if (!UUID_REGEX.test(programId)) {
-      return { error: "Некорректная программа." };
-    }
-
-    const name = sanitizeText(input.name);
-    if (!name) return { error: "Укажите ваше имя." };
-    if (name.length > NAME_MAX_LENGTH) {
-      return { error: "Имя слишком длинное." };
-    }
-
-    const contact = sanitizeText(input.contact).replace(/^@/, "");
-    if (!contact) return { error: "Укажите контакт для связи (Telegram)." };
-    if (contact.length > CONTACT_MAX_LENGTH) {
-      return { error: "Контакт слишком длинный." };
-    }
-    if (!isValidContact(contact)) {
-      return { error: "Укажите @username или номер телефона." };
-    }
-
-    const tgRaw = input.telegramId?.trim() ?? "";
-    const telegramId = parseTelegramId(tgRaw);
-    if (tgRaw !== "" && telegramId === null) {
-      return { error: "Telegram ID - только цифры (от 5 до 15)." };
-    }
-    const usernameRaw = input.telegramUsername?.trim() ?? "";
-    const telegramUsername = TELEGRAM_USERNAME_REGEX.test(usernameRaw)
-      ? usernameRaw
-      : null;
-
-    const now = Date.now();
-    const contactNorm = normalizeContactKey(contact);
-    dedupKey = `${ip}:${programId}:${contactNorm}`;
-    if (
-      dedupMap.has(dedupKey) &&
-      now - (dedupMap.get(dedupKey) ?? 0) < DEDUP_WINDOW_MS
-    ) {
-      return { error: DEDUP_ERROR_MESSAGE };
-    }
-    dedupMap.set(dedupKey, now);
-
-    const { data: program, error: programError } = await supabaseAdmin
-      .from("programs")
-      .select("id, title, type, description, duration_weeks, price")
-      .eq("id", programId)
-      .eq("active", true)
-      .eq("type", "template")
-      .is("client_id", null)
-      .maybeSingle<BuyProgram>();
-
-    if (programError) {
-      console.error("[PURCHASE] Program query error:", programError.message);
-      dedupMap.delete(dedupKey);
-      return { error: GENERIC_ERROR_MESSAGE };
-    }
-    if (!program || program.type !== "template") {
-      dedupMap.delete(dedupKey);
-      return { error: "Программа недоступна для покупки." };
-    }
-
-    dbDedupKey = `purchase:${programId}:${hashContact(contactNorm)}`;
-    const nowIso = new Date().toISOString();
-    const { error: purgeError } = await supabaseAdmin
-      .from("bot_dedup")
-      .delete()
-      .eq("key", dbDedupKey)
-      .lt("expires_at", nowIso);
-    if (purgeError) {
-      console.error(
-        "[PURCHASE] Failed to purge expired dedup key:",
-        purgeError.message,
-      );
-    }
-
-    const { error: dedupError } = await supabaseAdmin.from("bot_dedup").insert({
-      key: dbDedupKey,
-      expires_at: new Date(Date.now() + DEDUP_WINDOW_MS).toISOString(),
-    });
-    if (dedupError?.code === "23505") {
-      return { error: DEDUP_ERROR_MESSAGE };
-    }
-    if (dedupError) {
-      console.error(
-        "[PURCHASE] Failed to write dedup key:",
-        dedupError.message,
-      );
-      dedupMap.delete(dedupKey);
-      return { error: GENERIC_ERROR_MESSAGE };
-    }
-
-    const logged = await insertBotLog("purchase_request", "info", telegramId, {
-      program_id: program.id,
-      program_title: program.title,
-    });
-    if (!logged) {
-      dedupMap.delete(dedupKey);
-      await deleteDedupKey(dbDedupKey);
-      return { error: "Не удалось сохранить заявку. Попробуйте позже." };
-    }
-    const coachChatId = process.env.COACH_CHAT_ID;
-
-    const logNotificationFailure = async (reason: string) => {
-      await insertBotLog(
-        "purchase_request:coach_notification_failed",
-        "error",
-        telegramId,
-        {
-          program_id: program.id,
-          reason,
-        },
-      );
-    };
-
-    if (coachChatId) {
-      const sent = await sendTelegramMessage(
-        coachChatId,
-        buildPurchaseCoachMessage({
-          programTitle: program.title,
-          price: program.price,
-          durationWeeks: program.duration_weeks,
-          name,
-          contact,
-          telegramUsername,
-          telegramId,
-          formatContact,
-          formatPrice,
-        }),
-      );
-      if (!sent) {
-        console.error("[PURCHASE] Coach notification failed");
-        await logNotificationFailure("telegram_send_failed");
-      }
-    } else {
-      console.error("[PURCHASE] COACH_CHAT_ID is not set");
-      await logNotificationFailure("COACH_CHAT_ID_not_set");
-    }
-
-    return {};
-  } catch (e) {
-    console.error("[PURCHASE] createPurchaseRequest error:", e);
-    if (dedupKey) dedupMap.delete(dedupKey);
-    if (dbDedupKey) await deleteDedupKey(dbDedupKey);
-    return { error: GENERIC_ERROR_MESSAGE };
-  }
-}
 
 export type CoachRequestInput = {
   name: string;

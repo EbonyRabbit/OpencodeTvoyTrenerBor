@@ -400,7 +400,6 @@ export type Database = {
           payment_status: Database["public"]["Enums"]["payment_status"]
           program_id: string | null
           purchase_date: string | null
-          purchased_program_id: string | null
           checkin_day: number | null
           checkin_time: string | null
           spreadsheet_id: string | null
@@ -433,7 +432,6 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           program_id?: string | null
           purchase_date?: string | null
-          purchased_program_id?: string | null
           checkin_day?: number | null
           checkin_time?: string | null
           spreadsheet_id?: string | null
@@ -466,7 +464,6 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           program_id?: string | null
           purchase_date?: string | null
-          purchased_program_id?: string | null
           checkin_day?: number | null
           checkin_time?: string | null
           spreadsheet_id?: string | null
@@ -480,13 +477,6 @@ export type Database = {
           {
             foreignKeyName: "clients_program_id_fkey"
             columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "programs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clients_purchased_program_id_fkey"
-            columns: ["purchased_program_id"]
             isOneToOne: false
             referencedRelation: "programs"
             referencedColumns: ["id"]
@@ -1317,6 +1307,14 @@ export type Database = {
           p_schedule?: Json
         }
         Returns: string
+      }
+      close_active_period: {
+        Args: { p_client_id: string }
+        Returns: undefined
+      }
+      apply_program_rollback: {
+        Args: { p_client_id: string; p_pause_id: string; p_resume_date: string }
+        Returns: undefined
       }
       create_client_token: {
         Args: {

@@ -80,7 +80,7 @@ describe("delete_client_cascade", () => {
     const programId = await seedPersonalProgram(ownerId);
     await supabaseAdmin
       .from("clients")
-      .update({ program_id: programId, purchased_program_id: programId })
+      .update({ program_id: programId })
       .eq("id", deletedId);
 
     const { error } = await supabaseAdmin.rpc("delete_client_cascade", {
@@ -102,7 +102,7 @@ describe("delete_client_cascade", () => {
     const programId = await seedPersonalProgram(firstClientId);
     await supabaseAdmin
       .from("clients")
-      .update({ program_id: programId, purchased_program_id: programId })
+      .update({ program_id: programId })
       .in("id", [firstClientId, secondClientId]);
 
     const { error } = await supabaseAdmin.rpc("delete_client_cascade", {
@@ -117,11 +117,10 @@ describe("delete_client_cascade", () => {
       .eq("id", programId);
     const { data: secondClient } = await supabaseAdmin
       .from("clients")
-      .select("program_id, purchased_program_id")
+      .select("program_id")
       .eq("id", secondClientId)
       .single();
     expect(programs).toHaveLength(0);
     expect(secondClient?.program_id).toBeNull();
-    expect(secondClient?.purchased_program_id).toBeNull();
   });
 });

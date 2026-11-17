@@ -110,6 +110,26 @@ export async function resumePlan(
     return { error: "Пауза уже обрабатывается" };
   }
 
+  // 30.7: откат атомарен в SQL RPC (хвост 30.6-1) — архив, REPEAT-неделя,
+  // сдвиг будущих недель и завершение паузы в одной транзакции.
+  if (strategy === "rollback") {
+    try {
+      const { error } = await supabaseAdmin.rpc("apply_program_rollback", {
+        p_client_id: clientId,
+        p_pause_id: pause.id,
+        p_resume_date: resumeDate,
+      });
+      if (error) {
+        await revertToActive(pause.id);
+        return { error: error.message };
+      }
+      return {};
+    } catch (err) {
+      await revertToActive(pause.id);
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   let result: { error?: string };
 
   try {
@@ -119,8 +139,6 @@ export async function resumePlan(
       result = await applySkip(clientId, pause, resumeDate);
     } else if (strategy === "deload") {
       result = await applyDeload(clientId, pause, resumeDate);
-    } else if (strategy === "rollback") {
-      result = await applyRollback(clientId, pause, resumeDate);
     } else {
       result = { error: "Неизвестная стратегия" };
     }
@@ -311,109 +329,3 @@ async function applyDeload(
   return {};
 }
 
-async function applyRollback(
-  clientId: string,
-  pause: PlanPause,
-  resumeDate: string,
-): Promise<{ error?: string }> {
-  await ensureOriginalDates(clientId);
-
-  // 30.6: откат живёт внутри активного периода.
-  const period = await getActiveProgramPeriod(clientId);
-  if (!period) return {};
-
-  const { data: lastWorkout } = await supabaseAdmin
-    .from("workout_logs")
-    .select("date, week")
-    .eq("client_id", clientId)
-    .eq("program_period_id", period.id)
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const rollbackWeekNumber = lastWorkout?.week ?? 1;
-
-  const { data: rollbackWeek, error: rollbackWeekErr } = await supabaseAdmin
-    .from("program_schedule")
-    .select("*")
-    .eq("client_id", clientId)
-    .eq("program_period_id", period.id)
-    .neq("status", "archived")
-    .eq("week_number", rollbackWeekNumber)
-    .maybeSingle();
-
-  if (rollbackWeekErr) return { error: rollbackWeekErr.message };
-  if (!rollbackWeek) {
-    return {};
-  }
-
-  const originalStart = rollbackWeek.original_start_date ?? rollbackWeek.start_date ?? resumeDate;
-  const originalEnd = rollbackWeek.original_end_date ?? rollbackWeek.end_date ?? resumeDate;
-  const weekDuration = daysBetween(originalStart, originalEnd) + 1;
-
-  const repeatStart = resumeDate;
-  const repeatEnd = addDays(resumeDate, weekDuration - 1);
-
-  const { error: archiveOriginalError } = await supabaseAdmin
-    .from("program_schedule")
-    .update({ status: "archived" })
-    .eq("client_id", clientId)
-    .eq("program_period_id", period.id)
-    .eq("week_number", rollbackWeekNumber)
-    .neq("status", "archived");
-  if (archiveOriginalError) return { error: archiveOriginalError.message };
-
-  // Архивируем до выборки futureWeeks, чтобы свежезархивированный оригинал
-  // недели не попал в сдвиг и его даты не поехали.
-  const { data: futureWeeks, error: fetchErr } = await supabaseAdmin
-    .from("program_schedule")
-    .select("id, start_date, end_date, week_number")
-    .eq("client_id", clientId)
-    .eq("program_period_id", period.id)
-    .neq("status", "archived")
-    .gte("start_date", pause.pause_start)
-    .order("week_number", { ascending: true });
-
-  if (fetchErr) return { error: fetchErr.message };
-
-  const { error: insertErr } = await supabaseAdmin.from("program_schedule").insert({
-    client_id: clientId,
-    program_id: period.program_id,
-    program_period_id: period.id,
-    week_number: rollbackWeekNumber,
-    sheet_name: rollbackWeek.sheet_name ? `${rollbackWeek.sheet_name}_REPEAT` : null,
-    is_deload: false,
-    focus: rollbackWeek.focus ? `${rollbackWeek.focus} (повтор)` : "Повтор",
-    start_date: repeatStart,
-    end_date: repeatEnd,
-    original_start_date: originalStart,
-    original_end_date: originalEnd,
-    status: "active",
-  });
-
-  if (insertErr) return { error: insertErr.message };
-
-  if (futureWeeks && futureWeeks.length > 0) {
-    const shiftDays = daysBetween(pause.pause_start, resumeDate) + weekDuration;
-    const results = await Promise.allSettled(
-      futureWeeks
-        .filter((w) => w.start_date && w.end_date)
-        .map((week) =>
-          supabaseAdmin
-            .from("program_schedule")
-            .update({
-              start_date: addDays(week.start_date!, shiftDays),
-              end_date: addDays(week.end_date!, shiftDays),
-            })
-            .eq("id", week.id),
-        ),
-    );
-
-    const failures = results.filter((r) => r.status === "rejected");
-    if (failures.length > 0) {
-      return { error: `Failed to update ${failures.length} schedule entries` };
-    }
-  }
-
-  return {};
-}

@@ -1,6 +1,5 @@
 import type { MyContext } from "../bot.js";
 import { findClientByTelegramId } from "../lib/clients.js";
-import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { t } from "../i18n/index.js";
 import { guardActiveClient } from "./guards.js";
 import { InlineKeyboard } from "grammy";
@@ -40,21 +39,6 @@ export async function menuHandler(ctx: MyContext): Promise<void> {
       t("menu.guide", ctx.language),
       t("menu.settings", ctx.language),
     ];
-
-    if (client.purchased_program_id) {
-      try {
-        const { data: program } = await supabaseAdmin
-          .from("programs")
-          .select("title")
-          .eq("id", client.purchased_program_id)
-          .maybeSingle<{ title: string }>();
-        if (program?.title) {
-          lines.splice(1, 0, t("client.purchased", ctx.language, { title: program.title }));
-        }
-      } catch (err) {
-        console.error(`[MENU] Failed to fetch purchased program for ${ctx.from?.id}:`, err);
-      }
-    }
 
     await ctx.reply(lines.join("\n"), {
       reply_markup: new InlineKeyboard()

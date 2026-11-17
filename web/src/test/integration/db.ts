@@ -63,6 +63,25 @@ BEGIN
 END $$;
 `;
 
+export function dbDate(): string {
+  return execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      container,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-tAc",
+      "SELECT current_date",
+    ],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 },
+  ).trim();
+}
+
 export function resetDb(): void {
   try {
     execFileSync(

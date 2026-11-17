@@ -42,7 +42,6 @@ export interface Database {
           access_end_date: string | null;
           legacy_id: string | null;
           purchase_date: string | null;
-          purchased_program_id: string | null;
           client_consent_given: boolean;
           client_consent_given_at: string | null;
           client_consent_ip: string | null;
@@ -553,9 +552,25 @@ export interface Database {
         };
         Returns: undefined;
       };
+      apply_program_rollback: {
+        Args: { p_client_id: string; p_pause_id: string; p_resume_date: string };
+        Returns: undefined;
+      };
+      close_active_period: {
+        Args: { p_client_id: string };
+        Returns: undefined;
+      };
       delete_client_cascade: {
         Args: { p_client_id: string; p_telegram_id?: number | null };
         Returns: undefined;
+      };
+      start_program_period: {
+        Args: {
+          p_client_id: string;
+          p_program_id: string;
+          p_schedule?: unknown;
+        };
+        Returns: string;
       };
     };
     Enums: {

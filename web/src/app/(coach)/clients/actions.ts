@@ -58,7 +58,6 @@ export async function createClient(formData: {
       access_end_date: null,
       legacy_id: null,
       purchase_date: null,
-      purchased_program_id: null,
       consent_given: true,
       consent_given_at: new Date().toISOString(),
       client_consent_given: false,

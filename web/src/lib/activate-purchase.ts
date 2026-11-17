@@ -357,7 +357,6 @@ export async function applyProgramActivation({
 
   const update: Database["public"]["Tables"]["clients"]["Update"] = {
     program_id: programId,
-    purchased_program_id: programId,
     payment_status: "paid",
     status: "active",
   };
@@ -1098,7 +1097,6 @@ async function resolveOrCreateClient(
         status: "active",
         payment_status: "paid",
         program_id: programId,
-        purchased_program_id: programId,
         purchase_date: now.toISOString(),
         access_start_date: now.toISOString(),
         access_end_date: endDate.toISOString(),

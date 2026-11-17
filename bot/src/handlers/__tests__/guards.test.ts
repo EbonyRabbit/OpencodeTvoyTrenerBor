@@ -35,6 +35,10 @@ function makeChain(terminalResult: { data: unknown; error: unknown }) {
       calls.push({ method: "is", args });
       return chain;
     },
+    in: (...args: unknown[]) => {
+      calls.push({ method: "in", args });
+      return chain;
+    },
     lt: (...args: unknown[]) => {
       calls.push({ method: "lt", args });
       return chain;
@@ -61,6 +65,7 @@ function makeChain(terminalResult: { data: unknown; error: unknown }) {
 
 type DbConfig = {
   planPauseRow?: { id: string } | null;
+  liveSubRow?: { id: string } | null;
   clientUpdateRows?: unknown[] | null;
 };
 
@@ -70,6 +75,12 @@ function mockFrom(cfg: DbConfig) {
     if (table === "plan_pauses") {
       return makeChain({
         data: cfg.planPauseRow ?? null,
+        error: null,
+      }).chain;
+    }
+    if (table === "subscriptions") {
+      return makeChain({
+        data: cfg.liveSubRow ?? null,
         error: null,
       }).chain;
     }
@@ -132,6 +143,10 @@ describe("guardActiveClient - ленивое автоистечение дост
         const c = makeChain({ data: null, error: null });
         return c.chain;
       }
+      if (table === "subscriptions") {
+        const c = makeChain({ data: null, error: null });
+        return c.chain;
+      }
       const c = makeChain({ data: [{ id: "client-1" }], error: null });
       capturedCalls[table] = c.calls;
       return c.chain;
@@ -160,8 +175,8 @@ describe("guardActiveClient - ленивое автоистечение дост
     expect(new Date(ltVal).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
-  it("не истекает клиента на активной паузе", async () => {
-    mockFrom({ planPauseRow: { id: "pause-1" } });
+  it("не истекает клиента на активной паузе (запрос подписки не выполняется)", async () => {
+    const fromSpy = mockFrom({ planPauseRow: { id: "pause-1" } });
     vi.mocked(findClientByTelegramId).mockResolvedValue(
       makeClient({
         access_end_date: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
@@ -170,6 +185,55 @@ describe("guardActiveClient - ленивое автоистечение дост
 
     const result = await guardActiveClient(makeCtx());
     expect(result).toHaveProperty("client");
+    expect(fromSpy).not.toHaveBeenCalledWith("subscriptions");
+  });
+
+  it("30.8: живая подписка (active) блокирует ленивое истечение", async () => {
+    mockFrom({ liveSubRow: { id: "sub-1" } });
+    vi.mocked(findClientByTelegramId).mockResolvedValue(
+      makeClient({
+        access_end_date: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+      }),
+    );
+
+    const result = await guardActiveClient(makeCtx());
+    expect(result).toHaveProperty("client");
+  });
+
+  it("30.8: past_due (grace) тоже блокирует ленивое истечение", async () => {
+    mockFrom({ liveSubRow: { id: "sub-2" } });
+    vi.mocked(findClientByTelegramId).mockResolvedValue(
+      makeClient({
+        access_end_date: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString(),
+      }),
+    );
+
+    const result = await guardActiveClient(makeCtx());
+    expect(result).toHaveProperty("client");
+  });
+
+  it("30.8: без живой подписки (cancelled/expired) условный UPDATE выполняется", async () => {
+    const capturedCalls: Record<string, ChainCall[]> = {};
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockImplementation((table: string) => {
+      if (table === "plan_pauses" || table === "subscriptions") {
+        return makeChain({ data: null, error: null }).chain;
+      }
+      const c = makeChain({ data: [], error: null });
+      capturedCalls[table] = c.calls;
+      return c.chain;
+    });
+    vi.mocked(findClientByTelegramId).mockResolvedValue(
+      makeClient({
+        access_end_date: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+      }),
+    );
+
+    await guardActiveClient(makeCtx());
+
+    const updateCalls = capturedCalls["clients"] ?? [];
+    const update = updateCalls.find((c) => c.method === "update");
+    expect(update?.args?.[0]).toEqual({ status: "access_expired" });
   });
 
   it("при гонке с продлением (UPDATE вернул 0 строк) доступ сохраняется", async () => {

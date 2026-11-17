@@ -470,6 +470,26 @@ export async function disableClient(
       return { error: "Клиент уже отключён" };
     }
 
+    // 30.8: подписка - источник истины для доступа. Отключение гасит живую
+    // подписку (active/past_due → cancelled), иначе неактивный клиент с
+    // живой подпиской мог бы бесконечно переключать программы в боте.
+    // Отмена обязательна: не задавленная подписка переживёт disable, а
+    // повторная покупка потом упрётся в unique live-подписку.
+    const { error: subCancelError } = await supabaseAdmin
+      .from("subscriptions")
+      .update({ status: "cancelled" })
+      .eq("client_id", clientId)
+      .in("status", ["active", "past_due"]);
+    if (subCancelError) {
+      console.error(
+        "[DISABLE] Subscription cancel failed:",
+        subCancelError.message,
+      );
+      return {
+        error: "Не удалось отменить подписку клиента. Попробуйте ещё раз.",
+      };
+    }
+
     const { error } = await supabaseAdmin
       .from("clients")
       .update({

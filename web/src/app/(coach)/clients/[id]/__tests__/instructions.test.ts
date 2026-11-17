@@ -24,7 +24,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { verifySession } from "@/lib/dal";
 import { startProgramPeriod } from "@/lib/program-periods";
-import { activateProgram, generateConnectCode, markPurchased, sendProgramInstructions } from "../actions";
+import { activateProgram, disableClient, generateConnectCode, markPurchased, sendProgramInstructions } from "../actions";
 
 const CLIENT_ID = "11111111-2222-3333-4444-555555555555";
 const PROGRAM_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
@@ -516,5 +516,133 @@ describe("generateConnectCode", () => {
     const result = await generateConnectCode(CLIENT_ID);
     expect(result.error).toBeUndefined();
     expect(result.code).toMatch(/^[A-Z0-9]{8}$/);
+  });
+});
+describe("disableClient 30.8: подписка гасится вместе с доступом", () => {
+  function mockDbForDisable(subError?: { message: string } | null) {
+    const calls: { table: string; method: string; args: unknown[] }[] = [];
+    const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
+    const fake = supabaseAdmin as unknown as {
+      from: ReturnType<typeof vi.fn>;
+      rpc: ReturnType<typeof vi.fn>;
+    };
+    (fake as unknown as { rpc: unknown }).rpc = vi.fn((fn: string, args: Record<string, unknown>) => {
+      rpcCalls.push({ fn, args });
+      return Promise.resolve({ error: null });
+    });
+    fake.from.mockImplementation((table: string) => {
+      const chain: Record<string, unknown> = {};
+      const record = (method: string) => (...args: unknown[]) => {
+        calls.push({ table, method, args });
+        return chain;
+      };
+      for (const m of [
+        "select",
+        "eq",
+        "neq",
+        "is",
+        "in",
+        "update",
+        "delete",
+        "insert",
+        "order",
+        "range",
+        "limit",
+        "maybeSingle",
+      ]) {
+        chain[m] = record(m);
+      }
+      const outcome = subError && table === "subscriptions"
+        ? { data: null, error: subError }
+        : { data: table === "clients" ? { status: "active" } : null, error: null };
+      (chain as { then: unknown }).then = (
+        onFulfilled: (v: { data: unknown; error: unknown }) => unknown,
+      ) => Promise.resolve(outcome).then(onFulfilled);
+      return chain;
+    });
+    return { calls, rpcCalls };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (verifySession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      profile: { id: COACH_ID, role: "admin" },
+    });
+  });
+
+  it("отключение гасит живую подписку и закрывает период", async () => {
+    const { calls, rpcCalls } = mockDbForDisable();
+
+    const result = await disableClient(CLIENT_ID);
+
+    expect(result.error).toBeUndefined();
+    expect(rpcCalls).toContainEqual({
+      fn: "close_active_period",
+      args: { p_client_id: CLIENT_ID },
+    });
+
+    const subUpdate = calls.find(
+      (c) => c.table === "subscriptions" && c.method === "update",
+    );
+    expect(subUpdate?.args?.[0]).toEqual({ status: "cancelled" });
+    const subFilters = calls.filter(
+      (c) =>
+        c.table === "subscriptions" &&
+        (c.method === "eq" || c.method === "in"),
+    );
+    expect(subFilters).toEqual(
+      expect.arrayContaining([
+        { table: "subscriptions", method: "eq", args: ["client_id", CLIENT_ID] },
+        {
+          table: "subscriptions",
+          method: "in",
+          args: ["status", ["active", "past_due"]],
+        },
+      ]),
+    );
+
+    const clientUpdate = calls.find(
+      (c) => c.table === "clients" && c.method === "update",
+    );
+    expect(clientUpdate?.args?.[0]).toMatchObject({
+      status: "inactive",
+      program_id: null,
+      access_start_date: null,
+      access_end_date: null,
+    });
+  });
+
+  it("ошибка отмены подписки - disable падает и статус не трогает", async () => {
+    const { calls } = mockDbForDisable({ message: "connection reset" });
+
+    const result = await disableClient(CLIENT_ID);
+
+    expect(result.error).toContain("Не удалось отменить подписку");
+    const clientUpdate = calls.filter(
+      (c) => c.table === "clients" && c.method === "update",
+    );
+    expect(clientUpdate).toHaveLength(0);
+  });
+
+  it("клиент не найден - подписку не трогаем", async () => {
+    const { calls } = mockDbForDisable(null);
+    const fake = supabaseAdmin as unknown as {
+      from: ReturnType<typeof vi.fn>;
+    };
+    fake.from.mockImplementation((table: string) => {
+      if (table === "clients") {
+        const chain: Record<string, unknown> = {};
+        chain.select = vi.fn(() => chain);
+        chain.eq = vi.fn(() => chain);
+        chain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+        return chain;
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const result = await disableClient(CLIENT_ID);
+
+    expect(result.error).toBe("Клиент не найден");
+    expect(calls.filter((c) => c.table === "subscriptions")).toHaveLength(0);
   });
 });

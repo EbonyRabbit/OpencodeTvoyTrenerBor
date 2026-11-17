@@ -8,7 +8,9 @@ export type NotificationType =
   | "measurement"
   | "checkin"
   | "alert"
-  | "payment";
+  | "payment"
+  | "access_expiring"
+  | "subscription_expiring";
 export type PauseReason = "sick" | "vacation" | "injury" | "personal" | "other";
 export type ResumeStrategy = "skip" | "shift" | "deload" | "rollback";
 export type PauseStatus = "active" | "resuming" | "completed";
@@ -1485,6 +1487,7 @@ export const Constants = {
         "alert",
         "payment",
         "access_expiring",
+        "subscription_expiring",
       ],
       payment_status: ["pending", "paid"],
       photo_type: ["front", "side", "back"],

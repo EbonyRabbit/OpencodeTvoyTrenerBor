@@ -11,7 +11,8 @@ export type NotificationType =
   | "checkin"
   | "alert"
   | "payment"
-  | "access_expiring";
+  | "access_expiring"
+  | "subscription_expiring";
 export type PauseReason = "sick" | "vacation" | "injury" | "personal" | "other";
 export type ResumeStrategy = "skip" | "shift" | "deload" | "rollback";
 export type PauseStatus = "active" | "resuming" | "completed";

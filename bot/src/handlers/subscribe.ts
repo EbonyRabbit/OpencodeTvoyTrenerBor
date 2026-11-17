@@ -54,6 +54,8 @@ function buyerName(
 }
 
 // Живая подписка (active/past_due) открывает выбор любой программы.
+// Клиент должен быть status='active': у неактивного подписка гасится в
+// disableClient, а access_expired нельзя оживить старой подпиской.
 async function findLiveSubscription(clientId: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin
     .from("subscriptions")
@@ -130,7 +132,7 @@ export async function startProgramChoice(ctx: MyContext, programId: string): Pro
   if (client) applyClientLanguage(ctx, client.language);
   const lang = ctx.language;
 
-  if (!client) {
+  if (!client || client.status !== "active") {
     await ctx.reply(t("subscribe.required", lang));
     return;
   }
@@ -202,7 +204,7 @@ export async function handleSubscribeConfirm(ctx: MyContext, programId: string):
     }
 
     const client = await findClientByTelegramId(telegramId);
-    if (!client) {
+    if (!client || client.status !== "active") {
       await ctx.reply(t("subscribe.required", lang));
       return;
     }

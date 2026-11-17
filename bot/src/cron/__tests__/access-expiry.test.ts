@@ -6,6 +6,9 @@ import {
   accessExpiryWindow,
   formatExpiryDate,
   buildAccessExpiryMessage,
+  buildSubscriptionExpiryMessage,
+  expireStalePastDueSubscriptions,
+  getLiveSubsInWindow,
 } from "../access-expiry.js";
 
 vi.mock("../../lib/supabase-admin.js", () => ({
@@ -41,6 +44,7 @@ function makeChain(
     "select",
     "eq",
     "is",
+    "in",
     "not",
     "gte",
     "lt",
@@ -61,7 +65,7 @@ function makeChain(
 
 const insertedRows: Record<string, unknown[]> = {};
 
-function mockDb(clients: unknown[], pausedIds: string[] = []) {
+function mockDb(clients: unknown[], pausedIds: string[] = [], subs: unknown[] = []) {
   insertedRows.notification_log = [];
   const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   fromMock.from.mockImplementation((table: string) => {
@@ -70,6 +74,9 @@ function mockDb(clients: unknown[], pausedIds: string[] = []) {
         data: pausedIds.map((id) => ({ client_id: id })),
         error: null,
       }, table);
+    }
+    if (table === "subscriptions") {
+      return makeChain({ data: subs, error: null }, table);
     }
     if (table === "clients") {
       return makeChain({ data: clients, error: null }, table);
@@ -224,5 +231,189 @@ describe("runAccessExpiryReminder", () => {
 
     expect(bot.api.sendMessage).not.toHaveBeenCalled();
     expect(markAsSent).not.toHaveBeenCalled();
+  });
+});
+
+describe("30.8: подписочные напоминания и grace", () => {
+  const PERIOD_END_IN_WINDOW = new Date(
+    Date.now() + 5 * 24 * 3600 * 1000,
+  ).toISOString();
+
+  function makeSub(overrides: Record<string, unknown> = {}): unknown {
+    return {
+      id: "sub-1",
+      client_id: CLIENT_IN_WINDOW.id,
+      cancel_at_period_end: true,
+      current_period_end: PERIOD_END_IN_WINDOW,
+      ...overrides,
+    };
+  }
+
+  it("buildSubscriptionExpiryMessage содержит имя и дату", () => {
+    const ru = buildSubscriptionExpiryMessage(
+      "Иван",
+      "2026-08-27T12:00:00.000Z",
+      "ru",
+    );
+    expect(ru).toContain("Иван");
+    expect(ru).toContain("августа");
+    const en = buildSubscriptionExpiryMessage(
+      "John",
+      "2026-08-27T12:00:00.000Z",
+      "en",
+    );
+    expect(en.toLowerCase()).toContain("john");
+  });
+
+  it("getLiveSubsInWindow фильтрует active/past_due по окну периода", async () => {
+    const subs = [makeSub(), makeSub({ id: "sub-2", cancel_at_period_end: false })];
+    const captured: { calls: { method: string; args: unknown[] }[] } = { calls: [] };
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockImplementation((table: string) => {
+      if (table !== "subscriptions") return makeChain({ data: [], error: null }, table);
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "in", "gte", "lt"]) {
+        chain[m] = (...args: unknown[]) => {
+          captured.calls.push({ method: m, args });
+          return chain;
+        };
+      }
+      chain.then = (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) =>
+        Promise.resolve({ data: subs, error: null }).then(onFulfilled);
+      return chain;
+    });
+
+    const fromIso = new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString();
+    const toIso = new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString();
+    const result = await getLiveSubsInWindow(fromIso, toIso);
+
+    expect(result).toHaveLength(2);
+    expect(captured.calls).toEqual(
+      expect.arrayContaining([
+        { method: "in", args: ["status", ["active", "past_due"]] },
+        { method: "gte", args: ["current_period_end", fromIso] },
+        { method: "lt", args: ["current_period_end", toIso] },
+      ]),
+    );
+  });
+
+  it("cancel_at_period_end: отправляет подписочное напоминание, легаси-напоминание молчит", async () => {
+    const sub = makeSub();
+    mockDb([CLIENT_IN_WINDOW], [], [sub]);
+    const bot = makeBot();
+
+    await runAccessExpiryReminder(bot);
+
+    expect(bot.api.sendMessage).toHaveBeenCalledTimes(1);
+    expect(markAsSent).toHaveBeenCalledWith(
+      `sub_expiring:${sub.id}:${sub.current_period_end}`,
+      30 * 24,
+    );
+    expect(insertedRows.notification_log).toEqual([
+      {
+        client_id: CLIENT_IN_WINDOW.id,
+        type: "subscription_expiring",
+        status: "sent",
+        sent_at: expect.any(String),
+        metadata: { subscription_id: sub.id, current_period_end: sub.current_period_end },
+      },
+    ]);
+  });
+
+  it("автопродление (без отмены): молчит, легаси-напоминание тоже молчит", async () => {
+    mockDb([CLIENT_IN_WINDOW], [], [makeSub({ cancel_at_period_end: false })]);
+    const bot = makeBot();
+
+    await runAccessExpiryReminder(bot);
+
+    expect(bot.api.sendMessage).not.toHaveBeenCalled();
+    expect(markAsSent).not.toHaveBeenCalled();
+  });
+
+  it("expireStalePastDueSubscriptions гасит past_due старше 3 дней grace", async () => {
+    const captured: { update?: unknown; eqs: unknown[][]; lts: unknown[][] } = {
+      eqs: [],
+      lts: [],
+    };
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockImplementation((table: string) => {
+      if (table !== "subscriptions") return makeChain({ data: [], error: null }, table);
+      const chain: Record<string, unknown> = {};
+      chain.update = (...args: unknown[]) => {
+        captured.update = args[0];
+        return chain;
+      };
+      chain.eq = (...args: unknown[]) => {
+        captured.eqs.push(args);
+        return chain;
+      };
+      chain.lt = (...args: unknown[]) => {
+        captured.lts.push(args);
+        return chain;
+      };
+      chain.select = () => chain;
+      chain.then = (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) =>
+        Promise.resolve({ data: [{ id: "sub-1", client_id: "client-1" }], error: null }).then(
+          onFulfilled,
+        );
+      return chain;
+    });
+    const now = new Date("2026-11-17T12:00:00.000Z");
+
+    const expired = await expireStalePastDueSubscriptions(now);
+
+    expect(expired).toBe(1);
+    expect(captured.update).toEqual({ status: "expired" });
+    expect(captured.eqs).toEqual([["status", "past_due"]]);
+    expect(captured.lts).toHaveLength(1);
+    const [col, cutoff] = captured.lts[0] as [string, string];
+    expect(col).toBe("current_period_end");
+    // отсечка = now минус 3 дня grace
+    expect(new Date(cutoff).toISOString()).toBe("2026-11-14T12:00:00.000Z");
+  });
+
+  it("ошибка деградации past_due - 0 гашений и не бросает", async () => {
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockImplementation((table: string) => {
+      if (table !== "subscriptions") return makeChain({ data: [], error: null }, table);
+      const chain: Record<string, unknown> = {};
+      chain.update = () => chain;
+      chain.eq = () => chain;
+      chain.lt = () => chain;
+      chain.select = () => chain;
+      chain.then = (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) =>
+        Promise.resolve({ data: null, error: { message: "timeout" } }).then(onFulfilled);
+      return chain;
+    });
+
+    await expect(expireStalePastDueSubscriptions(new Date())).resolves.toBe(0);
+  });
+
+  it("арифметика отсечки: cutoff = now минус 3 дня grace, lt строгий", async () => {
+    const captured: { lts: unknown[][] } = { lts: [] };
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockImplementation((table: string) => {
+      if (table !== "subscriptions") return makeChain({ data: [], error: null }, table);
+      const chain: Record<string, unknown> = {};
+      chain.update = () => chain;
+      chain.eq = () => chain;
+      chain.lt = (...args: unknown[]) => {
+        captured.lts.push(args);
+        return chain;
+      };
+      chain.select = () => chain;
+      chain.then = (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(onFulfilled);
+      return chain;
+    });
+    const now = new Date("2026-11-17T12:00:00.000Z");
+
+    await expireStalePastDueSubscriptions(now);
+
+    // арифметика отсечки: now минус ровно 3 дня
+    expect(captured.lts[0]?.[1]).toBe("2026-11-14T12:00:00.000Z");
+    // период ровно на границе 3 дней не попадает в отсечку (lt строгий)
+    const cutoff = (captured.lts[0] as [string, string])[1];
+    expect(new Date("2026-11-14T12:00:00.000Z") < new Date(cutoff)).toBe(false);
   });
 });

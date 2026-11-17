@@ -167,6 +167,22 @@ describe("subscribe flow on real data", () => {
     expect(markup(ctx).inline_keyboard).toBeUndefined();
   });
 
+  it("does not count an access_expired client with a live subscription", async () => {
+    const programId = await seedProgram();
+    const clientId = await seedClient();
+    await seedSubscription(clientId);
+    await supabaseAdmin
+      .from("clients")
+      .update({ status: "access_expired" })
+      .eq("id", clientId);
+    const ctx = makeCtx();
+
+    await startProgramChoice(ctx, programId);
+
+    expect(ctx.reply).toHaveBeenCalled();
+    expect(markup(ctx).inline_keyboard).toBeUndefined();
+  });
+
   it("does not count a cancelled subscription as live access", async () => {
     const programId = await seedProgram();
     const clientId = await seedClient();

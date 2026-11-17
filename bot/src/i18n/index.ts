@@ -20,6 +20,7 @@ const resources = {
       client: {
         access_expired: "Ваш доступ истёк. Продлите программу у тренера.",
         access_expiring_soon: "{{name}}, ваш доступ заканчивается {{date}}. Продлите программу, чтобы не терять тренировки.",
+        subscription_expiring: "{{name}}, подписка отключится {{date}} - оплаченный период заканчивается. Вернуться можно у тренера.",
         inactive: "Аккаунт неактивен. Свяжитесь с тренером.",
         payment_pending: "Ожидается подтверждение оплаты.",
         no_program: "Программа ещё не назначена.\nОжидайте - тренер скоро свяжется с вами.",
@@ -567,6 +568,7 @@ const resources = {
       client: {
         access_expired: "Your access has expired. Please renew your program with your coach.",
         access_expiring_soon: "{{name}}, your access ends on {{date}}. Renew your program to keep your workouts going.",
+        subscription_expiring: "{{name}}, your subscription turns off on {{date}} - the paid period ends. You can return via your coach.",
         inactive: "Account is inactive. Please contact your coach.",
         payment_pending: "Payment confirmation pending.",
         no_program: "Program not yet assigned.\nPlease wait - your coach will contact you soon.",

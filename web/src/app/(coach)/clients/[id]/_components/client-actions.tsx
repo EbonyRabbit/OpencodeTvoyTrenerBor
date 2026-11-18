@@ -16,6 +16,9 @@ import {
   createPaymentLink,
   sendPaymentLinkToClient,
   getPayablePrograms,
+  createSubscriptionPaymentLink,
+  sendSubscriptionLinkToClient,
+  cancelClientSubscription,
 } from "../actions";
 import { TIMEZONE_LIST, MEASUREMENT_DAY_OPTIONS, CHECKIN_DAY_OPTIONS, LANGUAGE_LABELS, WEEKDAY_OPTIONS } from "@/lib/clients";
 import { Button } from "@/components/ui/button";
@@ -56,6 +59,7 @@ export function ClientActions({
   clientTrainingDays,
   programDayOrders,
   clientTelegramId,
+  subscription,
 }: {
   clientId: string;
   currentCode: string | null;
@@ -73,6 +77,12 @@ export function ClientActions({
   clientTrainingDays?: number[] | null;
   programDayOrders?: number[];
   clientTelegramId?: number | null;
+  subscription?: {
+    id: string;
+    status: string;
+    current_period_end: string | null;
+    cancel_at_period_end: boolean;
+  } | null;
 }) {
   const router = useRouter();
   const [activating, setActivating] = useState(false);
@@ -109,6 +119,10 @@ export function ClientActions({
   const [editError, setEditError] = useState<string | null>(null);
 
   const [payLinkOpen, setPayLinkOpen] = useState(false);
+  const [subLink, setSubLink] = useState<{ url: string; paymentId: string } | null>(null);
+  const [subLoading, setSubLoading] = useState(false);
+  const [subSending, setSubSending] = useState(false);
+  const [subError, setSubError] = useState<string | null>(null);
   const [payPrograms, setPayPrograms] = useState<PayableProgram[]>([]);
   const [payLoadingPrograms, setPayLoadingPrograms] = useState(false);
   const [paySelected, setPaySelected] = useState("");
@@ -422,6 +436,59 @@ export function ClientActions({
     }
   }, [clientId, payResult]);
 
+  const handleCreateSubscriptionLink = useCallback(async () => {
+    setSubLoading(true);
+    setSubError(null);
+    try {
+      const result = await createSubscriptionPaymentLink(clientId);
+      if (result.error || !result.url || !result.paymentId) {
+        setSubError(result.error ?? "Не удалось создать ссылку на подписку");
+        return;
+      }
+      setSubLink({ url: result.url, paymentId: result.paymentId });
+      router.refresh();
+    } catch {
+      setSubError("Произошла ошибка");
+    } finally {
+      setSubLoading(false);
+    }
+  }, [clientId, router]);
+
+  const handleSendSubscriptionLink = useCallback(async () => {
+    if (!subLink) return;
+    setSubSending(true);
+    setSubError(null);
+    try {
+      const result = await sendSubscriptionLinkToClient(clientId, subLink.paymentId);
+      if (result.error) {
+        setSubError(result.error);
+        return;
+      }
+      setSubError("Ссылка отправлена в Telegram");
+    } catch {
+      setSubError("Произошла ошибка");
+    } finally {
+      setSubSending(false);
+    }
+  }, [clientId, subLink]);
+
+  const handleCancelSubscription = useCallback(async () => {
+    setSubLoading(true);
+    setSubError(null);
+    try {
+      const result = await cancelClientSubscription(clientId);
+      if (result.error) {
+        setSubError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setSubError("Произошла ошибка");
+    } finally {
+      setSubLoading(false);
+    }
+  }, [clientId, router]);
+
   const openEditDialog = useCallback(() => {
     setEditError(null);
     setEditForm({
@@ -503,6 +570,64 @@ export function ClientActions({
 
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border p-3">
+        <p className="text-sm font-medium">Подписка</p>
+        {subscription ? (
+          <p className="text-sm text-muted-foreground">
+            {subscription.status === "past_due" ? "Просрочена" : "Активна"}
+            {subscription.current_period_end
+              ? ` до ${new Date(subscription.current_period_end).toLocaleDateString("ru-RU")}`
+              : ""}
+            {subscription.cancel_at_period_end ? " · отмена запланирована" : ""}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">Нет активной подписки</p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {!subscription && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={subLoading}
+              onClick={handleCreateSubscriptionLink}
+            >
+              {subLoading ? "Создание..." : "Ссылка на подписку"}
+            </Button>
+          )}
+          {subscription && !subscription.cancel_at_period_end && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={subLoading}
+              onClick={handleCancelSubscription}
+            >
+              Отменить подписку
+            </Button>
+          )}
+        </div>
+        {subLink && (
+          <div className="mt-2 rounded-md bg-muted p-2">
+            <p className="break-all font-mono text-xs">{subLink.url}</p>
+            {clientTelegramId != null && (
+              <Button
+                type="button"
+                size="sm"
+                className="mt-2"
+                disabled={subSending}
+                onClick={handleSendSubscriptionLink}
+              >
+                {subSending ? "Отправка..." : "Отправить в Telegram"}
+              </Button>
+            )}
+          </div>
+        )}
+        {subError && (
+          <p className="mt-2 text-sm text-destructive" role="alert">{subError}</p>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-3">
         <Button type="button" variant="outline" onClick={openEditDialog}>
           Редактировать

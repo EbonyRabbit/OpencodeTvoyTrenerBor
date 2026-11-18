@@ -3,6 +3,10 @@ import { config } from "./config.js";
 import { createApp } from "./app.js";
 import { bot } from "./bot.js";
 import { startScheduler, stopScheduler } from "./cron/scheduler.js";
+import {
+  startSubscriptionReconcile,
+  stopSubscriptionReconcile,
+} from "./cron/subscription-reconcile.js";
 import { startupWarnings } from "./startup-warnings.js";
 import { syncBotCommands } from "./lib/bot-commands.js";
 
@@ -24,6 +28,7 @@ async function main(): Promise<void> {
   await syncBotCommands(bot);
 
   startScheduler(bot);
+  startSubscriptionReconcile(bot);
 
   await new Promise<void>((resolve) => {
     server.listen(config.port, () => {
@@ -55,6 +60,7 @@ async function main(): Promise<void> {
 function shutdown(signal: string): void {
   console.log(`${signal} received, shutting down...`);
   stopScheduler();
+  stopSubscriptionReconcile();
   server.close(() => {
     console.log("Server closed");
     process.exit(0);

@@ -22,7 +22,6 @@ import {
   generateConnectCodeFor,
   applyProgramActivation,
   toFiniteNumber,
-  type ClientForInstructions,
 } from "@/lib/activate-purchase";
 import { startProgramPeriod } from "@/lib/program-periods";
 import type { ActivityEvent } from "./activity-types";
@@ -924,6 +923,311 @@ export async function createPaymentLink(
     revalidatePath(`/clients/${clientId}`);
     revalidatePath("/clients");
     return { url, requestId: request.id };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function createSubscriptionPaymentLink(
+  clientId: string,
+): Promise<{ url?: string; paymentId?: string; error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+    if (!UUID_RE.test(clientId)) return { error: "Некорректный идентификатор" };
+
+    const payformUrl = getPayformBaseUrl();
+    if (!payformUrl) {
+      return { error: "Платежи не настроены: отсутствует PRODAMUS_PAYFORM_BASE_URL" };
+    }
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id, status, telegram_id, client_consent_given")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+    if (!client.client_consent_given) {
+      return { error: "Клиент отозвал согласие на обработку данных" };
+    }
+    if (client.status === "inactive") {
+      return { error: "Клиент отключён. Сначала верни доступ" };
+    }
+
+    const { data: liveSub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id")
+      .eq("client_id", clientId)
+      .in("status", ["active", "past_due"])
+      .limit(1)
+      .maybeSingle();
+    if (liveSub) {
+      return { error: "У клиента уже есть активная подписка" };
+    }
+
+    const { data: plan, error: planError } = await supabaseAdmin
+      .from("subscription_plans")
+      .select("id, title, price, period_days")
+      .eq("code", "monthly")
+      .eq("active", true)
+      .maybeSingle();
+    if (planError || !plan) {
+      return { error: "Активный тариф подписки не найден" };
+    }
+
+    type PendingSub = { id: string } | null;
+    type PendingPayment = { id: string; order_id: string | null } | null;
+
+    const loadPendingSub = async (): Promise<PendingSub> => {
+      const { data, error } = await supabaseAdmin
+        .from("subscriptions")
+        .select("id")
+        .eq("client_id", clientId)
+        .eq("status", "pending")
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        console.error("createSubscriptionLink: pending sub lookup failed:", error.message);
+        return null;
+      }
+      return (data as PendingSub) ?? null;
+    };
+
+    const loadPendingPayment = async (subId: string): Promise<PendingPayment> => {
+      const { data, error } = await supabaseAdmin
+        .from("subscription_payments")
+        .select("id, order_id")
+        .eq("subscription_id", subId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        console.error("createSubscriptionLink: pending payment lookup failed:", error.message);
+        return null;
+      }
+      return (data as PendingPayment) ?? null;
+    };
+
+    type SyncedPayment = { id: string; order_id: string };
+
+    const syncPaymentAmount = async (
+      row: NonNullable<PendingPayment>,
+    ): Promise<{ payment?: SyncedPayment; error?: string }> => {
+      const orderId = row.order_id ?? randomUUID();
+      const { data, error } = await supabaseAdmin
+        .from("subscription_payments")
+        .update({ order_id: orderId, amount: plan.price })
+        .eq("id", row.id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+      if (error) {
+        console.error("createSubscriptionLink: amount sync failed:", error.message);
+        return { error: error.message };
+      }
+      if (!data) return { error: "Ссылка устарела. Попробуй заново" };
+      return { payment: { id: row.id, order_id: orderId } };
+    };
+
+    let subId = (await loadPendingSub())?.id ?? null;
+    if (!subId) {
+      const candidateId = randomUUID();
+      const { error: subError } = await supabaseAdmin.from("subscriptions").insert({
+        id: candidateId,
+        client_id: clientId,
+        plan_id: plan.id,
+        provider: "prodamus",
+        status: "pending",
+      });
+      if (subError?.code === "23505") {
+        subId = (await loadPendingSub())?.id ?? null;
+        if (!subId) return { error: "Конкурирующая подписка не найдена" };
+      } else if (subError) {
+        console.error("createSubscriptionLink: sub insert failed:", subError.message);
+        return { error: subError.message };
+      } else {
+        subId = candidateId;
+      }
+    }
+    if (!subId) return { error: "Не удалось создать подписку" };
+
+    const { data: syncedSub, error: planSyncError } = await supabaseAdmin
+      .from("subscriptions")
+      .update({ plan_id: plan.id })
+      .eq("id", subId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (planSyncError) {
+      console.error("createSubscriptionLink: plan sync failed:", planSyncError.message);
+      return { error: planSyncError.message };
+    }
+    if (!syncedSub) return { error: "Подписка изменилась. Попробуй заново" };
+
+    let payment: SyncedPayment | null = null;
+    const existingPayment = await loadPendingPayment(subId);
+    if (existingPayment) {
+      const synced = await syncPaymentAmount(existingPayment);
+      if (synced.error) return { error: synced.error };
+      payment = synced.payment ?? null;
+    } else {
+      const candidateId = randomUUID();
+      const candidateOrderId = randomUUID();
+      const { error: paymentError } = await supabaseAdmin
+        .from("subscription_payments")
+        .insert({
+          id: candidateId,
+          subscription_id: subId,
+          order_id: candidateOrderId,
+          amount: plan.price,
+          status: "pending",
+        });
+      if (paymentError?.code === "23505") {
+        const raced = await loadPendingPayment(subId);
+        if (!raced) return { error: "Конкурирующий платёж не найден" };
+        const synced = await syncPaymentAmount(raced);
+        if (synced.error) return { error: synced.error };
+        payment = synced.payment ?? null;
+      } else if (paymentError) {
+        console.error("createSubscriptionLink: payment insert failed:", paymentError.message);
+        return { error: paymentError.message };
+      } else {
+        payment = { id: candidateId, order_id: candidateOrderId };
+      }
+    }
+    if (!payment?.order_id) return { error: "Не удалось создать платеж" };
+
+    const url = await resolvePaymentUrl({
+      payformUrl,
+      orderId: payment.order_id,
+      amount: plan.price,
+      productName: plan.title,
+    });
+    revalidatePath(`/clients/${clientId}`);
+    return { url, paymentId: payment.id };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function sendSubscriptionLinkToClient(
+  clientId: string,
+  paymentId: string,
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+    if (!UUID_RE.test(clientId) || !UUID_RE.test(paymentId)) {
+      return { error: "Некорректный идентификатор" };
+    }
+    const payformUrl = getPayformBaseUrl();
+    if (!payformUrl) return { error: "Платежи не настроены" };
+
+    const { data: client } = await supabaseAdmin
+      .from("clients")
+      .select("id, status, telegram_id, client_consent_given")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (!client) return { error: "Клиент не найден" };
+    if (client.status === "inactive") return { error: "Клиент отключён. Сначала верни доступ" };
+    if (client.telegram_id == null) return { error: "Клиент не подключён к боту" };
+    if (!client.client_consent_given) {
+      return { error: "Клиент отозвал согласие на обработку данных" };
+    }
+
+    const { data: payment } = await supabaseAdmin
+      .from("subscription_payments")
+      .select("id, order_id, amount, status, subscriptions!inner(client_id, status)")
+      .eq("id", paymentId)
+      .eq("subscriptions.client_id", clientId)
+      .maybeSingle();
+    if (!payment || payment.status !== "pending") {
+      return { error: "Активная ссылка на подписку не найдена" };
+    }
+    if (!payment.order_id) return { error: "У платежа нет order_id" };
+
+    const dedupKey = `sub_link:${paymentId}`;
+    const { error: purgeError } = await supabaseAdmin
+      .from("bot_dedup")
+      .delete()
+      .eq("key", dedupKey)
+      .lt("expires_at", new Date().toISOString());
+    if (purgeError) {
+      console.error("sendSubscriptionLink: purge failed:", purgeError.message);
+    }
+    const { error: dedupError } = await supabaseAdmin.from("bot_dedup").insert({
+      key: dedupKey,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+    if (dedupError?.code === "23505") {
+      return { error: "Ссылка только что была отправлена - подождите минуту" };
+    }
+    if (dedupError) {
+      console.error("sendSubscriptionLink: dedup failed:", dedupError.message);
+    }
+
+    const url = await resolvePaymentUrl({
+      payformUrl,
+      orderId: payment.order_id,
+      amount: Number(payment.amount),
+      productName: "Подписка на все программы",
+    });
+    const amount = Number(payment.amount).toLocaleString("ru-RU");
+    const sent = await sendTelegramMessage(
+      client.telegram_id,
+      `Оплата подписки на все программы (${amount} ₽):\n\n${url}`,
+    );
+    if (!sent) {
+      await supabaseAdmin.from("bot_dedup").delete().eq("key", dedupKey);
+      return { error: "Не удалось отправить сообщение в Telegram" };
+    }
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Произошла ошибка" };
+  }
+}
+
+export async function cancelClientSubscription(
+  clientId: string,
+): Promise<{ error?: string }> {
+  try {
+    const { profile } = await verifySession();
+    if (!profile || (profile.role !== "admin" && profile.role !== "coach")) {
+      return { error: "Нет прав" };
+    }
+    if (!UUID_RE.test(clientId)) return { error: "Некорректный идентификатор" };
+
+    const { data: sub } = await supabaseAdmin
+      .from("subscriptions")
+      .select("id, current_period_end, cancel_at_period_end")
+      .eq("client_id", clientId)
+      .in("status", ["active", "past_due"])
+      .limit(1)
+      .maybeSingle();
+    if (!sub) return { error: "Активной подписки нет" };
+    if (sub.cancel_at_period_end) {
+      return { error: "Отмена подписки уже запланирована" };
+    }
+    if (!sub.current_period_end) {
+      return { error: "У подписки нет даты окончания периода" };
+    }
+
+    const { error } = await supabaseAdmin
+      .from("subscriptions")
+      .update({ cancel_at_period_end: true, next_payment_at: null })
+      .eq("id", sub.id)
+      .eq("cancel_at_period_end", false);
+    if (error) return { error: error.message };
+
+    const { scheduleImmediateExpiryNotice } = await import("@/lib/subscription-billing");
+    await scheduleImmediateExpiryNotice(sub.id, clientId, sub.current_period_end);
+    revalidatePath(`/clients/${clientId}`);
+    return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Произошла ошибка" };
   }

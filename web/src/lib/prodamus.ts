@@ -202,6 +202,10 @@ export type ProdamusOrder = {
   sum: number | null;
   paymentStatus: string | null;
   products: ProdamusProduct[];
+  // Продамус кладёт в order_id свой внутренний ID платежа (новый для каждого
+  // списания), а наш order_id возвращает в order_num. Для подписок этот ID -
+  // ключ идемпотентности отдельного списания.
+  providerOrderId: string | null;
 };
 
 export function parseProdamusOrder(entries: ProdamusFormEntries): ProdamusOrder {
@@ -236,6 +240,7 @@ export function parseProdamusOrder(entries: ProdamusFormEntries): ProdamusOrder 
     sum: sum === null || !Number.isFinite(sum) ? null : sum,
     paymentStatus: toStr(payload.payment_status),
     products,
+    providerOrderId: toStr(payload.order_id),
   };
 }
 

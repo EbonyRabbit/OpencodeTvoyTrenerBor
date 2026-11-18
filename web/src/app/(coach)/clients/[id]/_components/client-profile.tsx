@@ -221,6 +221,7 @@ export function ClientProfile({
   loadMoreActivity,
   // latestPhotos, // DISABLED: photo storage removed
   purchaseRequests,
+  subscription,
 }: {
   client: ClientRow;
   latestCheckin: CheckinRow | null;
@@ -237,6 +238,12 @@ export function ClientProfile({
   loadMoreActivity: (offset: number) => Promise<ActivityEvent[] | { error: string }>;
   // latestPhotos: PhotoRow[]; // DISABLED: photo storage removed
   purchaseRequests: PurchaseRequestRow[];
+  subscription: {
+    id: string;
+    status: string;
+    current_period_end: string | null;
+    cancel_at_period_end: boolean;
+  } | null;
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
@@ -734,6 +741,7 @@ export function ClientProfile({
         clientTrainingDays={client.training_days}
         programDayOrders={programDayOrders}
         clientTelegramId={client.telegram_id}
+        subscription={subscription}
       />
 
       <div className="flex justify-end gap-2">

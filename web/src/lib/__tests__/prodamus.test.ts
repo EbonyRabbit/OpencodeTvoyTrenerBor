@@ -229,6 +229,7 @@ describe("parseProdamusOrder", () => {
       sum: null,
       paymentStatus: null,
       products: [],
+      providerOrderId: null,
     });
   });
 

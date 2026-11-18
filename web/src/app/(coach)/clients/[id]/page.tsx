@@ -80,6 +80,7 @@ export default async function ClientProfilePage({
     measurementHistoryResult,
     workoutLogsResult,
     purchaseRequestsResult,
+    subscriptionResult,
     // latestPhotosResult, // DISABLED: photo storage removed
   ] = await Promise.all([
     safeFetch(
@@ -119,8 +120,18 @@ export default async function ClientProfilePage({
         return typedClient.telegram_id != null
           ? query.or(`client_id.eq.${id},and(client_id.is.null,telegram_id.eq.${typedClient.telegram_id})`)
           : query.eq("client_id", id);
-      })(),
+      }      )(),
       [],
+    ),
+    safeFetch(
+      supabase
+        .from("subscriptions")
+        .select("id, status, current_period_end, cancel_at_period_end")
+        .eq("client_id", id)
+        .in("status", ["active", "past_due"])
+        .limit(1)
+        .maybeSingle(),
+      null,
     ),
     // safeFetch( // DISABLED: photo storage removed
     //   supabase.from("photos").select("id, date, type, drive_url, storage_path").eq("client_id", id).order("date", { ascending: false }).limit(6),
@@ -175,6 +186,7 @@ export default async function ClientProfilePage({
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
         purchaseRequests={purchaseRequestsResult.data ?? []}
+        subscription={subscriptionResult.data ?? null}
       />
       <div className="mx-auto mt-6 max-w-4xl">
         <ExerciseSwapsSection clientId={id} />

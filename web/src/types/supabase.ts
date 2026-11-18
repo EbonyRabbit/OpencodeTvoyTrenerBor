@@ -1063,6 +1063,7 @@ export type Database = {
       subscription_payments: {
         Row: {
           amount: number
+          applied_at: string | null
           created_at: string
           id: string
           order_id: string | null
@@ -1076,6 +1077,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          applied_at?: string | null
           created_at?: string
           id?: string
           order_id?: string | null
@@ -1089,6 +1091,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          applied_at?: string | null
           created_at?: string
           id?: string
           order_id?: string | null
@@ -1345,6 +1348,8 @@ export type Database = {
         | "checkin"
         | "alert"
         | "payment"
+        | "access_expiring"
+        | "subscription_expiring"
       payment_status: "pending" | "paid"
       photo_type: "front" | "side" | "back"
     }

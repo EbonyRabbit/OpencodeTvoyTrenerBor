@@ -17,6 +17,10 @@ import {
   type ProdamusFormEntries,
 } from "@/lib/prodamus";
 import { activatePurchaseByOrder } from "@/lib/activate-purchase";
+import {
+  handleSubscriptionSuccess,
+  handleSubscriptionFailure,
+} from "@/lib/subscription-billing";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendCoachAlertOnce } from "@/lib/coach-alert";
@@ -27,6 +31,56 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CANCEL_STATUSES = new Set(["order_canceled", "order_denied"]);
+
+async function handleSubscriptionWebhook({
+  orderId,
+  paymentStatus,
+  paidSum,
+  providerOrderId,
+}: {
+  orderId: string;
+  paymentStatus: string;
+  paidSum: number | null;
+  providerOrderId: string | null;
+}): Promise<Response> {
+  if (paymentStatus === "success") {
+    const result = await handleSubscriptionSuccess({
+      orderId,
+      paidSum,
+      providerOrderId,
+    });
+    if (
+      result.outcome === "activated" ||
+      result.outcome === "renewed" ||
+      result.outcome === "already_processed"
+    ) {
+      return jsonResponse({ ok: true, subscription: result.outcome }, 200);
+    }
+    if (result.manual) {
+      return jsonResponse({ ok: false, error: result.outcome, manual: true }, 200);
+    }
+    console.error("[PRODAMUS WEBHOOK] Subscription activation failed:", result.outcome);
+    return jsonResponse({ ok: false, error: "subscription" }, 500);
+  }
+
+  if (paymentStatus === "fail" || CANCEL_STATUSES.has(paymentStatus)) {
+    const result = await handleSubscriptionFailure({
+      orderId,
+      paymentStatus,
+    });
+    if (
+      result.outcome === "failure_recorded" ||
+      result.outcome === "cancel_scheduled" ||
+      result.outcome === "already_processed"
+    ) {
+      return jsonResponse({ ok: true, subscription: result.outcome }, 200);
+    }
+    console.error("[PRODAMUS WEBHOOK] Subscription failure handling failed:", result.outcome);
+    return jsonResponse({ ok: false, error: "subscription" }, 500);
+  }
+
+  return jsonResponse({ ok: true, ignored: paymentStatus }, 200);
+}
 
 function jsonResponse(body: Record<string, unknown>, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -222,6 +276,37 @@ export async function POST(req: Request): Promise<Response> {
     return jsonResponse({ ok: false, error: "order_id" }, 400);
   }
   const paymentStatus = order.paymentStatus ?? "";
+
+  // 30.9: подписочные списания приходят по тому же order_num, что и обычные
+  // покупки. Наличие pending/success-строки в subscription_payments -
+  // признак подписочного заказа; всё остальное идёт в legacy-активацию.
+  if (
+    (paymentStatus === "success" ||
+      paymentStatus === "fail" ||
+      CANCEL_STATUSES.has(paymentStatus)) &&
+    UUID_REGEX.test(order.orderId)
+  ) {
+    const { data: subPayment, error: subPaymentError } = await supabaseAdmin
+      .from("subscription_payments")
+      .select("id")
+      .eq("order_id", order.orderId)
+      .maybeSingle();
+    if (subPaymentError) {
+      console.error(
+        "[PRODAMUS WEBHOOK] Subscription payment lookup failed:",
+        subPaymentError.message,
+      );
+      return jsonResponse({ ok: false, error: "db" }, 500);
+    }
+    if (subPayment) {
+      return handleSubscriptionWebhook({
+        orderId: order.orderId,
+        paymentStatus,
+        paidSum: order.sum,
+        providerOrderId: order.providerOrderId,
+      });
+    }
+  }
 
   if (paymentStatus === "success") {
     const result = await activatePurchaseByOrder({

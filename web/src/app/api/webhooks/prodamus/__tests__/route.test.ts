@@ -12,9 +12,20 @@ vi.mock("@/lib/activate-purchase", () => ({
   activatePurchaseByOrder: vi.fn(),
 }));
 
+const billingMock = vi.hoisted(() => ({
+  handleSubscriptionSuccess: vi.fn(),
+  handleSubscriptionFailure: vi.fn(),
+}));
+
+vi.mock("@/lib/subscription-billing", () => billingMock);
+
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { activatePurchaseByOrder } from "@/lib/activate-purchase";
+import {
+  handleSubscriptionSuccess,
+  handleSubscriptionFailure,
+} from "@/lib/subscription-billing";
 import { buildProdamusSignature } from "@/lib/prodamus";
 import { POST } from "../route";
 
@@ -23,12 +34,21 @@ const SECRET = "test-secret-key";
 
 type ChainRes = { data?: unknown; error?: { message: string } | null };
 
-function mockDb(calls: Array<() => Promise<ChainRes>>) {
+function mockDb(
+  calls: Array<() => Promise<ChainRes>>,
+  subPayment: unknown = null,
+) {
   const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   fake.from.mockReset();
   const eqCalls: Array<[string, unknown]> = [];
   let idx = 0;
-  fake.from.mockImplementation(() => {
+  const subLookup = {
+    select: () => subLookup,
+    eq: () => subLookup,
+    maybeSingle: () => Promise.resolve({ data: subPayment, error: null }),
+  };
+  fake.from.mockImplementation((table: string) => {
+    if (table === "subscription_payments") return subLookup;
     const link = {
       select: () => link,
       eq: (column: string, value: unknown) => {
@@ -81,9 +101,13 @@ function signedMultipartRequest(
 }
 
 const activationMock = vi.mocked(activatePurchaseByOrder);
+const subscriptionSuccessMock = vi.mocked(handleSubscriptionSuccess);
+const subscriptionFailureMock = vi.mocked(handleSubscriptionFailure);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  subscriptionSuccessMock.mockResolvedValue({ outcome: "already_processed" });
+  subscriptionFailureMock.mockResolvedValue({ outcome: "already_processed" });
   vi.stubEnv("PRODAMUS_SECRET_KEY", SECRET);
   const fake = supabaseAdmin as unknown as {
     from: ReturnType<typeof vi.fn>;
@@ -362,9 +386,75 @@ describe("prodamus webhook", () => {
     expect(sent.mock.calls[0][1]).toContain("оплаченной");
   });
 
+  it("направляет подписочный success в billing и прокидывает provider id", async () => {
+    subscriptionSuccessMock.mockResolvedValueOnce({ outcome: "renewed" });
+    mockDb([], { id: "payment-1" });
+
+    const res = await POST(
+      signedRequest({
+        order_num: ORDER_ID,
+        order_id: "47987743",
+        payment_status: "success",
+        sum: "4900",
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(subscriptionSuccessMock).toHaveBeenCalledWith({
+      orderId: ORDER_ID,
+      paidSum: 4900,
+      providerOrderId: "47987743",
+    });
+    expect(activationMock).not.toHaveBeenCalled();
+  });
+
+  it("направляет подписочный fail в billing и не трогает legacy-активацию", async () => {
+    subscriptionFailureMock.mockResolvedValueOnce({ outcome: "failure_recorded" });
+    mockDb([], { id: "payment-1" });
+
+    const res = await POST(
+      signedRequest({
+        order_num: ORDER_ID,
+        order_id: "47987743",
+        payment_status: "fail",
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(subscriptionFailureMock).toHaveBeenCalledWith({
+      orderId: ORDER_ID,
+      paymentStatus: "fail",
+    });
+    expect(activationMock).not.toHaveBeenCalled();
+  });
+
+  it("возвращает 200 с manual для заблокированного ручными проверками платежа", async () => {
+    subscriptionSuccessMock.mockResolvedValueOnce({
+      outcome: "client_inactive",
+      manual: true,
+    });
+    mockDb([], { id: "payment-1" });
+
+    const res = await POST(
+      signedRequest({
+        order_num: ORDER_ID,
+        order_id: "47987743",
+        payment_status: "success",
+        sum: "4900",
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "client_inactive",
+      manual: true,
+    });
+  });
+
   it("ignores other payment statuses with 200", async () => {
     const res = await POST(
-      signedRequest({ order_id: ORDER_ID, payment_status: "fail" }),
+      signedRequest({ order_id: ORDER_ID, payment_status: "processing" }),
     );
     expect(res.status).toBe(200);
     expect(activationMock).not.toHaveBeenCalled();

@@ -136,7 +136,6 @@ export interface Database {
           rounds: number | null;
           distance_km: number | null;
           duration_sec: number | null;
-          heart_rate: number | null;
           pace: string | null;
           comment: string | null;
           program_id: string | null;

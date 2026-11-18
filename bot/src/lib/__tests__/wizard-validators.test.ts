@@ -14,10 +14,8 @@ import {
   parseDurationSec,
   parseDistanceKm,
   parsePace,
-  parseHeartRate,
   parseRounds,
   roundsValue,
-  heartRateValue,
   AMRAP_ROUNDS_SENTINEL,
   repsListMatchesSets,
 } from "../wizard-validators.js";
@@ -423,44 +421,6 @@ describe("parsePace", () => {
   it("rejects invalid values", () => {
     expect(parsePace("abc")).toBeNull();
     expect(parsePace("5:99")).toBeNull();
-  });
-});
-
-describe("parseHeartRate", () => {
-  it("parses single value", () => {
-    expect(parseHeartRate("145")).toBe("145");
-    expect(parseHeartRate("145 bpm")).toBe("145");
-  });
-
-  it("parses ranges", () => {
-    expect(parseHeartRate("130-150")).toBe("130-150");
-    expect(parseHeartRate("130 - 150")).toBe("130-150");
-  });
-
-  it("rejects invalid values", () => {
-    expect(parseHeartRate("abc")).toBeNull();
-    expect(parseHeartRate("10")).toBeNull();
-    expect(parseHeartRate("300")).toBeNull();
-  });
-});
-
-describe("heartRateValue", () => {
-  it("converts single values", () => {
-    expect(heartRateValue("145")).toBe(145);
-    expect(heartRateValue(undefined)).toBeNull();
-  });
-
-  it("stores range midpoint", () => {
-    expect(heartRateValue("130-150")).toBe(140);
-    expect(heartRateValue("130 - 150")).toBe(140);
-    expect(heartRateValue("130-131")).toBe(131);
-  });
-
-  it("rejects invalid inputs", () => {
-    expect(heartRateValue("abc")).toBeNull();
-    expect(heartRateValue("300")).toBeNull();
-    expect(heartRateValue("150-130")).toBeNull();
-    expect(heartRateValue("10")).toBeNull();
   });
 });
 

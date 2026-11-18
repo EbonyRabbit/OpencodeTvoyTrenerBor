@@ -12,7 +12,6 @@ describe("formatMetrics", () => {
       rounds: 4,
       distance_km: null,
       duration_sec: 900,
-      heart_rate: null,
       pace: null,
       comment: null,
       date: "2026-07-27",
@@ -31,14 +30,13 @@ describe("formatMetrics", () => {
       rounds: null,
       distance_km: 5,
       duration_sec: 1500,
-      heart_rate: 145,
       pace: "5:00",
       comment: null,
       date: "2026-07-27",
     });
     expect(metrics).toContain("5 км");
     expect(metrics).toContain("25 мин");
-    expect(metrics).toContain("пульс 145");
+    expect(metrics).not.toContain("пульс 145");
   });
 
   it("shows МАКС раундов for unlimited rounds", () => {
@@ -51,7 +49,6 @@ describe("formatMetrics", () => {
       rounds: -1,
       distance_km: null,
       duration_sec: null,
-      heart_rate: null,
       pace: null,
       comment: null,
       date: "2026-07-27",

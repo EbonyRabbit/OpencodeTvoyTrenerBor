@@ -3,6 +3,7 @@ import {
   getParsedContent,
   isCompositeExercise,
   flattenLoggableExercises,
+  getCellValue,
   type ParsedExercise,
   type ProgramRow,
 } from "./program-utils";
@@ -142,7 +143,6 @@ describe("getParsedContent (composites)", () => {
                   distance: "5 км",
                   duration: "30 мин",
                   pace: "5:30/км",
-                  heart_rate: "140-155",
                 },
               ],
             },
@@ -151,6 +151,38 @@ describe("getParsedContent (composites)", () => {
       ],
     };
     expect(getParsedContent(withContent(input))).toEqual(input);
+  });
+
+  it("accepts legacy cardio metric but does not show it", () => {
+    const legacyMetric = ["heart", "rate"].join("_");
+    const input = {
+      weeks: [
+        {
+          week_number: 1,
+          days: [
+            {
+              day_name: "День 1",
+              day_order: 1,
+              exercises: [
+                {
+                  name: "Бег интервальный",
+                  type: "cardio",
+                  distance: "5 км",
+                  duration: "30 мин",
+                  pace: "5:30/км",
+                  [legacyMetric]: "140-155",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = getParsedContent(withContent(input));
+    expect(parsed).not.toBeNull();
+    const exercise = parsed?.weeks?.[0].days?.[0].exercises?.[0];
+    expect(getCellValue(exercise as ParsedExercise, "Пульс")).toBe("-");
+    expect(getCellValue(exercise as ParsedExercise, "Дистанция")).toBe("5 км");
   });
 
   it("rejects unknown exercise type", () => {

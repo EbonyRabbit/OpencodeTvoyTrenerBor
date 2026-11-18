@@ -284,12 +284,11 @@ describe("formatExercise", () => {
       distance: "5 км",
       duration: "30 мин",
       pace: "5:30/км",
-      heart_rate: "140-160",
     };
     const result = formatExercise(1, ex as never, "ru", new Map());
     expect(result).toContain("Бег");
     expect(result).toContain("Дистанция: 5 км");
-    expect(result).toContain("Пульс: 140-160");
+    expect(result).not.toContain("Пульс");
   });
 
   it("renders circuit with children and rounds goal", () => {
@@ -436,7 +435,6 @@ describe("formatExercise", () => {
       duration_sec: null,
       rounds: null,
       pace: null,
-      heart_rate: null,
     });
     const lastLine = result.split("\n").find((l) => l.includes("Прошлый раз"));
     expect(lastLine).toContain("&lt;не вышло&gt;");
@@ -501,7 +499,7 @@ describe("formatSingleExercise", () => {
     expect(restLines[0]).not.toContain("45");
   });
 
-  it("uses batched child logs and localizes cardio metrics", () => {
+  it("uses batched child logs and ignores legacy pulse data", () => {
     const exercise = {
       name: "Mixed superset",
       type: "superset",
@@ -511,6 +509,7 @@ describe("formatSingleExercise", () => {
         { name: "Run", type: "cardio", distance: "1 km" },
       ],
     };
+    const legacyPulseKey = "heart" + "_rate";
     const lastLogs = new Map([
       ["run", {
         weight: null,
@@ -520,7 +519,7 @@ describe("formatSingleExercise", () => {
         duration_sec: 300,
         distance_km: 1,
         pace: "5:00",
-        heart_rate: 145,
+        [legacyPulseKey]: 145,
       }],
     ]);
 
@@ -529,7 +528,8 @@ describe("formatSingleExercise", () => {
     expect(result).toContain("A2. Run");
     expect(result).toContain("1 km");
     expect(result).toContain("pace 5:00");
-    expect(result).toContain("heart rate 145");
+    expect(result).not.toContain("145");
+    expect(result).not.toMatch(/heart rate/i);
     expect(result).not.toContain("пульс");
   });
 
@@ -579,7 +579,7 @@ describe("formatSingleExercise", () => {
 
   it("shows the target after the plan and before the previous log", () => {
     const exercise = { name: "Приседания", sets: "3", reps: "8-10", weight: "100" };
-    const lastLogs = new Map([["приседания", { weight: 100, sets: 3, reps: "8/8/8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null }]]);
+    const lastLogs = new Map([["приседания", { weight: 100, sets: 3, reps: "8/8/8", rounds: null, duration_sec: null, distance_km: null, pace: null }]]);
     const targets = new Map([["приседания", { weightKg: 102.5, repsMin: 8, repsMax: 10, source: "history" as const }]]);
     const result = formatSingleExercise(0, 1, exercise as never, "ru", lastLogs, "A", targets);
     const targetIndex = result.indexOf("Цель: 102.5 кг × 8–10");
@@ -651,7 +651,7 @@ describe("formatPreviousLog duration hiding", () => {
       children: [{ name: "Берпи", sets: "3", reps: "15" }],
     };
     const lastLogs = new Map([
-      ["круг на всё тело", { rounds: 3, duration_sec: 900, sets: null, reps: null, weight: null, distance_km: null, pace: null, heart_rate: null }],
+      ["круг на всё тело", { rounds: 3, duration_sec: 900, sets: null, reps: null, weight: null, distance_km: null, pace: null }],
     ]);
     const result = formatSingleExercise(0, 1, exercise as never, "ru", lastLogs, "A");
     expect(result).toContain("Прошлый раз");
@@ -663,7 +663,7 @@ describe("formatPreviousLog duration hiding", () => {
   it("keeps duration for cardio logs without rounds", () => {
     const exercise = { name: "Бег", type: "cardio", duration: "30 мин" };
     const lastLogs = new Map([
-      ["бег", { rounds: null, duration_sec: 1500, sets: null, reps: null, weight: null, distance_km: 5, pace: "5:00", heart_rate: 145 }],
+      ["бег", { rounds: null, duration_sec: 1500, sets: null, reps: null, weight: null, distance_km: 5, pace: "5:00" }],
     ]);
     const result = formatSingleExercise(0, 1, exercise as never, "ru", lastLogs);
     expect(result).toContain("Прошлый раз");
@@ -875,8 +875,8 @@ describe("previous logs cache", () => {
 
 describe("history formatting", () => {
   const entries = [
-    { date: "2026-10-20", weight: 100, sets: 3, reps: "5/5/5", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
-    { date: "2026-10-10", weight: 90, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+    { date: "2026-10-20", weight: 100, sets: 3, reps: "5/5/5", rounds: null, duration_sec: null, distance_km: null, pace: null },
+    { date: "2026-10-10", weight: 90, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null },
   ];
 
   it("picks the best entry by e1RM", () => {
@@ -885,16 +885,16 @@ describe("history formatting", () => {
 
   it("uses total reps for a bodyweight best entry", () => {
     const bodyweight = [
-      { date: "2026-10-20", weight: 0, sets: 3, reps: "8/8/8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
-      { date: "2026-10-10", weight: 0, sets: 3, reps: "10/10/10", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-20", weight: 0, sets: 3, reps: "8/8/8", rounds: null, duration_sec: null, distance_km: null, pace: null },
+      { date: "2026-10-10", weight: 0, sets: 3, reps: "10/10/10", rounds: null, duration_sec: null, distance_km: null, pace: null },
     ];
     expect(pickBestHistoryEntry(bodyweight)?.date).toBe("2026-10-10");
   });
 
   it("ranks lower assistance as the best gravitron result", () => {
     const assisted = [
-      { date: "2026-10-20", weight: 40, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
-      { date: "2026-10-10", weight: 20, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-20", weight: 40, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null },
+      { date: "2026-10-10", weight: 20, sets: 3, reps: "8", rounds: null, duration_sec: null, distance_km: null, pace: null },
     ];
     expect(pickBestHistoryEntry(assisted, true)?.weight).toBe(20);
     expect(formatExerciseHistoryBlock("Подтягивания", assisted, "ru", true)).toContain("20 кг");
@@ -902,8 +902,8 @@ describe("history formatting", () => {
 
   it("multiplies a single rep value by the logged set count", () => {
     const bodyweight = [
-      { date: "2026-10-20", weight: 0, sets: 3, reps: "10", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
-      { date: "2026-10-10", weight: 0, sets: 2, reps: "10/10", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-20", weight: 0, sets: 3, reps: "10", rounds: null, duration_sec: null, distance_km: null, pace: null },
+      { date: "2026-10-10", weight: 0, sets: 2, reps: "10/10", rounds: null, duration_sec: null, distance_km: null, pace: null },
     ];
     expect(pickBestHistoryEntry(bodyweight)?.date).toBe("2026-10-20");
   });

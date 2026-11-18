@@ -16,7 +16,6 @@ type ExerciseLog = {
   rounds: number | null;
   distance_km: number | null;
   duration_sec: number | null;
-  heart_rate: number | null;
   pace: string | null;
   comment: string | null;
 };
@@ -52,11 +51,10 @@ function validateExerciseLog(ex: ExerciseLog): string | null {
   if (!isNumberInRange(ex.rounds, -1, 99, true)) return `${ex.exercise}: некорректное число раундов`;
   if (!isNumberInRange(ex.distance_km, 0.001, 500)) return `${ex.exercise}: некорректная дистанция`;
   if (!isNumberInRange(ex.duration_sec, 1, 86400, true)) return `${ex.exercise}: некорректное время`;
-  if (!isNumberInRange(ex.heart_rate, 30, 250, true)) return `${ex.exercise}: некорректный пульс`;
 
   if (ex.type === "cardio" && (
-    ex.distance_km === null || ex.duration_sec === null || ex.heart_rate === null || ex.pace === null
-  )) return `${ex.exercise}: заполните дистанцию, время, темп и пульс`;
+    ex.distance_km === null || ex.duration_sec === null || ex.pace === null
+  )) return `${ex.exercise}: заполните дистанцию, время и темп`;
   if (ex.type === "circuit" && ex.rounds === null) {
     return `${ex.exercise}: укажите число раундов или МАКС`;
   }
@@ -111,7 +109,6 @@ export async function logWorkoutFromWeb(
       rounds: ex.rounds,
       distance_km: ex.distance_km,
       duration_sec: ex.duration_sec,
-      heart_rate: ex.heart_rate,
       pace: ex.pace,
       comment: ex.comment,
     }));

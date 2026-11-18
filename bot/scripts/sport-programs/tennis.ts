@@ -106,7 +106,6 @@ function cardioRun(phase: Phase): ParsedExercise {
       distance: phase === "deload" ? "4-5 км" : "6-8 км",
       duration: phase === "deload" ? "25-30 мин" : "35-45 мин",
       pace: "комфортный",
-      heart_rate: "Z2-Z3",
       notes: "аэробная база - без спринтов (финиш ОФП-дня)",
     };
   }
@@ -117,7 +116,6 @@ function cardioRun(phase: Phase): ParsedExercise {
       type: "cardio",
       duration: "8-10×(400 м)",
       pace: "темп 5К",
-      heart_rate: "Z4-Z5",
       notes: "интервалы после силовой - восстановление между повторами - легкий бег/ходьба",
     };
   }
@@ -128,8 +126,7 @@ function cardioRun(phase: Phase): ParsedExercise {
     distance: "8-10 км",
     duration: "45-55 мин",
     pace: "комфортный",
-    heart_rate: "Z2-Z3",
-      notes: "объемный легкий бег",
+    notes: "объемный легкий бег",
   };
 }
 

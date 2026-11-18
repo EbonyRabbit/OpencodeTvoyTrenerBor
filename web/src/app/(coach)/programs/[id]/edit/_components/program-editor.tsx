@@ -335,7 +335,6 @@ function MetricParams({
         <ParamField label="Дист." value={exercise.distance} onChange={(v) => onUpdate({ distance: v })} placeholder="500 м" />
         <ParamField label="Время" value={exercise.duration} onChange={(v) => onUpdate({ duration: v })} placeholder="20 мин" />
         <ParamField label="Темп" value={exercise.pace} onChange={(v) => onUpdate({ pace: v })} placeholder="5:30/км" />
-        <ParamField label="Пульс" value={exercise.heart_rate} onChange={(v) => onUpdate({ heart_rate: v })} placeholder="140-160" />
       </>
     );
   }

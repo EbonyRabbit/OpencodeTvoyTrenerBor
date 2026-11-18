@@ -21,10 +21,8 @@ import {
   parseDurationSec,
   parseDistanceKm,
   parsePace,
-  parseHeartRate,
   parseRounds,
   roundsValue,
-  heartRateValue,
   repsListMatchesSets,
 } from "../lib/wizard-validators.js";
 import type { ExerciseType, ParsedExercise } from "../lib/program-utils.js";
@@ -47,7 +45,6 @@ export interface ChildLogEntry {
   duration?: string;
   distance?: string;
   pace?: string;
-  heart_rate?: string;
 }
 
 export interface WizardData {
@@ -69,7 +66,6 @@ export interface WizardData {
   duration?: string;
   distance?: string;
   pace?: string;
-  heart_rate?: string;
   rounds?: string;
 }
 
@@ -80,13 +76,17 @@ export interface WizardResult {
 
 type WizardStep =
   | "sets" | "reps" | "weight" | "rpe" | "comment"
-  | "duration" | "distance" | "pace" | "heart_rate" | "rounds";
+  | "duration" | "distance" | "pace" | "rounds";
 
 const STRENGTH_STEPS: WizardStep[] = ["sets", "reps", "weight", "rpe", "comment"];
-const CARDIO_STEPS: WizardStep[] = ["duration", "distance", "pace", "heart_rate", "comment"];
+const CARDIO_STEPS: WizardStep[] = ["duration", "distance", "pace", "comment"];
 const CIRCUIT_STEPS: WizardStep[] = ["rounds", "comment"];
 const SUPERSET_PARENT_STEPS: WizardStep[] = ["sets"];
 const SUPERSET_CHILD_STEPS: WizardStep[] = ["reps", "weight", "rpe", "comment"];
+
+export function getCardioSteps(): WizardStep[] {
+  return [...CARDIO_STEPS];
+}
 
 function getStepsForPosition(data: WizardData): WizardStep[] {
   switch (data.type) {
@@ -137,8 +137,6 @@ export function getStepPrompt(step: WizardStep, lang: Language): { text: string;
       return { text: t("wizard.step_distance", lang), hint: t("wizard.step_distance_hint", lang), required: true };
     case "pace":
       return { text: t("wizard.step_pace", lang), hint: t("wizard.step_pace_hint", lang), required: false };
-    case "heart_rate":
-      return { text: t("wizard.step_heart_rate", lang), hint: t("wizard.step_heart_rate_hint", lang), required: false };
     case "rounds":
       return { text: t("wizard.step_rounds", lang), hint: t("wizard.step_rounds_hint", lang), required: true };
   }
@@ -154,7 +152,6 @@ function validateStep(step: WizardStep, input: string): string | null {
     case "duration": return parseDurationSec(input);
     case "distance": return parseDistanceKm(input);
     case "pace": return parsePace(input);
-    case "heart_rate": return parseHeartRate(input);
     case "rounds": return parseRounds(input);
   }
 }
@@ -241,7 +238,6 @@ function buildSummary(data: WizardData, lang: Language): string {
         if (child.distance) parts.push(t("wizard.summary_distance", lang, { distance: child.distance }));
         if (child.duration) parts.push(t("wizard.summary_duration", lang, { duration: formatDurationLabel(child.duration, lang) }));
         if (child.pace) parts.push(t("wizard.summary_pace", lang, { pace: child.pace }));
-        if (child.heart_rate) parts.push(t("wizard.summary_heart_rate", lang, { heart_rate: child.heart_rate }));
       } else {
         if (child.sets) parts.push(t("workout.exercise_sets_reps", lang, { sets: child.sets, reps: child.reps ?? "-" }));
         if (child.weight) parts.push(t("wizard.summary_weight", lang, { weight: child.weight }));
@@ -258,7 +254,6 @@ function buildSummary(data: WizardData, lang: Language): string {
     if (data.distance) metrics.push(`${t("wizard.summary_distance", lang, { distance: data.distance })}`);
     if (data.duration) metrics.push(t("wizard.summary_duration", lang, { duration: formatDurationLabel(data.duration, lang) }));
     if (data.pace) metrics.push(t("wizard.summary_pace", lang, { pace: data.pace }));
-    if (data.heart_rate) metrics.push(t("wizard.summary_heart_rate", lang, { heart_rate: data.heart_rate }));
     const commentLine = data.comment ? `\n${t("wizard.summary_comment", lang, { comment: data.comment })}` : "";
     return t("wizard.logged_summary_cardio", lang, {
       exercise: data.exercise_name,
@@ -443,7 +438,6 @@ function storeChildLog(data: WizardData): void {
     child.duration = data.duration;
     child.distance = data.distance;
     child.pace = data.pace;
-    child.heart_rate = data.heart_rate;
   } else {
     child.sets = data.sets;
     child.reps = data.reps;
@@ -478,7 +472,6 @@ async function advanceWizard(
       data.duration = undefined;
       data.distance = undefined;
       data.pace = undefined;
-      data.heart_rate = undefined;
 
       const childSteps = getStepsForPosition(data);
 
@@ -545,7 +538,6 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
         rounds: null,
         distance_km: null,
         duration_sec: null,
-        heart_rate: null,
         pace: null,
         comment: data.comment || null,
       });
@@ -565,7 +557,6 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
             rounds: null,
             distance_km: child.distance ? Number(child.distance) : null,
             duration_sec: child.duration ? Number(child.duration) : null,
-            heart_rate: heartRateValue(child.heart_rate),
             pace: child.pace || null,
             comment: child.comment || null,
           });
@@ -583,7 +574,6 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
             rounds: null,
             distance_km: null,
             duration_sec: null,
-            heart_rate: null,
             pace: null,
             comment: child.comment || null,
           });
@@ -604,7 +594,6 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
       duration_sec: data.duration ? Number(data.duration) : null,
       distance_km: data.distance ? Number(data.distance) : null,
       pace: data.pace || null,
-      heart_rate: heartRateValue(data.heart_rate),
       rounds: null,
       comment: data.comment || null,
     });
@@ -622,7 +611,6 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
       rounds: roundsValue(data.rounds),
       duration_sec: null,
       distance_km: null,
-      heart_rate: null,
       pace: null,
       comment: data.comment || null,
     });
@@ -640,7 +628,6 @@ async function completeWizard(ctx: MyContext, data: WizardData): Promise<WizardR
       rounds: null,
       distance_km: null,
       duration_sec: null,
-      heart_rate: null,
       pace: null,
       comment: data.comment || null,
     });

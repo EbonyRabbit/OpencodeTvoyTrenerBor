@@ -16,14 +16,16 @@ vi.mock("../../lib/supabase-admin.js", () => ({
   supabaseAdmin: { from: vi.fn() },
 }));
 
-import { buildPrLines, getStepPrompt, safePrLines } from "../wizard.js";
+import { buildPrLines, getCardioSteps, getStepPrompt, safePrLines } from "../wizard.js";
 
 describe("getStepPrompt required flags", () => {
-  it("pace and heart_rate are optional (skip button)", () => {
+  it("pace is optional", () => {
     expect(getStepPrompt("pace", "ru").required).toBe(false);
-    expect(getStepPrompt("heart_rate", "ru").required).toBe(false);
     expect(getStepPrompt("pace", "en").required).toBe(false);
-    expect(getStepPrompt("heart_rate", "en").required).toBe(false);
+  });
+
+  it("cardio wizard does not ask for heart rate", () => {
+    expect(getCardioSteps()).toEqual(["duration", "distance", "pace", "comment"]);
   });
 
   it("core cardio steps stay required", () => {

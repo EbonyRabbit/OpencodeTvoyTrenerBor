@@ -63,8 +63,8 @@ describe("handleExerciseHistory", () => {
   it("shows the last entries and the best result", async () => {
     mocks.getTodayWorkout.mockResolvedValue(workout([{ name: "Приседания", sets: "3", reps: "5" }]));
     mocks.getExerciseHistory.mockResolvedValue([
-      { date: "2026-10-20", weight: 100, sets: 3, reps: "5/5/5", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
-      { date: "2026-10-10", weight: 95, sets: 3, reps: "5/5/5", rounds: null, duration_sec: null, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-20", weight: 100, sets: 3, reps: "5/5/5", rounds: null, duration_sec: null, distance_km: null, pace: null },
+      { date: "2026-10-10", weight: 95, sets: 3, reps: "5/5/5", rounds: null, duration_sec: null, distance_km: null, pace: null },
     ]);
     const ctx = makeCtx();
     await handleExerciseHistory(ctx, "0");
@@ -97,7 +97,7 @@ describe("handleExerciseHistory", () => {
       children: [{ name: "Берпи" }],
     }]));
     mocks.getExerciseHistory.mockResolvedValue([
-      { date: "2026-10-20", weight: null, sets: null, reps: null, rounds: 4, duration_sec: 900, distance_km: null, pace: null, heart_rate: null },
+      { date: "2026-10-20", weight: null, sets: null, reps: null, rounds: 4, duration_sec: 900, distance_km: null, pace: null },
     ]);
     const ctx = makeCtx();
     await handleExerciseHistory(ctx, "0");

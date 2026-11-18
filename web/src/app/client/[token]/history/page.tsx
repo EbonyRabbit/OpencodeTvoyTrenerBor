@@ -23,7 +23,6 @@ type WorkoutLogRow = {
   rounds: number | null;
   distance_km: number | null;
   duration_sec: number | null;
-  heart_rate: number | null;
   pace: string | null;
   comment: string | null;
 };
@@ -153,7 +152,7 @@ export default async function HistoryPage() {
 
   let historyLogsQuery = supabaseAdmin
     .from("workout_logs")
-    .select("date, week, day_order, exercise, sets, reps, weight, rpe, rounds, distance_km, duration_sec, heart_rate, pace, comment")
+    .select("date, week, day_order, exercise, sets, reps, weight, rpe, rounds, distance_km, duration_sec, pace, comment")
     .eq("client_id", clientId);
   if (activePeriod) historyLogsQuery = historyLogsQuery.eq("program_period_id", activePeriod.id);
   const { data: logs, error: logsError } = await historyLogsQuery
@@ -338,7 +337,6 @@ export default async function HistoryPage() {
       rounds: log.rounds,
       distance_km: log.distance_km,
       duration_sec: log.duration_sec,
-      heart_rate: log.heart_rate,
       pace: log.pace,
       comment: log.comment,
       date: log.date,

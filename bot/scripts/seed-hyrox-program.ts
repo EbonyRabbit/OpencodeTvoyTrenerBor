@@ -205,14 +205,13 @@ function circuit(name: string, notes: string, children: ParsedExercise[], rounds
   };
 }
 
-function cardioRun(distance: string, pace = "разговорный темп", hr = "65-75% HRmax"): ParsedExercise {
+function cardioRun(distance: string, pace = "разговорный темп"): ParsedExercise {
   return {
     type: "cardio",
     block: "Бег",
     name: "Лёгкий бег Z2",
     distance,
     pace,
-    heart_rate: hr,
   };
 }
 

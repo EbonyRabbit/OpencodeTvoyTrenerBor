@@ -376,7 +376,6 @@ export interface PreviousLog {
   duration_sec: number | null;
   distance_km: number | null;
   pace: string | null;
-  heart_rate: number | null;
   date?: string | null;
 }
 
@@ -449,7 +448,7 @@ export async function getPreviousWorkoutLogs(
 
   let logsQuery = supabaseAdmin
     .from("workout_logs")
-    .select("exercise, date, sets, reps, weight, rounds, duration_sec, distance_km, pace, heart_rate")
+    .select("exercise, date, sets, reps, weight, rounds, duration_sec, distance_km, pace")
     .eq("client_id", client.id)
     .lt("date", todayStr);
   if (period) logsQuery = logsQuery.eq("program_period_id", period.id);
@@ -477,7 +476,6 @@ export async function getPreviousWorkoutLogs(
       duration_sec: row.duration_sec,
       distance_km: row.distance_km,
       pace: row.pace,
-      heart_rate: row.heart_rate,
       date: row.date ?? null,
     });
   }
@@ -496,7 +494,6 @@ function toHistoryEntry(row: Record<string, unknown>): ExerciseHistoryEntry {
     duration_sec: (row.duration_sec as number | null) ?? null,
     distance_km: (row.distance_km as number | null) ?? null,
     pace: (row.pace as string | null) ?? null,
-    heart_rate: (row.heart_rate as number | null) ?? null,
   };
 }
 
@@ -512,7 +509,7 @@ export async function getExerciseHistory(
 
   const { data, error } = await supabaseAdmin
     .from("workout_logs")
-    .select("exercise, date, sets, reps, weight, rounds, duration_sec, distance_km, pace, heart_rate, created_at")
+    .select("exercise, date, sets, reps, weight, rounds, duration_sec, distance_km, pace, created_at")
     .eq("client_id", client.id)
     .ilike("exercise", escapeLikeValue(name))
     .lte("date", todayStr)
@@ -698,9 +695,6 @@ function formatPreviousLog(log: PreviousLog, lang: Language): string {
       ? t("workout.metric_rounds_max", lang)
       : t("workout.metric_rounds", lang, { rounds: log.rounds }));
   }
-  if (log.heart_rate != null) {
-    parts.push(t("workout.metric_heart_rate", lang, { heart_rate: log.heart_rate }));
-  }
 
   if (parts.length > 0) return parts.join(" · ");
 
@@ -753,7 +747,6 @@ function formatPlannedDetail(ex: ParsedExercise, lang: Language, separator = " �
     if (ex.distance) parts.push(t("workout.planned_distance", lang, { distance: escapeHtml(ex.distance) }));
     if (ex.duration) parts.push(t("workout.planned_duration", lang, { duration: escapeHtml(ex.duration) }));
     if (ex.pace) parts.push(t("workout.planned_pace", lang, { pace: escapeHtml(ex.pace) }));
-    if (ex.heart_rate) parts.push(t("workout.planned_heart_rate", lang, { heart_rate: escapeHtml(ex.heart_rate) }));
     return parts.join(" · ");
   }
   if (ex.sets && ex.reps) parts.push(`${escapeHtml(ex.sets)}×${escapeHtml(ex.reps)}`);

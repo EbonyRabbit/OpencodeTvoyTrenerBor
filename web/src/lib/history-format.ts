@@ -7,7 +7,6 @@ export type HistoryEntry = {
   rounds: number | null;
   distance_km: number | null;
   duration_sec: number | null;
-  heart_rate: number | null;
   pace: string | null;
   comment: string | null;
   date: string;
@@ -44,7 +43,6 @@ export function formatMetrics(entry: HistoryEntry): string[] {
   if (entry.distance_km != null && entry.distance_km > 0) metrics.push(`${entry.distance_km} км`);
   if (entry.duration_sec != null && entry.rounds == null && entry.duration_sec > 0) metrics.push(formatDuration(entry)!);
   if (entry.pace) metrics.push(`темп ${entry.pace}`);
-  if (entry.heart_rate != null) metrics.push(`пульс ${entry.heart_rate}`);
   return metrics;
 }
 

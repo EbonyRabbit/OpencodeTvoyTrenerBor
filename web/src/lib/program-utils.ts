@@ -51,7 +51,6 @@ export type ParsedExercise = {
   rounds?: string;
   distance?: string;
   pace?: string;
-  heart_rate?: string;
   /** Фаза 25: вид упражнения, дефолт работа. */
   kind?: ExerciseKind;
 };
@@ -124,7 +123,6 @@ function isValidExercise(value: unknown, isChild = false): value is ParsedExerci
   if (e.rounds !== undefined && typeof e.rounds !== "string") return false;
   if (e.distance !== undefined && typeof e.distance !== "string") return false;
   if (e.pace !== undefined && typeof e.pace !== "string") return false;
-  if (e.heart_rate !== undefined && typeof e.heart_rate !== "string") return false;
   if (e.kind !== undefined && !(EXERCISE_KINDS as string[]).includes(e.kind as string)) return false;
   if (e.children !== undefined) {
     if (!Array.isArray(e.children)) return false;
@@ -229,7 +227,6 @@ export function getCellValue(exercise: ParsedExercise, column: string): string {
     "Дистанция": exercise.distance,
     "Время": exercise.duration,
     "Темп": exercise.pace,
-    "Пульс": exercise.heart_rate,
     "Раунды": exercise.rounds,
   };
   return map[column] ?? "-";

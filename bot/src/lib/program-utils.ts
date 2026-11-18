@@ -49,7 +49,6 @@ export type ParsedExercise = {
   rounds?: string;
   distance?: string;
   pace?: string;
-  heart_rate?: string;
   /** Фаза 25: вид упражнения, дефолт работа. */
   kind?: ExerciseKind;
   /** Фаза 24: runtime-метка персональной замены, канон не меняет. */
@@ -130,7 +129,6 @@ function isValidExercise(value: unknown, isChild = false): value is ParsedExerci
   if (e.rounds !== undefined && typeof e.rounds !== "string") return false;
   if (e.distance !== undefined && typeof e.distance !== "string") return false;
   if (e.pace !== undefined && typeof e.pace !== "string") return false;
-  if (e.heart_rate !== undefined && typeof e.heart_rate !== "string") return false;
   if (e.kind !== undefined && !(EXERCISE_KINDS as string[]).includes(e.kind as string)) return false;
   if (e.swapped_from !== undefined && typeof e.swapped_from !== "string") return false;
   if (e.children !== undefined) {

@@ -55,12 +55,12 @@ function getBlockAccent(block: string | undefined): string {
   return "border-l-border";
 }
 
-const NUMERIC_COLS = new Set(["Подходы", "Повторы", "Вес", "Вес/% 1ПМ", "RPE", "Отдых", "Дистанция", "Время", "Темп", "Пульс", "Раунды"]);
+const NUMERIC_COLS = new Set(["Подходы", "Повторы", "Вес", "Вес/% 1ПМ", "RPE", "Отдых", "Дистанция", "Время", "Темп", "Раунды"]);
 
 function ExerciseCards({ exercise, letter, isChild = false }: { exercise: ParsedExercise; letter?: string; isChild?: boolean }) {
   const isComposite = isCompositeExercise(exercise);
   const detail = [exercise.sets && exercise.reps ? `${exercise.sets}×${exercise.reps}` : exercise.sets ?? exercise.reps, exercise.weight ? (exercise.weight === "0" ? "вес тела" : exercise.weight) : null, exercise.rpe ? `RPE ${exercise.rpe}` : null].filter(Boolean).join(" · ");
-  const cardioMetrics = [exercise.distance ? `Дистанция: ${exercise.distance}` : null, exercise.duration ? `Время: ${exercise.duration}` : null, exercise.pace ? `Темп: ${exercise.pace}` : null, exercise.heart_rate ? `Пульс: ${exercise.heart_rate}` : null, exercise.rounds ? `Раунды: ${exercise.rounds}` : null].filter(Boolean);
+  const cardioMetrics = [exercise.distance ? `Дистанция: ${exercise.distance}` : null, exercise.duration ? `Время: ${exercise.duration}` : null, exercise.pace ? `Темп: ${exercise.pace}` : null, exercise.rounds ? `Раунды: ${exercise.rounds}` : null].filter(Boolean);
 
   if (isComposite && exercise.children?.length) {
     return (
@@ -116,7 +116,6 @@ function ExerciseRows({ exercise, columns, letter, isChild = false }: { exercise
     exercise.distance ? `Дистанция: ${exercise.distance}` : null,
     !isCircuit && exercise.duration ? `Время: ${exercise.duration}` : null,
     exercise.pace ? `Темп: ${exercise.pace}` : null,
-    exercise.heart_rate ? `Пульс: ${exercise.heart_rate}` : null,
     exercise.rounds ? `Раунды: ${exercise.rounds}` : null,
   ].filter(Boolean);
 

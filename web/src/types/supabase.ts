@@ -1219,7 +1219,6 @@ export type Database = {
           distance_km: number | null
           duration_sec: number | null
           exercise: string
-          heart_rate: number | null
           id: string
           pace: string | null
           program_id: string | null
@@ -1241,7 +1240,6 @@ export type Database = {
           distance_km?: number | null
           duration_sec?: number | null
           exercise: string
-          heart_rate?: number | null
           id?: string
           pace?: string | null
           program_id?: string | null
@@ -1263,7 +1261,6 @@ export type Database = {
           distance_km?: number | null
           duration_sec?: number | null
           exercise?: string
-          heart_rate?: number | null
           id?: string
           pace?: string | null
           program_id?: string | null

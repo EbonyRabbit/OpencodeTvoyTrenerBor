@@ -149,21 +149,6 @@ export function parsePace(input: string): string | null {
   return null;
 }
 
-export function parseHeartRate(input: string): string | null {
-  const trimmed = input.trim().toLowerCase().replace(/уд\/мин|уд\б|bpm|пульс/g, "").replace(/\s+/g, " ").trim();
-  if (!trimmed) return null;
-  const range = trimmed.match(/^(\d{2,3})\s*[--]\s*(\d{2,3})$/);
-  if (range) {
-    const a = Number(range[1]);
-    const b = Number(range[2]);
-    if (a >= 30 && a <= 250 && b >= 30 && b <= 250 && a <= b) return `${a}-${b}`;
-    return null;
-  }
-  const num = Number(trimmed);
-  if (Number.isInteger(num) && num >= 30 && num <= 250) return String(num);
-  return null;
-}
-
 export function parseRounds(input: string): string | null {
   const trimmed = input.trim().toLowerCase();
   if (trimmed === "макс" || trimmed === "max" || trimmed === "максимум") return "МАКС";
@@ -180,20 +165,6 @@ export function roundsValue(validated: string | undefined): number | null {
   const num = Number(validated);
   if (!Number.isInteger(num) || num < 0) return null;
   return num;
-}
-
-export function heartRateValue(validated: string | undefined): number | null {
-  if (!validated) return null;
-  const range = validated.match(/^(\d{2,3})\s*[--]\s*(\d{2,3})$/);
-  if (range) {
-    const a = Number(range[1]);
-    const b = Number(range[2]);
-    if (a < 30 || b > 250 || a > b) return null;
-    return Math.round((a + b) / 2);
-  }
-  const num = Number(validated);
-  if (Number.isInteger(num) && num >= 30 && num <= 250) return num;
-  return null;
 }
 
 export function parseMeasurement(input: string): string | null {

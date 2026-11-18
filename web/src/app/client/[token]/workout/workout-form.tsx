@@ -38,20 +38,6 @@ function amrapRoundsToInt(v: string): number | null {
   return Number.isInteger(n) && n >= 0 ? n : null;
 }
 
-function heartRateToInt(v: string): number | null {
-  const trimmed = v.trim();
-  if (!trimmed) return null;
-  const range = trimmed.match(/^(\d{2,3})\s*[--]\s*(\d{2,3})$/);
-  if (range) {
-    const a = Number(range[1]);
-    const b = Number(range[2]);
-    if (a < 30 || b > 250 || a > b) return null;
-    return Math.round((a + b) / 2);
-  }
-  const n = Number(trimmed);
-  return Number.isInteger(n) && n >= 30 && n <= 250 ? n : null;
-}
-
 function toDurationSec(v: string): number | null {
   const trimmed = v.trim().toLowerCase();
   if (!trimmed) return null;
@@ -90,7 +76,6 @@ type ExerciseInput = {
   distance: string;
   duration: string;
   pace: string;
-  heart_rate: string;
   comment: string;
 };
 
@@ -230,7 +215,6 @@ export function WorkoutForm({
       distance: "",
       duration: "",
       pace: "",
-      heart_rate: "",
       comment: "",
     })),
   );
@@ -259,10 +243,6 @@ export function WorkoutForm({
         }
         if (!inp.pace.trim() || toPace(inp.pace) == null) {
           setError(`${ex.name}: укажите темп, например 5:30`);
-          return;
-        }
-        if (!inp.heart_rate.trim() || heartRateToInt(inp.heart_rate) == null) {
-          setError(`${ex.name}: укажите пульс от 30 до 250`);
           return;
         }
       } else if (type === "circuit") {
@@ -303,7 +283,6 @@ export function WorkoutForm({
             rounds: null,
             distance_km: null,
             duration_sec: null,
-            heart_rate: null,
             pace: null,
             comment: inp.comment || null,
           };
@@ -319,7 +298,6 @@ export function WorkoutForm({
             rounds: null,
             distance_km: toNum(inp.distance),
             duration_sec: toDurationSec(inp.duration),
-            heart_rate: heartRateToInt(inp.heart_rate),
             pace: toPace(inp.pace),
             comment: inp.comment || null,
           };
@@ -335,7 +313,6 @@ export function WorkoutForm({
             rounds: amrapRoundsToInt(inp.rounds),
             distance_km: null,
             duration_sec: null,
-            heart_rate: null,
             pace: null,
             comment: inp.comment || null,
           };
@@ -350,7 +327,6 @@ export function WorkoutForm({
           rounds: null,
           distance_km: null,
           duration_sec: null,
-          heart_rate: null,
           pace: null,
           comment: inp.comment || null,
         };
@@ -403,11 +379,10 @@ export function WorkoutForm({
               {isWarmCool(ex) ? (
                 <p className="text-xs text-muted-foreground">Отмечается автоматически как выполненная, подходы вводить не нужно.</p>
               ) : type === "cardio" ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <Field label="Время" value={inputs[i].duration} onChange={(v) => updateField(i, "duration", v)} placeholder={ex.duration ?? "мин"} />
                   <Field label="Дистанция, км" value={inputs[i].distance} onChange={(v) => updateField(i, "distance", v)} placeholder={ex.distance ?? "км"} />
                   <Field label="Темп" value={inputs[i].pace} onChange={(v) => updateField(i, "pace", v)} placeholder={ex.pace ?? "5:30"} />
-                  <Field label="Пульс" value={inputs[i].heart_rate} onChange={(v) => updateField(i, "heart_rate", v)} placeholder={ex.heart_rate ?? "140"} />
                 </div>
               ) : type === "circuit" ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

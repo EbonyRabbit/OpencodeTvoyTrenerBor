@@ -400,7 +400,6 @@ export async function handleExerciseDoneSimple(ctx: MyContext, params: string): 
     rounds: null,
     distance_km: null,
     duration_sec: null,
-    heart_rate: null,
     pace: null,
     comment: null,
   });
@@ -501,7 +500,6 @@ export async function handleSkipReason(ctx: MyContext): Promise<boolean> {
     rounds: null,
     distance_km: null,
     duration_sec: null,
-    heart_rate: null,
     pace: null,
     comment: reason,
   });

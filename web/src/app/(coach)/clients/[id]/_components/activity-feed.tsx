@@ -23,19 +23,11 @@ function formatEventDate(raw: string): string {
 
 const TYPE_LABELS: Record<ActivityEvent["event_type"], string> = {
   workout: "Тренировка",
-  checkin: "Чек-ин",
-  measurement: "Замеры",
-  // photo: "Фото", // DISABLED: photo storage removed
-  message: "Сообщение",
   notification: "Уведомление",
 };
 
 const TYPE_ICONS: Record<ActivityEvent["event_type"], string> = {
   workout: "\uD83C\uDFCB",
-  checkin: "\uD83D\uDCCB",
-  measurement: "\uD83D\uDCCF",
-  // photo: "\uD83D\uDCF8", // DISABLED: photo storage removed
-  message: "\uD83D\uDCAC",
   notification: "\uD83D\uDD14",
 };
 
@@ -53,28 +45,6 @@ function EventContent({ event }: { event: ActivityEvent }) {
     case "workout": {
       const exercise = String(d.exercise ?? "");
       return <span>{exercise}{formatExercise({ sets: d.sets, reps: d.reps })}</span>;
-    }
-    case "checkin": {
-      const wb = String(d.wellbeing ?? "-");
-      const sl = String(d.sleep ?? "-");
-      const st = String(d.stress ?? "-");
-      return <span>Самочувствие: {wb}/10, Сон: {sl}/10, Стресс: {st}/10</span>;
-    }
-    case "measurement": {
-      const parts: string[] = [];
-      if (d.weight != null) parts.push(`Вес: ${String(d.weight)} кг`);
-      if (d.waist != null) parts.push(`Талия: ${String(d.waist)} см`);
-      if (d.chest != null) parts.push(`Грудь: ${String(d.chest)} см`);
-      return <span>{parts.join(", ") || "Замеры"}</span>;
-    }
-    // case "photo": { // DISABLED: photo storage removed
-    //   const labels: Record<string, string> = { front: "Фронтальное", side: "Боковое", back: "Заднее" };
-    //   return <span>{labels[String(d.type ?? "")] ?? "Фото"}</span>;
-    // }
-    case "message": {
-      const dir = d.direction === "to_client" ? "\u2192" : "\u2190";
-      const preview = String(d.preview ?? "").slice(0, 80);
-      return <span>{dir} {preview}{preview.length >= 80 ? "..." : ""}</span>;
     }
     case "notification": {
       const ntLabels: Record<string, string> = {

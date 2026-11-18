@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { activatePurchaseByOrder } from "@/lib/activate-purchase";
 import { resetDb } from "@/test/integration/db";
-import type { Database } from "@/types/supabase";
 
 const mocks = vi.hoisted(() => ({
   startProgramPeriod: vi.fn(),
@@ -103,18 +102,25 @@ async function seedClient(
   return data.id;
 }
 
-type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
-type MessageRow = Database["public"]["Tables"]["messages"]["Row"];
-type PurchaseRequestRow = Database["public"]["Tables"]["purchase_requests"]["Row"];
+type ClientRow = {
+  id: string;
+  telegram_id: number | null;
+  program_id: string | null;
+  payment_status: string | null;
+  status: string | null;
+  access_start_date: string | null;
+  access_end_date: string | null;
+  connect_code: string | null;
+};
+type PurchaseRequestRow = {
+  id: string;
+  status: string;
+  client_id: string | null;
+  paid_at: string | null;
+};
 
 async function clientRows(): Promise<ClientRow[]> {
   const { data, error } = await supabaseAdmin.from("clients").select("*");
-  if (error) throw error;
-  return data ?? [];
-}
-
-async function messageRows(): Promise<MessageRow[]> {
-  const { data, error } = await supabaseAdmin.from("messages").select("*");
   if (error) throw error;
   return data ?? [];
 }
@@ -150,7 +156,7 @@ beforeEach(() => {
 });
 
 describe("activatePurchaseByOrder on real data", () => {
-  it("activates a pending request, creates one client and records instructions", async () => {
+  it("activates a pending request and creates one client", async () => {
     const programId = await seedProgram();
     const requestId = await seedRequest({ programId });
     const orderId = await orderIdFor(requestId);
@@ -185,13 +191,6 @@ describe("activatePurchaseByOrder on real data", () => {
       client_id: result.clientId,
     });
     expect(requests[0].paid_at).toBeTruthy();
-
-    const messages = await messageRows();
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toMatchObject({
-      client_id: result.clientId,
-      direction: "to_client",
-    });
 
     expect(mocks.startProgramPeriod).toHaveBeenCalledWith(
       result.clientId,
@@ -234,7 +233,6 @@ describe("activatePurchaseByOrder on real data", () => {
     expect(result.error).toBeTruthy();
     expect(await clientRows()).toHaveLength(0);
     expect((await requestRows())[0].status).toBe("pending");
-    expect(await messageRows()).toHaveLength(0);
   });
 
   it("does not activate without consent", async () => {
@@ -255,7 +253,6 @@ describe("activatePurchaseByOrder on real data", () => {
       status: "pending",
       paid_at: null,
     });
-    expect(await messageRows()).toHaveLength(0);
   });
 
   it("is idempotent after the client is fully activated", async () => {
@@ -292,7 +289,6 @@ describe("activatePurchaseByOrder on real data", () => {
     expect(second.alreadyActivated).toBe(true);
     expect(second.clientId).toBe(first.clientId);
     expect(await clientRows()).toHaveLength(1);
-    expect(await messageRows()).toHaveLength(1);
   });
 
   it("does not burn the cancelled-payment dedup key without a coach chat", async () => {
@@ -410,7 +406,6 @@ describe("activatePurchaseByOrder on real data", () => {
       status: "paid",
       client_id: clients[0].id,
     });
-    expect(await messageRows()).toHaveLength(1);
   });
 
   it("does not activate when the payment status is not success", async () => {
@@ -428,7 +423,6 @@ describe("activatePurchaseByOrder on real data", () => {
     expect(result.error).toBeTruthy();
     expect(await clientRows()).toHaveLength(0);
     expect((await requestRows())[0].status).toBe("pending");
-    expect(await messageRows()).toHaveLength(0);
   });
 
   it("supports manual activation without a payment status", async () => {
@@ -477,7 +471,6 @@ describe("activatePurchaseByOrder on real data", () => {
       status: "pending",
       paid_at: null,
     });
-    expect(await messageRows()).toHaveLength(0);
   });
 
   it("does not activate an inactive program", async () => {
@@ -498,7 +491,6 @@ describe("activatePurchaseByOrder on real data", () => {
       status: "pending",
       paid_at: null,
     });
-    expect(await messageRows()).toHaveLength(0);
   });
 
   it("keeps the access dates of an already active identical program", async () => {
@@ -535,7 +527,8 @@ describe("activatePurchaseByOrder on real data", () => {
       month: "numeric",
       day: "numeric",
     }).format(new Date(accessEndDate));
-    expect((await messageRows())[0].text).toContain(expectedDate);
+    expect(mocks.sendTelegramMessage).toHaveBeenCalled();
+    expect(mocks.sendTelegramMessage.mock.calls.at(-1)?.[1]).toContain(expectedDate);
   });
 
   it("generates a connect code when the buyer has no Telegram", async () => {
@@ -618,7 +611,6 @@ describe("activatePurchaseByOrder on real data", () => {
     // заведомо неверную привязку. Заявку разбирает тренер.
     expect(request.status).toBe("paid");
     expect(request.paid_at).toBeTruthy();
-    expect(await messageRows()).toHaveLength(0);
 
     const retry = await activatePurchaseByOrder({
       orderId,
@@ -645,7 +637,6 @@ describe("activatePurchaseByOrder on real data", () => {
       paidSum: 5900,
     });
     expect(first.warning).toBeTruthy();
-    expect(await messageRows()).toHaveLength(0);
 
     const stale = new Date(Date.now() - 11 * 60 * 1000).toISOString();
     const { error: staleError } = await supabaseAdmin
@@ -661,7 +652,6 @@ describe("activatePurchaseByOrder on real data", () => {
       paidSum: 5900,
     });
     expect(retry.warning).toBeUndefined();
-    expect(await messageRows()).toHaveLength(1);
   });
 
   it("reports a schedule generation failure but keeps the assigned program", async () => {
@@ -708,7 +698,6 @@ describe("activatePurchaseByOrder on real data", () => {
     const client = (await clientRows())[0];
     expect(client.payment_status).toBe("paid");
     expect(client.access_end_date).toBeTruthy();
-    expect(await messageRows()).toHaveLength(1);
   });
 
   it("refuses to recover a paid request into a mismatched Telegram client", async () => {
@@ -732,7 +721,6 @@ describe("activatePurchaseByOrder on real data", () => {
     expect(result.error).toBeTruthy();
     const client = (await clientRows())[0];
     expect(client.payment_status).not.toBe("paid");
-    expect(await messageRows()).toHaveLength(0);
     expect((await requestRows())[0].status).toBe("paid");
   });
 
@@ -758,7 +746,6 @@ describe("activatePurchaseByOrder on real data", () => {
     expect(result.alreadyActivated).toBeUndefined();
     const client = (await clientRows())[0];
     expect(client.payment_status).not.toBe("paid");
-    expect(await messageRows()).toHaveLength(0);
   });
 
   it("reuses an existing connect code for a client without Telegram", async () => {

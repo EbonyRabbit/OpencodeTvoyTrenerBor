@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase-proxy";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { hashClientToken } from "@/lib/client-token";
 
-const protectedRoutes = ["/dashboard", "/clients", "/programs", "/checkins", "/chat", "/exercises"];
+const protectedRoutes = ["/dashboard", "/clients", "/programs", "/exercises"];
 const authRoutes = ["/login"];
 
 const CLIENT_ROUTE_EXCLUSIONS = ["/client/expired"];

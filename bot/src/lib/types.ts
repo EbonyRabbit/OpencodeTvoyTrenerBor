@@ -2,8 +2,6 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 export type ClientStatus = "active" | "inactive" | "access_expired";
 export type PaymentStatus = "pending" | "paid";
-export type PhotoType = "front" | "side" | "back";
-export type MessageDirection = "to_client" | "to_coach";
 export type NotificationType =
   | "morning"
   | "evening"
@@ -190,75 +188,6 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["client_exercise_swaps"]["Row"]>;
         Relationships: [];
       };
-      measurements: {
-        Row: {
-          id: string;
-          client_id: string;
-          date: string;
-          weight: number | null;
-          waist: number | null;
-          abdomen: number | null;
-          chest: number | null;
-          hips: number | null;
-          glutes: number | null;
-          left_thigh: number | null;
-          right_thigh: number | null;
-          left_arm: number | null;
-          right_arm: number | null;
-          body_fat: number | null;
-          muscle_mass: number | null;
-          visceral_fat: number | null;
-          comment: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: Omit<Database["public"]["Tables"]["measurements"]["Row"], "id" | "created_at" | "updated_at"> & {
-          id?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["measurements"]["Row"]>;
-        Relationships: [];
-      };
-      checkins: {
-        Row: {
-          id: string;
-          client_id: string;
-          date: string;
-          week: number | null;
-          wellbeing: number | null;
-          sleep: number | null;
-          stress: number | null;
-          nutrition_adherence: number | null;
-          missed_workouts: number | null;
-          complaints: string | null;
-          comment: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: Omit<Database["public"]["Tables"]["checkins"]["Row"], "id" | "created_at" | "updated_at"> & {
-          id?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["checkins"]["Row"]>;
-        Relationships: [];
-      };
-      photos: {
-        Row: {
-          id: string;
-          client_id: string;
-          date: string;
-          week: number | null;
-          type: PhotoType;
-          drive_url: string | null;
-          folder_url: string | null;
-          storage_path: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: Omit<Database["public"]["Tables"]["photos"]["Row"], "id" | "created_at" | "updated_at"> & {
-          id?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["photos"]["Row"]>;
-        Relationships: [];
-      };
       program_schedule: {
         Row: {
           id: string;
@@ -335,24 +264,6 @@ export interface Database {
           contraindications?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["exercises"]["Row"]>;
-        Relationships: [];
-      };
-      messages: {
-        Row: {
-          id: string;
-          client_id: string;
-          coach_id: string | null;
-          direction: MessageDirection;
-          text: string;
-          sent_at: string;
-          read_at: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: Omit<Database["public"]["Tables"]["messages"]["Row"], "id" | "created_at" | "updated_at"> & {
-          id?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
         Relationships: [];
       };
       notification_log: {
@@ -577,8 +488,6 @@ export interface Database {
     Enums: {
       client_status: ClientStatus;
       payment_status: PaymentStatus;
-      photo_type: PhotoType;
-      message_direction: MessageDirection;
       notification_type: NotificationType;
     };
   };

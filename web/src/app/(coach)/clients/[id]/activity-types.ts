@@ -1,7 +1,7 @@
 export type ActivityEvent = {
   id: string;
   date: string;
-  event_type: "workout" | "checkin" | "measurement" /* | "photo" */ | "message" | "notification";
+  event_type: "workout" | "notification";
   details: Record<string, unknown>;
 };
 

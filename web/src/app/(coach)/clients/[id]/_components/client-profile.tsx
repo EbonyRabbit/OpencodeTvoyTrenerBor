@@ -19,13 +19,9 @@ import {
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_VARIANTS,
   LANGUAGE_LABELS,
-  MEASUREMENT_DAY_OPTIONS,
-  CHECKIN_DAY_OPTIONS,
 } from "@/lib/clients";
 import { getProgramStatus, STATUS_LABELS } from "@/lib/programs";
 import { ProgramWeekPreview } from "@/app/(coach)/programs/[id]/_components/program-week-preview";
-import { MiniLineChart } from "./mini-line-chart";
-// import { PHOTO_TYPE_LABELS } from "@/lib/photos"; // DISABLED: photo storage removed
 import { PauseSection } from "./pause-section";
 import type { ParsedContent } from "@/lib/program-utils";
 import type { NextWorkoutDay } from "@/lib/next-workout";
@@ -33,25 +29,12 @@ import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import type { Database, Json } from "@/types/supabase";
 
-type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "measurement_time" | "measurement_day" | "checkin_day" | "checkin_time" | "training_days" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
-type CheckinRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress" | "nutrition_adherence" | "missed_workouts" | "complaints">;
-type MeasurementRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
+type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "training_days" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
 type ScheduleRow = Pick<Database["public"]["Tables"]["program_schedule"]["Row"], "id" | "week_number" | "focus" | "start_date" | "end_date">;
-type CheckinHistoryRow = Pick<Database["public"]["Tables"]["checkins"]["Row"], "date" | "wellbeing" | "sleep" | "stress">;
-type MeasurementHistoryRow = Pick<Database["public"]["Tables"]["measurements"]["Row"], "date" | "weight" | "waist" | "chest" | "hips">;
 type PurchaseRequestRow = Pick<
   Database["public"]["Tables"]["purchase_requests"]["Row"],
   "id" | "sub_type" | "status" | "amount" | "created_at" | "paid_at"
 > & { program: { id: string; title: string } | null };
-// type PhotoRow = Pick<Database["public"]["Tables"]["photos"]["Row"], "id" | "date" | "type" | "drive_url"> & { resolvedUrl: string | null }; // DISABLED: photo storage removed
-
-const MEASUREMENT_DAY_LABELS: Record<number, string> = Object.fromEntries(
-  MEASUREMENT_DAY_OPTIONS.map((o) => [o.value, o.label])
-) as Record<number, string>;
-
-const WEEKDAY_LABELS: Record<number, string> = Object.fromEntries(
-  CHECKIN_DAY_OPTIONS.map((o) => [o.value, o.label])
-) as Record<number, string>;
 
 const PURCHASE_REQUEST_STATUS_LABELS: Record<string, string> = {
   pending: "Ожидает оплаты",
@@ -178,65 +161,24 @@ function AccessBadge({
   return <Badge variant="secondary">Не указан</Badge>;
 }
 
-function CheckinScore({ label, value }: { label: string; value: number | null }) {
-  const isStress = label === "Стресс";
-  const color =
-    value === null
-      ? "text-muted-foreground"
-      : isStress
-        ? value <= 3
-          ? "text-green-600"
-          : value <= 6
-            ? "text-yellow-600"
-            : "text-red-600"
-        : value >= 7
-          ? "text-green-600"
-          : value >= 4
-            ? "text-yellow-600"
-            : "text-red-600";
-
-  return (
-    <div className="flex items-center justify-between py-0.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`font-medium ${color}`}>
-        {value !== null ? `${value}/10` : "-"}
-      </span>
-    </div>
-  );
-}
-
 export function ClientProfile({
   client,
-  latestCheckin,
-  latestMeasurement,
   workoutCount,
-  checkinCount,
-  messageCount,
   schedule,
   parsedContent,
   nextWorkout,
-  checkinHistory,
-  measurementHistory,
   initialActivityEvents,
   loadMoreActivity,
-  // latestPhotos, // DISABLED: photo storage removed
   purchaseRequests,
   subscription,
 }: {
   client: ClientRow;
-  latestCheckin: CheckinRow | null;
-  latestMeasurement: MeasurementRow | null;
   workoutCount: number | null;
-  checkinCount: number;
-  messageCount: number;
   schedule: ScheduleRow[];
   parsedContent: ParsedContent | null;
   nextWorkout: NextWorkoutDay | null;
-  checkinHistory: CheckinHistoryRow[];
-  measurementHistory: MeasurementHistoryRow[];
   initialActivityEvents: ActivityEvent[];
   loadMoreActivity: (offset: number) => Promise<ActivityEvent[] | { error: string }>;
-  // latestPhotos: PhotoRow[]; // DISABLED: photo storage removed
   purchaseRequests: PurchaseRequestRow[];
   subscription: {
     id: string;
@@ -320,10 +262,6 @@ export function ClientProfile({
           <InfoRow label="Язык" value={LANGUAGE_LABELS[client.language] ?? client.language} />
           <InfoRow label="Часовой пояс" value={client.timezone ?? "-"} />
           <InfoRow label="Утро (напоминание)" value={formatTime(client.morning_time)} />
-          <InfoRow label="Замеры - день" value={client.measurement_day != null ? (MEASUREMENT_DAY_LABELS[client.measurement_day] ?? String(client.measurement_day)) : "-"} />
-          <InfoRow label="Замеры - время" value={formatTime(client.measurement_time)} />
-          <InfoRow label="Чек-ин - день" value={client.checkin_day != null ? WEEKDAY_LABELS[client.checkin_day] ?? String(client.checkin_day) : "-"} />
-          <InfoRow label="Чек-ин - время" value={formatTime(client.checkin_time)} />
           <InfoRow label="Код подключения" value={client.connect_code ?? "-"} />
           <InfoRow label="ID в Google Sheets" value={client.spreadsheet_id ?? "-"} />
         </SectionCard>
@@ -473,146 +411,15 @@ export function ClientProfile({
         )}
       </SectionCard>
 
-      <div className="grid gap-6 sm:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2">
         <SectionCard title="Статистика">
           <InfoRow
             label="Тренировок"
             value={workoutCount == null ? "-" : String(workoutCount)}
           />
-          <InfoRow label="Чек-инов" value={String(checkinCount)} />
-          <InfoRow label="Сообщений" value={String(messageCount)} />
           <InfoRow label="Недель в расписании" value={String(schedule.length)} />
         </SectionCard>
-
-        <SectionCard title="Последний чек-ин">
-          {latestCheckin ? (
-            <>
-              <InfoRow label="Дата" value={formatDate(latestCheckin.date)} />
-              <CheckinScore label="Самочувствие" value={latestCheckin.wellbeing} />
-              <CheckinScore label="Сон" value={latestCheckin.sleep} />
-              <CheckinScore label="Стресс" value={latestCheckin.stress} />
-              <InfoRow
-                label="Питание"
-                value={
-                  latestCheckin.nutrition_adherence != null
-                    ? `${latestCheckin.nutrition_adherence}%`
-                    : "-"
-                }
-              />
-              <InfoRow
-                label="Пропуски"
-                value={
-                  latestCheckin.missed_workouts != null
-                    ? String(latestCheckin.missed_workouts)
-                    : "-"
-                }
-              />
-              {latestCheckin.complaints && (
-                <div className="pt-2">
-                  <p className="text-xs text-muted-foreground">Жалобы</p>
-                  <p className="mt-0.5 text-sm">{latestCheckin.complaints}</p>
-                </div>
-              )}
-              <div className="pt-3">
-                <Link
-                  href={`/clients/${client.id}/checkins`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Все чек-ины →
-                </Link>
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Нет чек-инов
-            </p>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Последние замеры">
-          {latestMeasurement ? (
-            <>
-              <InfoRow label="Дата" value={formatDate(latestMeasurement.date)} />
-              {latestMeasurement.weight != null && (
-                <InfoRow label="Вес" value={`${latestMeasurement.weight} кг`} />
-              )}
-              {latestMeasurement.waist != null && (
-                <InfoRow label="Талия" value={`${latestMeasurement.waist} см`} />
-              )}
-              {latestMeasurement.chest != null && (
-                <InfoRow label="Грудь" value={`${latestMeasurement.chest} см`} />
-              )}
-              {latestMeasurement.hips != null && (
-                <InfoRow label="Бёдра" value={`${latestMeasurement.hips} см`} />
-              )}
-              <div className="pt-3">
-                <Link
-                  href={`/clients/${client.id}/measurements`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Все замеры →
-                </Link>
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Нет замеров
-            </p>
-          )}
-        </SectionCard>
       </div>
-
-      {/* DISABLED: photo storage removed - clients save photos on their own devices
-      <SectionCard title="Последние фото">
-        {latestPhotos.length > 0 ? (
-          <>
-            <div className="grid grid-cols-3 gap-2">
-              {latestPhotos.slice(0, 6).map((photo) => (
-                <Link
-                  key={photo.id}
-                  href={`/clients/${client.id}/photos`}
-                  className="group relative aspect-[3/4] w-full overflow-hidden rounded-md border bg-muted"
-                  aria-label={`${PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}`}
-                >
-                  {photo.resolvedUrl && !failedImages.has(photo.id) ? (
-                    <Image
-                      src={photo.resolvedUrl}
-                      alt={PHOTO_TYPE_LABELS[photo.type] ?? "Фото"}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105"
-                      sizes="(max-width: 640px) 33vw, 15vw"
-                      onError={() => setFailedImages((prev) => new Set(prev).add(photo.id))}
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <span className="text-xs text-muted-foreground">-</span>
-                    </div>
-                  )}
-                  <Badge
-                    className="absolute left-1 top-1 text-[10px]"
-                    variant="secondary"
-                  >
-                    {PHOTO_TYPE_LABELS[photo.type] ?? photo.type}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Нет прогресс-фото
-          </p>
-        )}
-        <div className="pt-3">
-          <Link
-            href={`/clients/${client.id}/photos`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            Все фото →
-          </Link>
-        </div>
-      </SectionCard>
-      */}
 
       <SectionCard title="Дисциплина">
         <p className="text-sm text-muted-foreground">
@@ -629,54 +436,6 @@ export function ClientProfile({
       </SectionCard>
 
       <PauseSection clientId={client.id} />
-
-      {(checkinHistory.length > 0 || measurementHistory.length > 0) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Прогресс
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {measurementHistory.length > 0 && (
-              <div>
-                <h3 className="mb-2 text-sm font-medium">Вес</h3>
-                <MiniLineChart
-                  data={measurementHistory.map((m) => ({
-                    label: m.date,
-                    value: m.weight,
-                  }))}
-                  color="var(--color-primary, #2563eb)"
-                />
-              </div>
-            )}
-            {checkinHistory.some((c) => c.wellbeing !== null) && (
-              <div>
-                <h3 className="mb-2 text-sm font-medium">Самочувствие</h3>
-                <MiniLineChart
-                  data={checkinHistory.map((c) => ({
-                    label: c.date,
-                    value: c.wellbeing,
-                  }))}
-                  color="var(--color-chart-2, #16a34a)"
-                />
-              </div>
-            )}
-            {checkinHistory.some((c) => c.stress !== null) && (
-              <div>
-                <h3 className="mb-2 text-sm font-medium">Стресс</h3>
-                <MiniLineChart
-                  data={checkinHistory.map((c) => ({
-                    label: c.date,
-                    value: c.stress,
-                  }))}
-                  color="var(--color-chart-3, #dc2626)"
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {schedule.length > 0 && (
         <Card>
@@ -734,10 +493,6 @@ export function ClientProfile({
         clientLanguage={client.language}
         clientTimezone={client.timezone}
         clientMorningTime={client.morning_time}
-        clientMeasurementTime={client.measurement_time}
-        clientMeasurementDay={client.measurement_day}
-        clientCheckinDay={client.checkin_day}
-        clientCheckinTime={client.checkin_time}
         clientTrainingDays={client.training_days}
         programDayOrders={programDayOrders}
         clientTelegramId={client.telegram_id}
@@ -745,12 +500,6 @@ export function ClientProfile({
       />
 
       <div className="flex justify-end gap-2">
-        <Link
-          href={`/clients/${client.id}/chat`}
-          className={buttonVariants({ variant: "outline" })}
-        >
-          Чат
-        </Link>
         {client.telegram_id ? (
           <a
             href={`tg://user?id=${client.telegram_id}`}

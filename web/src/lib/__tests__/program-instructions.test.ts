@@ -20,12 +20,10 @@ describe("buildProgramInstructions", () => {
     expect(text).toContain("Введи код подключения: ABC12345");
     expect(text).toContain("1. Открой бота");
     expect(text).toContain("2. Введи код подключения");
-    expect(text).toContain("3. Настрой тренировки и замеры");
+    expect(text).toContain("3. Настрой тренировки и напоминания");
     expect(text).toContain("4. Начни первую тренировку: /today");
     expect(text).toContain("5. Программа и план всегда в /menu");
     expect(text).toContain("дни тренировок");
-    expect(text).toContain("день и время замеров");
-    expect(text).toContain("день и время чек-ина");
     expect(text).toContain("/settings");
   });
 
@@ -40,8 +38,6 @@ describe("buildProgramInstructions", () => {
     expect(text).toContain("Hi, John!");
     expect(text).toContain("Program: Strength 12 weeks");
     expect(text).toContain("training days");
-    expect(text).toContain("measurement day and time");
-    expect(text).toContain("check-in day and time");
   });
 
   it("numbers steps sequentially when connect code is absent", () => {
@@ -55,11 +51,11 @@ describe("buildProgramInstructions", () => {
 
     expect(text).not.toContain("Введи код подключения");
     expect(text).toContain("1. Открой бота");
-    expect(text).toContain("2. Настрой тренировки и замеры");
+    expect(text).toContain("2. Настрой тренировки и напоминания");
     expect(text).toContain("3. Начни первую тренировку: /today");
     expect(text).toContain("4. Программа и план всегда в /menu");
     expect(text).not.toMatch(/\n5\. /);
-    expect(text).not.toContain("3. Настрой тренировки и замеры");
+    expect(text).not.toContain("3. Настрой тренировки и напоминания");
   });
 
   it("uses the default name when name is empty", () => {
@@ -140,7 +136,7 @@ describe("buildProgramInstructions", () => {
 
     expect(text).toContain("1. Open the bot");
     expect(text).toContain("2. Enter the connect code: ABC12345");
-    expect(text).toContain("3. Set up your workouts and measurements");
+    expect(text).toContain("3. Set up your workouts and reminders");
     expect(text).toContain("4. Start your first workout: /today");
   });
 

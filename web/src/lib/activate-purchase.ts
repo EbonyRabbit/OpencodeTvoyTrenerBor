@@ -189,53 +189,26 @@ export async function deliverProgramInstructions(
     timezone: input.timezone,
   });
 
-  const saveMessage = async (): Promise<{ error?: string }> => {
-    const { error } = await supabaseAdmin.from("messages").insert({
-      client_id: input.clientId,
-      coach_id: input.coachId,
-      direction: "to_client",
-      text,
-      sent_at: new Date().toISOString(),
-      read_at: null,
-    });
-    if (error) {
-      console.error("[INSTRUCTIONS] Failed to save message:", error.message);
-      return { error: error.message };
-    }
-    return {};
-  };
-
   if (input.clientTelegramId) {
     const sent = await sendTelegramMessage(input.clientTelegramId, text);
     if (!sent) {
-      // Не сохраняем запись до успешной доставки: hasInstructionsFor иначе
-      // примет её за доставленные инструкции и не повторит отправку.
       return {
         warning:
           "Инструкции не доставлены в Telegram. Проверьте, что клиент не заблокировал бота и что токен бота настроен, затем повторите отправку.",
       };
     }
-    const saved = await saveMessage();
-    return saved.error
-      ? {
-          warning:
-            "Инструкции доставлены в Telegram, но не сохранены в истории чата.",
-        }
-      : {};
+    return {};
   }
 
-  const saved = await saveMessage();
   if (input.connectCode) {
     return {
-      warning: saved.error
-        ? "Инструкции не сохранены в истории чата. Передайте клиенту код подключения."
-        : "Клиент не подключён к Telegram. Передайте ему код подключения; после подключения отправьте инструкции ещё раз кнопкой «Отправить инструкции».",
+      warning:
+        "Клиент не подключён к Telegram. Передайте ему код подключения; после подключения отправьте инструкции ещё раз кнопкой «Отправить инструкции».",
     };
   }
   return {
-    warning: saved.error
-      ? "Инструкции не сохранены в истории чата, а код подключения не удалось сгенерировать. Попробуйте кнопкой «Код подключения»."
-      : "Клиент не подключён к Telegram, а код подключения не удалось сгенерировать. Попробуйте кнопкой «Код подключения».",
+    warning:
+      "Клиент не подключён к Telegram, а код подключения не удалось сгенерировать. Попробуйте кнопкой «Код подключения».",
   };
 }
 
@@ -628,7 +601,6 @@ export async function activatePurchaseByOrder({
         const recovered = await recoverLinkedRequest({
           requestId: request.id,
           clientId: current.client_id,
-          paidAt: current.paid_at ?? null,
           programId: request.program_id,
           telegramId: request.telegram_id,
         });
@@ -767,7 +739,6 @@ export async function activatePurchaseByOrder({
           const recovered = await recoverLinkedRequest({
             requestId: request.id,
             clientId: linkedClientId,
-            paidAt: current?.paid_at ?? null,
             programId: request.program_id,
             telegramId: request.telegram_id,
           });
@@ -829,13 +800,11 @@ type RecoveryOutcome =
 async function recoverLinkedRequest({
   requestId,
   clientId,
-  paidAt,
   programId,
   telegramId,
 }: {
   requestId: string;
   clientId: string;
-  paidAt: string | null;
   programId: string;
   telegramId: number | null;
 }): Promise<RecoveryOutcome> {
@@ -874,9 +843,7 @@ async function recoverLinkedRequest({
   if (activated) {
     const hasSchedule = await hasScheduleFor(clientId);
     if (hasSchedule) {
-      if (!paidAt || (await hasInstructionsFor(clientId, paidAt))) {
-        return { kind: "alreadyActivated", clientId };
-      }
+      return { kind: "alreadyActivated", clientId };
     }
   }
 
@@ -929,30 +896,6 @@ async function hasScheduleFor(clientId: string): Promise<boolean> {
     .maybeSingle();
   if (error) {
     console.error("[ACTIVATION] Active period lookup error:", error.message);
-    return false;
-  }
-  return data !== null;
-}
-
-async function hasInstructionsFor(
-  clientId: string,
-  sinceIso: string,
-): Promise<boolean> {
-  // Accepted limitation: any to_client message saved after paid_at counts as
-  // delivered instructions. The row is now written only after Telegram accepts
-  // the message, so an undelivered attempt cannot mask auto-redelivery. A save
-  // failure after a successful send can still duplicate instructions on a
-  // later takeover; the coach warning covers that case.
-  const { data, error } = await supabaseAdmin
-    .from("messages")
-    .select("id")
-    .eq("client_id", clientId)
-    .eq("direction", "to_client")
-    .gte("sent_at", sinceIso)
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.error("[ACTIVATION] Instructions lookup error:", error.message);
     return false;
   }
   return data !== null;

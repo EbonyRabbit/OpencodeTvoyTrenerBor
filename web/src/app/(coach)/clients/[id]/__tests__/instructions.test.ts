@@ -180,18 +180,6 @@ describe("markPurchased", () => {
     expect(result.warning).toContain("не доставлены в Telegram");
   });
 
-  it("warns when the messages insert fails but delivery still happens", async () => {
-    mockDb({
-      client: { ...baseClient, telegram_id: 12345 },
-      program: baseProgram,
-      insertError: { message: "boom" },
-    });
-
-    const result = await markPurchased(CLIENT_ID, PROGRAM_ID);
-    expect(result.error).toBeUndefined();
-    expect(result.warning).toContain("не сохранены в истории");
-    expect(sendTelegramMessage).toHaveBeenCalledTimes(1);
-  });
 
   it("returns an error when the program is missing", async () => {
     mockDb({ client: baseClient, program: null });

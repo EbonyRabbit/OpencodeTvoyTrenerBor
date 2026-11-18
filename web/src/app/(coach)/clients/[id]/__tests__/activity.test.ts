@@ -35,12 +35,11 @@ const WORKOUT_ROW = {
   reps: "5",
   weight: 100,
 };
-const CHECKIN_ROW = {
-  id: "c1",
+const NOTIFICATION_ROW = {
+  id: "n1",
   created_at: "2024-01-02T10:00:00.000Z",
-  wellbeing: 4,
-  sleep: 4,
-  stress: 2,
+  type: "morning",
+  status: "sent",
 };
 
 function mockSupabase() {
@@ -56,8 +55,8 @@ function mockSupabase() {
             data:
               table === "workout_logs"
                 ? [WORKOUT_ROW]
-                : table === "checkins"
-                  ? [CHECKIN_ROW]
+                : table === "notification_log"
+                  ? [NOTIFICATION_ROW]
                   : [],
             error: null,
           }),

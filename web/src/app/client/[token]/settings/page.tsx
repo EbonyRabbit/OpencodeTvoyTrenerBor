@@ -6,14 +6,7 @@ import { SettingsForm } from "./settings-form";
 
 type SettingsClient = Pick<
   ClientRow,
-  | "language"
-  | "timezone"
-  | "morning_time"
-  | "measurement_time"
-  | "measurement_day"
-  | "checkin_day"
-  | "checkin_time"
-  | "training_days"
+  "language" | "timezone" | "morning_time" | "training_days"
 >;
 
 export default async function SettingsPage() {
@@ -23,9 +16,7 @@ export default async function SettingsPage() {
 
   const { data: client } = await supabaseAdmin
     .from("clients")
-    .select(
-      "language, timezone, morning_time, measurement_time, measurement_day, checkin_day, checkin_time, training_days, program_id",
-    )
+    .select("language, timezone, morning_time, training_days, program_id")
     .eq("id", clientId)
     .maybeSingle<SettingsClient & { program_id: string | null }>();
 
@@ -61,7 +52,11 @@ export default async function SettingsPage() {
           Управляйте уведомлениями, языком и расписанием тренировок
         </p>
       </div>
-      <SettingsForm client={client} programDayOrders={programDayOrders} />
+      <SettingsForm
+        key={`${client.language}-${client.timezone ?? ""}-${client.morning_time ?? ""}-${(client.training_days ?? []).join(",")}-${programDayOrders.join(",")}`}
+        client={client}
+        programDayOrders={programDayOrders}
+      />
     </div>
   );
 }

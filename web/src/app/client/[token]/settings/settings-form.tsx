@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,19 +14,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Check } from "lucide-react";
 import { updateClientSettings, type ClientSettingsInput } from "../actions";
-import { TIMEZONE_LIST, LANGUAGE_LABELS, MEASUREMENT_DAY_OPTIONS, CHECKIN_DAY_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/clients";
+import { TIMEZONE_LIST, LANGUAGE_LABELS, WEEKDAY_OPTIONS } from "@/lib/clients";
 import type { ClientRow } from "@/lib/clients";
 
 type SettingsClient = Pick<
   ClientRow,
-  | "language"
-  | "timezone"
-  | "morning_time"
-  | "measurement_time"
-  | "measurement_day"
-  | "checkin_day"
-  | "checkin_time"
-  | "training_days"
+  "language" | "timezone" | "morning_time" | "training_days"
 >;
 
 export function SettingsForm({
@@ -40,14 +33,6 @@ export function SettingsForm({
   const [language, setLanguage] = useState(client.language);
   const [timezone, setTimezone] = useState(client.timezone ?? "");
   const [morningTime, setMorningTime] = useState((client.morning_time ?? "").slice(0, 5));
-  const [measurementTime, setMeasurementTime] = useState((client.measurement_time ?? "").slice(0, 5));
-  const [measurementDay, setMeasurementDay] = useState(
-    client.measurement_day != null ? String(client.measurement_day) : "",
-  );
-  const [checkinDay, setCheckinDay] = useState(
-    client.checkin_day != null ? String(client.checkin_day) : "",
-  );
-  const [checkinTime, setCheckinTime] = useState((client.checkin_time ?? "").slice(0, 5));
   const [trainingDays, setTrainingDays] = useState<(number | null)[]>(
     programDayOrders.map((_, i) => client.training_days?.[i] ?? null),
   );
@@ -55,20 +40,6 @@ export function SettingsForm({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLanguage(client.language);
-    setTimezone(client.timezone ?? "");
-    setMorningTime((client.morning_time ?? "").slice(0, 5));
-    setMeasurementTime((client.measurement_time ?? "").slice(0, 5));
-    setMeasurementDay(
-      client.measurement_day != null ? String(client.measurement_day) : "",
-    );
-    setCheckinDay(client.checkin_day != null ? String(client.checkin_day) : "");
-    setCheckinTime((client.checkin_time ?? "").slice(0, 5));
-    setTrainingDays(
-      programDayOrders.map((_, i) => client.training_days?.[i] ?? null),
-    );
-  }, [client, programDayOrders]);
 
   const updateTrainingDay = useCallback(
     (index: number, value: number | null) => {
@@ -102,10 +73,6 @@ export function SettingsForm({
         language,
         timezone: timezone || null,
         morning_time: morningTime || null,
-        measurement_time: measurementTime || null,
-        measurement_day: measurementDay ? Number(measurementDay) : null,
-        checkin_day: checkinDay ? Number(checkinDay) : null,
-        checkin_time: checkinTime || null,
         training_days: scheduleComplete ? trainingDays.map((d) => d as number) : null,
       };
 
@@ -193,68 +160,6 @@ export function SettingsForm({
               step={900}
               value={morningTime}
               onChange={(e) => setMorningTime(e.target.value)}
-              className="h-9"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="settings-meas-day" className="text-xs text-muted-foreground">
-              День замеров
-            </label>
-            <Select value={measurementDay} onValueChange={(v) => setMeasurementDay(v ?? "")}>
-              <SelectTrigger id="settings-meas-day" className="w-full">
-                <SelectValue placeholder="Не задан" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Не задан</SelectItem>
-                {MEASUREMENT_DAY_OPTIONS.map(({ value, label }) => (
-                  <SelectItem key={value} value={String(value)}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="settings-meas-time" className="text-xs text-muted-foreground">
-              Время замеров (HH:MM)
-            </label>
-            <Input
-              id="settings-meas-time"
-              type="time"
-              step={900}
-              value={measurementTime}
-              onChange={(e) => setMeasurementTime(e.target.value)}
-              className="h-9"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="settings-checkin-day" className="text-xs text-muted-foreground">
-              Чек-ин - день недели
-            </label>
-            <Select value={checkinDay} onValueChange={(v) => setCheckinDay(v ?? "")}>
-              <SelectTrigger id="settings-checkin-day" className="w-full">
-                <SelectValue placeholder="Не задан" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Не задан</SelectItem>
-                {CHECKIN_DAY_OPTIONS.map(({ value, label }) => (
-                  <SelectItem key={value} value={String(value)}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="settings-checkin-time" className="text-xs text-muted-foreground">
-              Чек-ин - время (HH:MM)
-            </label>
-            <Input
-              id="settings-checkin-time"
-              type="time"
-              step={900}
-              value={checkinTime}
-              onChange={(e) => setCheckinTime(e.target.value)}
               className="h-9"
             />
           </div>

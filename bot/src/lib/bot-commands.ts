@@ -3,16 +3,15 @@ import type { MyContext } from "../bot.js";
 
 // Клиентские команды, которые видны в текстовом /menu. Панель команд
 // Telegram (кнопка «Меню») синхронизируется при старте бота; скрытые
-// служебные команды (debug_today, recalc_schedule, generate_codes,
-// measure, measurements, chat) сюда не попадают сознательно.
+// служебные команды (debug_today, recalc_schedule, generate_codes, chat)
+// сюда не попадают сознательно.
 const CLIENT_COMMANDS = [
   { command: "start", description: "Запуск бота" },
   { command: "menu", description: "Меню" },
   { command: "today", description: "Тренировка дня" },
-  { command: "progress", description: "Прогресс и замеры" },
+  { command: "progress", description: "Прогресс" },
   { command: "myprogram", description: "Моя программа" },
   { command: "mystats", description: "Статистика за месяц" },
-  { command: "checkin", description: "Чек-ин" },
   { command: "pause", description: "Пауза в тренировках" },
   { command: "resume", description: "Возобновить тренировки" },
   { command: "programs", description: "Каталог программ" },

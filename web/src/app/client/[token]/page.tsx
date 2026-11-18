@@ -51,7 +51,7 @@ export default async function ClientHomePage({
 
   const activePeriod = await getActiveProgramPeriod(clientId);
 
-  const [programResult, scheduleResult, workoutResult, checkinResult] = await Promise.all([
+  const [programResult, scheduleResult, workoutResult] = await Promise.all([
     client.program_id
       ? safeFetch(
           supabaseAdmin
@@ -62,7 +62,6 @@ export default async function ClientHomePage({
           null,
         )
       : Promise.resolve({ data: null }),
-    // 30.6: неделя и адхеренс портала — по активному периоду.
     activePeriod
       ? safeFetch(
           supabaseAdmin
@@ -85,22 +84,11 @@ export default async function ClientHomePage({
           [] as { date: string; exercise?: string | null; week?: number | null; day_order?: number | null }[],
         )
       : Promise.resolve({ data: [] as { date: string; exercise?: string | null; week?: number | null; day_order?: number | null }[] }),
-    safeFetch(
-      supabaseAdmin
-        .from("checkins")
-        .select("created_at, wellbeing, sleep, stress")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle<{ created_at: string; wellbeing: number | null; sleep: number | null; stress: number | null }>(),
-      null,
-    ),
   ]);
 
   const program = programResult.data as Parameters<typeof getParsedContent>[0] | null;
   const schedule = scheduleResult.data ?? [];
   const workoutLogs = (workoutResult.data ?? []) as Parameters<typeof calculateAdherence>[2];
-  const latestCheckin = checkinResult.data as { created_at: string; wellbeing: number | null; sleep: number | null; stress: number | null } | null;
 
   const parsed = program ? getParsedContent(program) : null;
 
@@ -138,9 +126,7 @@ export default async function ClientHomePage({
 
   const quickLinks = [
     { href: `/client/${token}/program`, label: "Программа", desc: "Просмотр тренировок" },
-    { href: `/client/${token}/measurements`, label: "Замеры", desc: "Прогресс тела" },
-    { href: `/client/${token}/photos`, label: "Фото", desc: "Фото прогресса" },
-    { href: `/client/${token}/checkin`, label: "Чек-ин", desc: "Еженедельный опрос" },
+    { href: `/client/${token}/history`, label: "История", desc: "История тренировок" },
   ];
 
   return (
@@ -260,32 +246,6 @@ export default async function ClientHomePage({
             <p className="text-xs text-muted-foreground">
               {adherence.totalCompleted} тренировок (плановых:{" "}
               {adherence.totalExpected})
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {latestCheckin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Последний чек-ин
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 text-sm">
-              {latestCheckin.wellbeing != null && (
-                <span>Самочувствие: {latestCheckin.wellbeing}/10</span>
-              )}
-              {latestCheckin.sleep != null && (
-                <span>Сон: {latestCheckin.sleep}ч</span>
-              )}
-              {latestCheckin.stress != null && (
-                <span>Стресс: {latestCheckin.stress}/10</span>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {new Date(latestCheckin.created_at).toLocaleDateString("ru-RU")}
             </p>
           </CardContent>
         </Card>

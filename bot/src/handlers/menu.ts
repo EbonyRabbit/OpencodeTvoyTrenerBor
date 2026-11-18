@@ -1,5 +1,4 @@
 import type { MyContext } from "../bot.js";
-import { findClientByTelegramId } from "../lib/clients.js";
 import { t } from "../i18n/index.js";
 import { guardActiveClient } from "./guards.js";
 import { InlineKeyboard } from "grammy";
@@ -27,7 +26,6 @@ export async function menuHandler(ctx: MyContext): Promise<void> {
       t("menu.title", ctx.language),
       t("menu.today", ctx.language),
       t("menu.progress", ctx.language),
-      t("menu.checkin", ctx.language),
       t("menu.myprogram", ctx.language),
       t("menu.mystats", ctx.language),
       t("menu.programs", ctx.language),

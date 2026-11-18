@@ -91,14 +91,6 @@ export const TIMEZONE_LIST = [
   "America/Chicago",
 ] as const;
 
-export const MEASUREMENT_DAY_OPTIONS: readonly { value: number; label: string }[] = Array.from(
-  { length: 31 },
-  (_, i) => ({
-    value: i + 1,
-    label: `${i + 1}-е число`,
-  }),
-);
-
 export const WEEKDAY_OPTIONS = [
   { value: 1, label: "Понедельник" },
   { value: 2, label: "Вторник" },
@@ -108,8 +100,6 @@ export const WEEKDAY_OPTIONS = [
   { value: 6, label: "Суббота" },
   { value: 7, label: "Воскресенье" },
 ] as const;
-
-export const CHECKIN_DAY_OPTIONS = WEEKDAY_OPTIONS;
 
 export function isQuarterTime(time: string): boolean {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return false;

@@ -15,7 +15,6 @@ import {
   generateClientTokenValue,
   hashClientToken,
 } from "@/lib/client-token";
-import { deleteClientPhotoStorage } from "@/lib/client-storage";
 import {
   archivePlanAssignments,
   notifyClientForProgram,
@@ -34,28 +33,6 @@ type RawWorkout = {
   sets: number | null;
   reps: string | null;
   weight: number | null;
-};
-type RawCheckin = {
-  id: string;
-  created_at: string;
-  wellbeing: number | null;
-  sleep: number | null;
-  stress: number | null;
-};
-type RawMeasurement = {
-  id: string;
-  created_at: string;
-  weight: number | null;
-  waist: number | null;
-  chest: number | null;
-  hips: number | null;
-};
-// type RawPhoto = { id: string; created_at: string; type: string }; // DISABLED: photo storage removed
-type RawMessage = {
-  id: string;
-  created_at: string;
-  direction: string;
-  text: string;
 };
 type RawNotification = {
   id: string;
@@ -76,40 +53,20 @@ async function fetchPage(
   const from = offset;
   const to = offset + PER_TABLE_SIZE - 1;
 
-  const [workouts, checkins, measurements, messages, notifications] =
-    await Promise.all([
-      supabase
-        .from("workout_logs")
-        .select("id, created_at, exercise, sets, reps, weight")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .range(from, to),
-      supabase
-        .from("checkins")
-        .select("id, created_at, wellbeing, sleep, stress")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .range(from, to),
-      supabase
-        .from("measurements")
-        .select("id, created_at, weight, waist, chest, hips")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .range(from, to),
-      // supabase.from("photos").select("id, created_at, type").eq("client_id", clientId).order("created_at", { ascending: false }).range(from, to), // DISABLED: photo storage removed
-      supabase
-        .from("messages")
-        .select("id, created_at, direction, text")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .range(from, to),
-      supabase
-        .from("notification_log")
-        .select("id, created_at, type, status")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .range(from, to),
-    ]);
+  const [workouts, notifications] = await Promise.all([
+    supabase
+      .from("workout_logs")
+      .select("id, created_at, exercise, sets, reps, weight")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+    supabase
+      .from("notification_log")
+      .select("id, created_at, type, status")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+  ]);
 
   const all: ActivityEvent[] = [];
 
@@ -124,39 +81,6 @@ async function fetchPage(
         reps: w.reps,
         weight: w.weight,
       },
-    });
-  }
-  for (const c of (checkins.data ?? []) as RawCheckin[]) {
-    all.push({
-      id: c.id,
-      date: c.created_at,
-      event_type: "checkin",
-      details: { wellbeing: c.wellbeing, sleep: c.sleep, stress: c.stress },
-    });
-  }
-  for (const m of (measurements.data ?? []) as RawMeasurement[]) {
-    all.push({
-      id: m.id,
-      date: m.created_at,
-      event_type: "measurement",
-      details: {
-        weight: m.weight,
-        waist: m.waist,
-        chest: m.chest,
-        hips: m.hips,
-      },
-    });
-  }
-  // DISABLED: photo storage removed
-  // for (const p of (photos.data ?? []) as RawPhoto[]) {
-  //   all.push({ id: p.id, date: p.created_at, event_type: "photo", details: { type: p.type } });
-  // }
-  for (const msg of (messages.data ?? []) as RawMessage[]) {
-    all.push({
-      id: msg.id,
-      date: msg.created_at,
-      event_type: "message",
-      details: { direction: msg.direction, preview: msg.text },
     });
   }
   for (const n of (notifications.data ?? []) as RawNotification[]) {
@@ -548,33 +472,10 @@ export async function deleteClient(
       return { error: "Не удалось загрузить клиента. Повторите попытку." };
     }
     if (!client) {
-      try {
-        await deleteClientPhotoStorage(clientId);
-        return {};
-      } catch (storageError) {
-        console.error(
-          "deleteClient: photo storage cleanup failed:",
-          storageError instanceof Error ? storageError.message : storageError,
-        );
-        return { error: "Не удалось удалить фото клиента. Повторите попытку." };
-      }
+      return {};
     }
 
-    const { data: externalPhoto, error: externalPhotoError } = await supabaseAdmin
-      .from("photos")
-      .select("id")
-      .eq("client_id", clientId)
-      .or("drive_url.not.is.null,folder_url.not.is.null")
-      .limit(1)
-      .maybeSingle();
-    if (externalPhotoError) {
-      console.error(
-        "deleteClient: external photo check failed:",
-        externalPhotoError.message,
-      );
-      return { error: "Не удалось проверить внешние файлы. Повторите попытку." };
-    }
-    if ((client.spreadsheet_id || externalPhoto) && !force) {
+    if (client.spreadsheet_id && !force) {
       return {
         error:
           "У клиента есть файлы в Google Drive/Sheets. Удалите их вручную и повторите с подтверждением.",
@@ -586,19 +487,6 @@ export async function deleteClient(
       p_telegram_id: client.telegram_id ?? null,
     });
     if (error) return { error: error.message };
-
-    try {
-      await deleteClientPhotoStorage(clientId);
-    } catch (storageError) {
-      console.error(
-        "deleteClient: photo storage cleanup failed:",
-        storageError instanceof Error ? storageError.message : storageError,
-      );
-      return {
-        error:
-          "Клиент удалён, но фото не удалены. Повторите удаление для очистки.",
-      };
-    }
 
     revalidatePath("/clients");
     revalidatePath(`/clients/${clientId}`);
@@ -1338,10 +1226,6 @@ export async function updateClient(
     language?: string;
     timezone?: string | null;
     morning_time?: string | null;
-    measurement_time?: string | null;
-    measurement_day?: number | null;
-    checkin_day?: number | null;
-    checkin_time?: string | null;
     training_days?: number[] | null;
   },
 ): Promise<{ error?: string }> {
@@ -1389,64 +1273,6 @@ export async function updateClient(
         update.morning_time = data.morning_time;
       } else {
         update.morning_time = null;
-      }
-    }
-
-    if (data.measurement_time !== undefined) {
-      if (data.measurement_time !== null && data.measurement_time !== "") {
-        if (!isQuarterTime(data.measurement_time)) {
-          return {
-            error:
-              "Время напоминания замеров должно быть с шагом 15 минут (00, 15, 30, 45)",
-          };
-        }
-        update.measurement_time = data.measurement_time;
-      } else {
-        update.measurement_time = null;
-      }
-    }
-
-    if (data.measurement_day !== undefined) {
-      if (data.measurement_day !== null) {
-        if (
-          !Number.isInteger(data.measurement_day) ||
-          data.measurement_day < 1 ||
-          data.measurement_day > 31
-        ) {
-          return { error: "День замеров должен быть числом от 1 до 31" };
-        }
-        update.measurement_day = data.measurement_day;
-      } else {
-        update.measurement_day = null;
-      }
-    }
-
-    if (data.checkin_day !== undefined) {
-      if (data.checkin_day !== null) {
-        if (
-          !Number.isInteger(data.checkin_day) ||
-          data.checkin_day < 1 ||
-          data.checkin_day > 7
-        ) {
-          return { error: "День чек-ина должен быть от 1 до 7" };
-        }
-        update.checkin_day = data.checkin_day;
-      } else {
-        update.checkin_day = null;
-      }
-    }
-
-    if (data.checkin_time !== undefined) {
-      if (data.checkin_time !== null && data.checkin_time !== "") {
-        if (!isQuarterTime(data.checkin_time)) {
-          return {
-            error:
-              "Время чек-ина должно быть с шагом 15 минут (00, 15, 30, 45)",
-          };
-        }
-        update.checkin_time = data.checkin_time;
-      } else {
-        update.checkin_time = null;
       }
     }
 

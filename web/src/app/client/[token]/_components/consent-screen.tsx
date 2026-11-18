@@ -7,16 +7,10 @@ import { Button } from "@/components/ui/button";
 import { acceptConsent } from "../actions";
 
 interface ConsentScreenProps {
-  token: string;
   clientName: string;
-  privacyPolicyVersion: string;
 }
 
-export function ConsentScreen({
-  token,
-  clientName,
-  privacyPolicyVersion,
-}: ConsentScreenProps) {
+export function ConsentScreen({ clientName }: ConsentScreenProps) {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,10 +58,10 @@ export function ConsentScreen({
             </p>
             <p className="mb-3">Мы собираем и обрабатываем:</p>
             <ul className="mb-3 ml-4 list-inside list-disc space-y-1">
-              <li>Параметры тела (вес, объёмы, процент жира)</li>
-              <li>Фотографии прогресса</li>
-              <li>Данные о тренировках</li>
-              <li>Данные о самочувствии (сон, стресс, настроение)</li>
+              <li>Имя и идентификатор в Telegram</li>
+              <li>Данные о тренировках и расписании</li>
+              <li>Данные о программах, подписках и платежах</li>
+              <li>Технические данные, необходимые для работы сервиса</li>
             </ul>
             <p className="mb-3">
               Подробности в{" "}

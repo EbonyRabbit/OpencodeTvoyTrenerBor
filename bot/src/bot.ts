@@ -7,11 +7,8 @@ import { todayHandler } from "./handlers/today.js";
 import { callbackRouter, handleSkipReason, showExercise } from "./handlers/callbacks.js";
 import { guardActiveClient, guardAuthenticatedClient } from "./handlers/guards.js";
 import { handleWizardInput } from "./handlers/wizard.js";
-import { startMeasurements, handleMeasurementsInput, showMeasurementHistory } from "./handlers/measurements.js";
-// import { startPhotos, handlePhotoMessage, showPhotoHistory } from "./handlers/photos.js"; // DISABLED: photo storage removed
-import { startCheckin, handleCheckinInput } from "./handlers/checkin.js";
 import { startPause, handlePauseInput } from "./handlers/pause.js";
-import { startResume, handleResumeCallback } from "./handlers/resume.js";
+import { startResume } from "./handlers/resume.js";
 import { programsHandler, handleProgramDetailsCallback } from "./handlers/programs.js";
 import {
   startProgramChoice,
@@ -27,9 +24,9 @@ import { settingsHandler, handleSettingsCallback } from "./handlers/settings.js"
 import { scheduleHandler } from "./handlers/training-days.js";
 import { progressHandler } from "./handlers/progress.js";
 import { handleConsentAccept } from "./handlers/consent.js";
-import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, handleChatSelectCallback, endCoachChat } from "./handlers/chat.js";
+import { handleFreeTextMessage, handleCoachIncoming, startCoachChat, endCoachChat, handleChatSelectCallback } from "./handlers/chat.js";
 import { handleWelcomeCallback } from "./handlers/welcome.js";
-import { handleGuideCallback, handleGuideInput, handleGuideStart } from "./handlers/guide-calories.js";
+import { handleGuideCallback, handleGuideStart, handleGuideInput } from "./handlers/guide-calories.js";
 import { handleChannelJoin } from "./handlers/channel-join.js";
 import { adminDebugToday, adminRecalcSchedule, adminGenerateCodes } from "./handlers/admin.js";
 import { getTodayWorkout } from "./lib/workout-utils.js";
@@ -67,7 +64,7 @@ bot.use(async (ctx, next) => {
       ctx.state = null;
     }
 
-    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "measurements" /* || ctx.state?.action === "photos" */ || ctx.state?.action === "checkin" || ctx.state?.action === "pause" || ctx.state?.action === "resume" || ctx.state?.action === "training_days") {
+    if (ctx.state?.action === "exercise_log" || ctx.state?.action === "skip_workout" || ctx.state?.action === "pause" || ctx.state?.action === "resume" || ctx.state?.action === "training_days") {
       try {
         const client = await findClientByTelegramId(ctx.from.id);
         if (client) ctx.client = client;
@@ -89,56 +86,6 @@ bot.command("menu", menuHandler);
 bot.command("today", todayHandler);
 bot.command("progress", progressHandler);
 bot.command("myprogram", myProgramHandler);
-bot.command("measure", async (ctx) => {
-  const guard = await guardActiveClient(ctx);
-  if (typeof guard === "string") {
-    await ctx.reply(guard);
-    return;
-  }
-  ctx.client = guard.client;
-  await startMeasurements(ctx);
-});
-
-bot.command("measurements", async (ctx) => {
-  const guard = await guardActiveClient(ctx);
-  if (typeof guard === "string") {
-    await ctx.reply(guard);
-    return;
-  }
-  ctx.client = guard.client;
-  await showMeasurementHistory(ctx);
-});
-
-// DISABLED: photo storage removed
-// bot.command("photos", async (ctx) => {
-//   const guard = await guardActiveClient(ctx);
-//   if (typeof guard === "string") {
-//     await ctx.reply(guard);
-//     return;
-//   }
-//   ctx.client = guard.client;
-//   await startPhotos(ctx);
-// });
-
-// bot.command("photos_history", async (ctx) => {
-//   const guard = await guardActiveClient(ctx);
-//   if (typeof guard === "string") {
-//     await ctx.reply(guard);
-//     return;
-//   }
-//   ctx.client = guard.client;
-//   await showPhotoHistory(ctx);
-// });
-
-bot.command("checkin", async (ctx) => {
-  const guard = await guardActiveClient(ctx);
-  if (typeof guard === "string") {
-    await ctx.reply(guard);
-    return;
-  }
-  ctx.client = guard.client;
-  await startCheckin(ctx);
-});
 
 bot.command("pause", async (ctx) => {
   const guard = await guardActiveClient(ctx);
@@ -310,14 +257,6 @@ bot.on("chat_member", handleChannelJoin);
 
 bot.on("callback_query:data", callbackRouter);
 
-// DISABLED: photo storage removed
-// bot.on("message:photo", async (ctx) => {
-//   if (ctx.state?.action === "photos") {
-//     await handlePhotoMessage(ctx);
-//     return;
-//   }
-// });
-
 bot.on("message:text", async (ctx) => {
   if (ctx.state?.action === "exercise_log") {
     const result = await handleWizardInput(ctx);
@@ -337,16 +276,6 @@ bot.on("message:text", async (ctx) => {
     if (!handled) {
       await ctx.reply(t("wizard.skip_reason_prompt", ctx.language));
     }
-    return;
-  }
-
-  if (ctx.state?.action === "measurements") {
-    await handleMeasurementsInput(ctx);
-    return;
-  }
-
-  if (ctx.state?.action === "checkin") {
-    await handleCheckinInput(ctx);
     return;
   }
 

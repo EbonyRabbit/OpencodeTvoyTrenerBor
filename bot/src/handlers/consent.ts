@@ -6,7 +6,7 @@ import { InlineKeyboard, GrammyError } from "grammy";
 import { runAfterConnect } from "./connect-flow.js";
 
 // ⚠️ MUST stay in sync with web/src/lib/consent.ts (portal shows the version it records)
-export const PRIVACY_POLICY_VERSION = "2026-07-16";
+export const PRIVACY_POLICY_VERSION = "2026-11-18";
 
 const PRIVACY_URL_FALLBACK = "https://твой-тренер.ру/privacy";
 

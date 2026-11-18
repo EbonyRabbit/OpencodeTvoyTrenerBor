@@ -5,7 +5,6 @@ import { cleanupExpired } from "./dedup.js";
 import { runEveningPoll } from "./evening-scheduler.js";
 import { runMorningNotification } from "./morning.js";
 import { runMeasurementReminder } from "./measurement-reminder.js";
-import { runCheckinReminder } from "./checkin-reminder.js";
 import { runAccessExpiryReminder } from "./access-expiry.js";
 import { runWelcomeFollowup } from "./welcome-followup.js";
 import { runAutoResume, runResumeReminder } from "./resume.js";
@@ -63,10 +62,6 @@ export function startScheduler(bot: Bot<MyContext>): void {
 
   tasks.push(
     cron.schedule(POLL_CRON, wrapWithGuard("measurement_reminder", () => runMeasurementReminder(bot))),
-  );
-
-  tasks.push(
-    cron.schedule(POLL_CRON, wrapWithGuard("checkin_reminder", () => runCheckinReminder(bot))),
   );
 
   tasks.push(

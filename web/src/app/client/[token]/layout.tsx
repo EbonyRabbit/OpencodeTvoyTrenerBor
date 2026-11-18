@@ -4,27 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CLIENT_STATUS_LABELS, type ClientRow } from "@/lib/clients";
 import { ConsentScreen } from "./_components/consent-screen";
-import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 
-/**
- * Ленивое автоистечение доступа (21.10): активный клиент с прошедшим
- * access_end_date помечается status='access_expired' и отправляется на
- * /client/expired. Условный UPDATE (status=active + lt access_end_date)
- * делает операцию идемпотентной: продлённый доступ не перезаписывается.
- * Возвращает true только если истечение реально применено.
- *
- * 30.8: живая подписка (active/past_due) - источник истины; past_due даёт
- * grace 3 дня после current_period_end, поэтому ленивое истечение при
- * живой подписке не срабатывает - подписку гасит её жизненный цикл.
- */
 async function lazyExpireAccess(client: ClientRow): Promise<boolean> {
   if (client.status !== "active" || !client.access_end_date) return false;
   if (new Date(client.access_end_date).getTime() >= Date.now()) return false;
 
-  // Активная пауза - доступ не истекает во время паузы. Ошибка запроса
-  // тоже пропускает истечение в этот заход: гейт перезапустится на
-  // следующем визите, а ошибочное истечение живого клиента не лечится
-  // само.
   const pauseResult = await supabaseAdmin
     .from("plan_pauses")
     .select("id")
@@ -38,7 +22,6 @@ async function lazyExpireAccess(client: ClientRow): Promise<boolean> {
   }
   if (pauseResult.data) return false;
 
-  // Живая подписка (включая past_due grace) - доступ решает подписка.
   const subResult = await supabaseAdmin
     .from("subscriptions")
     .select("id")
@@ -67,7 +50,6 @@ async function lazyExpireAccess(client: ClientRow): Promise<boolean> {
     console.error("[client-layout] Failed to expire access:", error.message);
     return false;
   }
-  // 0 строк = дату успели продлить в гонке - доступ остаётся активным.
   return Array.isArray(data) && data.length > 0;
 }
 
@@ -101,9 +83,6 @@ const NAV_ITEMS = [
   { href: "/program", label: "Программа" },
   { href: "/workout", label: "Тренировка" },
   { href: "/history", label: "История" },
-  { href: "/measurements", label: "Замеры" },
-  { href: "/photos", label: "Фото" },
-  { href: "/checkin", label: "Чек-ин" },
   { href: "/settings", label: "Настройки" },
 ] as const;
 
@@ -131,19 +110,13 @@ export default async function ClientPortalLayout({
     redirect("/client/expired");
   }
 
-  // Fallback для клиентов, истёкших до внедрения ленивого автоистечения
-  // или помеченных вручную (proxy их не пускает только при смене статуса).
   if (client.status === "access_expired") {
     redirect("/client/expired");
   }
 
   if (!client.client_consent_given) {
     return (
-      <ConsentScreen
-        token={token}
-        clientName={client.name}
-        privacyPolicyVersion={PRIVACY_POLICY_VERSION}
-      />
+      <ConsentScreen clientName={client.name} />
     );
   }
 

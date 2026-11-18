@@ -57,10 +57,9 @@ export function buildProgramInstructions(input: ProgramInstructionsInput): strin
     }
     steps.push(
       [
-        "Set up your workouts and measurements via /settings:",
+        "Set up your workouts and reminders via /settings:",
         "   - training days (Mon/Wed/Fri, etc.)",
-        "   - measurement day and time",
-        "   - check-in day and time",
+        "   - morning reminder time",
       ].join("\n"),
     );
     steps.push("Start your first workout: /today");
@@ -86,10 +85,9 @@ export function buildProgramInstructions(input: ProgramInstructionsInput): strin
     }
     steps.push(
       [
-        "Настрой тренировки и замеры через /settings:",
+        "Настрой тренировки и напоминания через /settings:",
         "   - дни тренировок (пн/ср/пт и т.д.)",
-        "   - день и время замеров",
-        "   - день и время чек-ина",
+        "   - время утреннего напоминания",
       ].join("\n"),
     );
     steps.push("Начни первую тренировку: /today");

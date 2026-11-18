@@ -10,26 +10,6 @@ const COACH_CHAT_ID = config.coachChatId;
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_KEYBOARD_BUTTONS = 50;
 
-async function storeMessage(
-  clientId: string,
-  direction: "to_client" | "to_coach",
-  text: string,
-  coachId?: string,
-): Promise<void> {
-  const { error } = await supabaseAdmin.from("messages").insert({
-    client_id: clientId,
-    coach_id: coachId ?? null,
-    direction,
-    text,
-    sent_at: new Date().toISOString(),
-    read_at: null,
-  });
-
-  if (error) {
-    console.error(`[CHAT] Failed to store message:`, error.code);
-  }
-}
-
 async function getClientForCoach(state: BotState | null): Promise<string | null> {
   if (state?.action === "chat" && state.data && typeof state.data === "object") {
     const data = state.data as Record<string, unknown>;
@@ -53,8 +33,6 @@ export async function handleFreeTextMessage(ctx: MyContext): Promise<void> {
 
   const client = await findClientByTelegramId(ctx.from.id);
   if (!client) return;
-
-  await storeMessage(client.id, "to_coach", text);
 
   try {
     const { bot } = await import("../bot.js");
@@ -98,12 +76,9 @@ export async function handleCoachIncoming(ctx: MyContext): Promise<boolean> {
     .maybeSingle();
 
   if (!client?.telegram_id) {
-    await storeMessage(targetClientId, "to_client", text, String(COACH_CHAT_ID));
     await ctx.reply(t("chat.client_no_telegram", ctx.language));
     return true;
   }
-
-  await storeMessage(targetClientId, "to_client", text, String(COACH_CHAT_ID));
 
   try {
     const { bot } = await import("../bot.js");

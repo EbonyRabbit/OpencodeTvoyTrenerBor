@@ -4,13 +4,12 @@ import { verifySession } from "@/lib/dal";
 import { createClient } from "@/lib/supabase-server";
 // import { supabaseAdmin } from "@/lib/supabase-admin"; // DISABLED: photo storage removed
 import { getParsedContent } from "@/lib/program-utils";
-import { safeFetch, safeCount } from "@/lib/safe-fetch";
+import { safeFetch } from "@/lib/safe-fetch";
 import { resolveWorkoutCount } from "@/lib/workout-stats";
 import { getNextWorkoutDay } from "@/lib/next-workout";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { getActiveProgramPeriod, NIL_PERIOD_ID } from "@/lib/program-periods";
-// import { resolvePhotoUrls } from "@/lib/photos"; // DISABLED: photo storage removed
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
 import { ExerciseSwapsSection } from "./_components/exercise-swaps-section";
@@ -50,7 +49,7 @@ export default async function ClientProfilePage({
 
   const { data: client, error } = await supabase
     .from("clients")
-    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, training_days, morning_time, measurement_time, measurement_day, checkin_day, checkin_time, access_start_date, access_end_date, purchase_date, created_at, updated_at, program:programs!clients_program_id_fkey(id, title, active, template_file_url, parsed_content)")
+    .select("id, name, telegram_id, status, payment_status, program_id, connect_code, spreadsheet_id, language, timezone, training_days, morning_time, access_start_date, access_end_date, purchase_date, created_at, updated_at, program:programs!clients_program_id_fkey(id, title, active, template_file_url, parsed_content)")
     .eq("id", id)
     .single();
 
@@ -71,39 +70,15 @@ export default async function ClientProfilePage({
   const activePeriodId = activePeriod?.id ?? NIL_PERIOD_ID;
 
   const [
-    latestCheckinResult,
     workoutCountResult,
-    checkinCountResult,
-    messageCountResult,
     scheduleResult,
-    checkinHistoryResult,
-    measurementHistoryResult,
     workoutLogsResult,
     purchaseRequestsResult,
     subscriptionResult,
-    // latestPhotosResult, // DISABLED: photo storage removed
   ] = await Promise.all([
-    safeFetch(
-      supabase.from("checkins").select("date, wellbeing, sleep, stress, nutrition_adherence, missed_workouts, complaints").eq("client_id", id).order("date", { ascending: false }).limit(1).maybeSingle(),
-      null,
-    ),
     supabase.rpc("count_client_workout_days", { p_client_id: id }),
-    safeCount(
-      supabase.from("checkins").select("*", { count: "exact", head: true }).eq("client_id", id),
-    ),
-    safeCount(
-      supabase.from("messages").select("*", { count: "exact", head: true }).eq("client_id", id),
-    ),
     safeFetch(
       supabase.from("program_schedule").select("id, week_number, focus, start_date, end_date, training_days").eq("client_id", id).eq("program_period_id", activePeriodId).order("week_number", { ascending: true }).limit(52),
-      [],
-    ),
-    safeFetch(
-      supabase.from("checkins").select("date, wellbeing, sleep, stress").eq("client_id", id).order("date", { ascending: false }).limit(20),
-      [],
-    ),
-    safeFetch(
-      supabase.from("measurements").select("date, weight, waist, chest, hips").eq("client_id", id).order("date", { ascending: false }).limit(20),
       [],
     ),
     safeFetch(
@@ -120,7 +95,7 @@ export default async function ClientProfilePage({
         return typedClient.telegram_id != null
           ? query.or(`client_id.eq.${id},and(client_id.is.null,telegram_id.eq.${typedClient.telegram_id})`)
           : query.eq("client_id", id);
-      }      )(),
+      })(),
       [],
     ),
     safeFetch(
@@ -133,10 +108,6 @@ export default async function ClientProfilePage({
         .maybeSingle(),
       null,
     ),
-    // safeFetch( // DISABLED: photo storage removed
-    //   supabase.from("photos").select("id, date, type, drive_url, storage_path").eq("client_id", id).order("date", { ascending: false }).limit(6),
-    //   [],
-    // ),
   ]);
 
   const parsedContent = typedClient.program ? getParsedContent(typedClient.program) : null;
@@ -154,35 +125,18 @@ export default async function ClientProfilePage({
     console.error("Failed to count client workout days:", workoutCountResult.error);
   }
 
-  const measurementHistory = (measurementHistoryResult.data ?? []).reverse();
-  const checkinHistory = (checkinHistoryResult.data ?? []).reverse();
-  const latestMeasurement = measurementHistory.length > 0
-    ? measurementHistory[measurementHistory.length - 1]
-    : null;
-
   const activityResult = await getClientActivity(id);
   const initialActivityEvents =
     "events" in activityResult ? activityResult.events : [];
-
-  // DISABLED: photo storage removed
-  // const rawPhotos = latestPhotosResult.data ?? [];
-  // const latestPhotos = await resolvePhotoUrls(rawPhotos, supabaseAdmin);
 
   return (
     <div className="p-6">
       <ClientProfile
         client={typedClient}
-        latestCheckin={latestCheckinResult.data}
-        latestMeasurement={latestMeasurement}
         workoutCount={workoutCount}
-        checkinCount={checkinCountResult.count}
-        messageCount={messageCountResult.count}
         schedule={scheduleResult.data ?? []}
         parsedContent={parsedContent}
         nextWorkout={nextWorkout}
-        checkinHistory={checkinHistory}
-        measurementHistory={measurementHistory}
-        // latestPhotos={latestPhotos} // DISABLED: photo storage removed
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
         purchaseRequests={purchaseRequestsResult.data ?? []}

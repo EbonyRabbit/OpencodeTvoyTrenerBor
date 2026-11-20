@@ -28,7 +28,7 @@ describe("buildPrivacyUrl", () => {
 
 describe("PRIVACY_POLICY_VERSION", () => {
   it("matches the 18+ policy version", () => {
-    expect(PRIVACY_POLICY_VERSION).toBe("2026-11-18.18plus");
+    expect(PRIVACY_POLICY_VERSION).toBe("2026-11-20.subscription");
   });
 });
 

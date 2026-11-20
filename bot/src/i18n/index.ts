@@ -26,10 +26,11 @@ const resources = {
         no_program: "Программа ещё не назначена.\nОжидайте - тренер скоро свяжется с вами.",
         program_not_found: "Программа не найдена в системе.\nСвяжитесь с тренером для уточнения.",
         consent_title: "📋 Согласие на обработку данных",
-        consent_text: "Для использования сервиса необходимо согласие на обработку персональных данных (152-ФЗ) и подтверждение возраста 18+.\n\nМы обрабатываем username в Telegram, Telegram ID и данные о тренировках.\n\nПринимая согласие, вы подтверждаете, что вам 18 лет или больше.\n\nПолитика конфиденциальности: {{privacyUrl}}",
+        consent_text: "Для использования сервиса необходимо согласие на обработку персональных данных (152-ФЗ) и подтверждение возраста 18+.\n\nМы обрабатываем username в Telegram, Telegram ID, данные о тренировках, подписках и платежах.\n\nПринимая согласие, вы подтверждаете, что вам 18 лет или больше.\n\nПолитика конфиденциальности: {{privacyUrl}}",
         consent_accept: "✅ Принимаю согласие",
         consent_accepted: "Спасибо! Согласие принято.",
         consent_required: "Чтобы продолжить, нажмите кнопку ниже:",
+        policy_notice: "Обновили политику и условия подписки. Автопродление, отмена, возврат и чеки 54-ФЗ описаны здесь: {{privacyUrl}}\n\nПодтвердите согласие 18+ кнопкой ниже.",
       },
       menu: {
         title: "Доступные команды:",
@@ -290,7 +291,7 @@ const resources = {
       },
       coach_request: {
         button: "✉️ Связаться с тренером",
-        policy: "Для заявки на индивидуальное ведение/кураторство необходимо согласие на обработку персональных данных (152-ФЗ) и подтверждение возраста 18+.\n\nМы собираем: username в Telegram, Telegram ID, данные о тренировках и самочувствии.\n\nПринимая согласие, вы подтверждаете, что вам 18 лет или больше.\n\nПолитика конфиденциальности: {{privacyUrl}}",
+        policy: "Для заявки на индивидуальное ведение/кураторство необходимо согласие на обработку персональных данных (152-ФЗ) и подтверждение возраста 18+.\n\nМы собираем: username в Telegram, Telegram ID, данные о тренировках, подписках и платежах.\n\nПринимая согласие, вы подтверждаете, что вам 18 лет или больше.\n\nПолитика конфиденциальности: {{privacyUrl}}",
         sent: "✅ Заявка отправлена! Тренер скоро свяжется с вами.",
         already_sent: "Вы уже отправили заявку. Тренер скоро свяжется с вами.",
         error: "❌ Не удалось отправить заявку. Попробуйте позже.",
@@ -462,10 +463,11 @@ const resources = {
         no_program: "Program not yet assigned.\nPlease wait - your coach will contact you soon.",
         program_not_found: "Program not found in the system.\nPlease contact your coach for details.",
         consent_title: "📋 Consent to data processing",
-        consent_text: "To use the service you need to consent to the processing of personal data and confirm that you are 18+.\n\nWe process your Telegram username, Telegram ID, and workout data.\n\nBy accepting, you confirm that you are 18 years old or older.\n\nPrivacy policy: {{privacyUrl}}",
+        consent_text: "To use the service you need to consent to the processing of personal data and confirm that you are 18+.\n\nWe process your Telegram username, Telegram ID, workout, subscription and payment data.\n\nBy accepting, you confirm that you are 18 years old or older.\n\nPrivacy policy: {{privacyUrl}}",
         consent_accept: "✅ I accept",
         consent_accepted: "Thank you! Consent accepted.",
         consent_required: "To continue, tap the button below:",
+        policy_notice: "We updated the privacy policy and subscription terms. Auto-renewal, cancellation, refunds and 54-FZ receipts are described here: {{privacyUrl}}\n\nPlease confirm your 18+ consent with the button below.",
       },
       menu: {
         title: "Available commands:",
@@ -726,7 +728,7 @@ const resources = {
       },
       coach_request: {
         button: "✉️ Contact coach",
-        policy: "To send a request for individual coaching/mentoring, we need your consent to process personal data and confirmation that you are 18+.\n\nWe collect: your Telegram username, Telegram ID, workout and wellbeing data.\n\nBy accepting, you confirm that you are 18 years old or older.\n\nPrivacy policy: {{privacyUrl}}",
+        policy: "To send a request for individual coaching/mentoring, we need your consent to process personal data and confirmation that you are 18+.\n\nWe collect: your Telegram username, Telegram ID, workout, subscription and payment data.\n\nBy accepting, you confirm that you are 18 years old or older.\n\nPrivacy policy: {{privacyUrl}}",
         sent: "✅ Request sent! Your coach will contact you soon.",
         already_sent: "You have already sent a request. Your coach will contact you soon.",
         error: "❌ Failed to send the request. Please try again later.",

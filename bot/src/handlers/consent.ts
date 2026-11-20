@@ -6,7 +6,7 @@ import { InlineKeyboard, GrammyError } from "grammy";
 import { runAfterConnect } from "./connect-flow.js";
 
 // ⚠️ MUST stay in sync with web/src/lib/consent.ts (portal shows the version it records)
-export const PRIVACY_POLICY_VERSION = "2026-11-18.18plus";
+export const PRIVACY_POLICY_VERSION = "2026-11-20.subscription";
 
 const PRIVACY_URL_FALLBACK = "https://твой-тренер.ру/privacy";
 
@@ -73,7 +73,9 @@ export async function handleConsentAccept(ctx: MyContext): Promise<void> {
 
   applyClientLanguage(ctx, client.language);
 
-  if (hasCurrentConsent(client)) {
+  const needsConsentUpdate = !hasCurrentConsent(client);
+  const hadAnyConsent = client.client_consent_given === true;
+  if (!needsConsentUpdate) {
     await ctx.answerCallbackQuery().catch(() => {});
     await sendAcceptedReply(ctx);
     return;
@@ -103,7 +105,7 @@ export async function handleConsentAccept(ctx: MyContext): Promise<void> {
   client.client_consent_given = true;
   client.client_consent_version = PRIVACY_POLICY_VERSION;
   await sendAcceptedReply(ctx);
-  await runAfterConnect(ctx);
+  if (!hadAnyConsent) await runAfterConnect(ctx);
 }
 
 async function sendAcceptedReply(ctx: MyContext): Promise<void> {

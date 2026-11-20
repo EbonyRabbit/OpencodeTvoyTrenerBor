@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { t, type Language } from "../i18n/index.js";
 import { markAsSent, deleteDedup } from "./dedup.js";
 import { logBotEvent } from "./logger.js";
+import { runPolicyNotice } from "./policy-notice.js";
 
 const DEDUP_TTL_HOURS = 7 * 24;
 const BATCH_SIZE = 200;
@@ -35,6 +36,17 @@ function stringifyDetails(v: unknown): string {
 }
 
 export async function runWelcomeFollowup(bot: Bot<MyContext>): Promise<void> {
+  try {
+    await runPolicyNotice(bot);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[WELCOME_FOLLOWUP] policy notice failed:", err);
+    await logBotEvent("cron:policy_notice", {
+      status: "error",
+      details: message,
+    }).catch(() => {});
+  }
+
   const now = Date.now();
   const cutoff1 = new Date(now - FOLLOWUP1_DELAY_MS).toISOString();
   const windowStart = new Date(

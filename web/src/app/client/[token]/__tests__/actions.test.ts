@@ -49,11 +49,11 @@ describe("acceptConsent", () => {
     expect(result).toEqual({});
     expect(updatePayload).toMatchObject({
       client_consent_given: true,
-      client_consent_version: "2026-11-18.18plus",
+      client_consent_version: "2026-11-20.subscription",
       client_consent_ip: "1.2.3.4",
       client_consent_user_agent: "ua",
     });
-    expect(PRIVACY_POLICY_VERSION).toBe("2026-11-18.18plus");
+    expect(PRIVACY_POLICY_VERSION).toBe("2026-11-20.subscription");
     expect(typeof (updatePayload as unknown as { client_consent_given_at: unknown }).client_consent_given_at).toBe("string");
   });
 });

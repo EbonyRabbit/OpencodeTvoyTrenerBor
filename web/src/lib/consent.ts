@@ -1,5 +1,5 @@
 // ⚠️ MUST stay in sync with bot/src/handlers/consent.ts (bot records the version it shows)
-export const PRIVACY_POLICY_VERSION = "2026-11-18.18plus";
+export const PRIVACY_POLICY_VERSION = "2026-11-20.subscription";
 
 type ConsentState = {
   client_consent_given: boolean;

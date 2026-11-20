@@ -27,22 +27,24 @@ describe("buildPrivacyUrl", () => {
 });
 
 describe("PRIVACY_POLICY_VERSION", () => {
-  it("is a date-like version string", () => {
-    expect(PRIVACY_POLICY_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  it("matches the 18+ policy version", () => {
+    expect(PRIVACY_POLICY_VERSION).toBe("2026-11-18.18plus");
   });
 });
 
 describe("buildConsentMessage", () => {
-  it("renders Russian consent with the privacy link", () => {
+  it("renders Russian consent with 18+ confirmation and privacy link", () => {
     const text = buildConsentMessage("ru");
     expect(text).toContain("Согласие на обработку данных");
+    expect(text).toContain("18");
     expect(text).toContain("https://portal.example.com/privacy");
     expect(text).not.toContain("{{");
   });
 
-  it("renders English consent with the privacy link", () => {
+  it("renders English consent with 18+ confirmation and privacy link", () => {
     const text = buildConsentMessage("en");
     expect(text).toContain("Consent to data processing");
+    expect(text).toContain("18");
     expect(text).toContain("https://portal.example.com/privacy");
     expect(text).not.toContain("{{");
   });

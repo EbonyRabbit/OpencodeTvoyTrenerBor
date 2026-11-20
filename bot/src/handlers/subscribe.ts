@@ -3,8 +3,13 @@ import type { MyContext } from "../bot.js";
 import { t, applyClientLanguage } from "../i18n/index.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { config } from "../config.js";
-import { buildPrivacyUrl, PRIVACY_POLICY_VERSION } from "./consent.js";
-import { findClientByTelegramId, type Client } from "../lib/clients.js";
+import { buildPrivacyUrl, hasCurrentConsent, PRIVACY_POLICY_VERSION } from "./consent.js";
+import {
+  findClientByTelegramId,
+  normalizeTelegramUsername,
+  telegramDisplayName,
+  type Client,
+} from "../lib/clients.js";
 import { getParsedContent } from "../lib/program-utils.js";
 import { switchProgramPeriod } from "../lib/program-periods.js";
 import { InlineKeyboard } from "grammy";
@@ -39,18 +44,6 @@ interface CatalogProgram {
   id: string;
   title: string;
   parsed_content: unknown;
-}
-
-function buyerContact(username: string | undefined, telegramId: number): string {
-  return username ? `@${username}` : String(telegramId);
-}
-
-function buyerName(
-  from: { first_name?: string; last_name?: string; username?: string },
-  telegramId: number,
-): string {
-  const name = [from.first_name, from.last_name].filter(Boolean).join(" ").trim();
-  return name || buyerContact(from.username, telegramId);
 }
 
 // Живая подписка (active/past_due) открывает выбор любой программы.
@@ -249,28 +242,27 @@ export async function handleSubscribeConfirm(ctx: MyContext, programId: string):
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function buildCoachRequestCoachMessage({
-  firstName,
-  lastName,
+  name,
   username,
   telegramId,
 }: {
-  firstName: string | null;
-  lastName: string | null;
+  name: string;
   username: string | null;
   telegramId: number;
 }): string {
-  const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "-";
-  const usernameLine = username ? `🔗 @${username} (https://t.me/${username})` : null;
+  const normalizedUsername = normalizeTelegramUsername(username);
+  const nameLine = normalizedUsername
+    ? `👤 ${name} (https://t.me/${normalizedUsername})`
+    : `👤 ${name}`;
   const lines = [
     "🤝 Хочу индивидуальное ведение/кураторство",
     "",
-    `👤 ${name}`,
-    usernameLine,
+    nameLine,
     `🆔 TG ID: ${telegramId}`,
     "",
     "Свяжитесь с клиентом в Telegram.",
   ];
-  return lines.filter((line) => line !== null).join("\n");
+  return lines.join("\n");
 }
 
 // Соло-лимит: у пользователя может быть только одна активная individ-заявка
@@ -309,7 +301,7 @@ function sendCoachRequestConsentStep(ctx: MyContext): Promise<unknown> {
 
 async function submitIndividRequest(
   ctx: MyContext,
-  from: { id: number; first_name?: string; last_name?: string; username?: string },
+  from: { id: number; username?: string },
   client: Client | null,
 ): Promise<void> {
   const telegramId = from.id;
@@ -325,21 +317,16 @@ async function submitIndividRequest(
     // хранилища согласия нет (clients-строка отсутствует). Для клиента берём
     // его постоянное согласие только если оно действует под текущей версией
     // политики, иначе фиксируем свежее (пользователь только что видел политику).
-    const standingConsent =
-      client != null &&
-      client.client_consent_given &&
-      client.client_consent_version === PRIVACY_POLICY_VERSION;
+    const standingConsent = client != null && hasCurrentConsent(client);
 
     const requestId = randomUUID();
+    const name = telegramDisplayName(from.username, client?.id ?? String(telegramId));
     const payload = {
       id: requestId,
       program_id: null,
       client_id: client?.id ?? null,
-      name: buyerName(from, telegramId),
-      contact: buyerContact(from.username, telegramId),
+      name,
       telegram_id: telegramId,
-      first_name: from.first_name ?? null,
-      last_name: from.last_name ?? null,
       sub_type: "individ",
       consent_given: true,
       consent_at: standingConsent && client.client_consent_given_at
@@ -347,9 +334,8 @@ async function submitIndividRequest(
         : new Date().toISOString(),
       consent_version: standingConsent ? client.client_consent_version : PRIVACY_POLICY_VERSION,
     };
-    const insert = async () => supabaseAdmin.from("purchase_requests").insert(payload);
 
-    let { error } = await insert();
+    const { error } = await supabaseAdmin.from("purchase_requests").insert(payload);
     if (error?.code === "23505") {
       // гонка двойного тапа: параллельная заявка победила
       const winner = await findPendingIndividRequest(telegramId).catch(() => null);
@@ -358,15 +344,19 @@ async function submitIndividRequest(
         return;
       }
       // winner пропал (гонка отмен тренером) - повторяем вставку один раз
-      error = (await insert()).error;
-    }
-    if (error) {
+      const retry = await supabaseAdmin.from("purchase_requests").insert(payload);
+      if (retry.error) {
+        console.error(`[COACH_REQUEST] Insert failed for ${telegramId}:`, retry.error.message);
+        await ctx.reply(t("coach_request.error", lang));
+        return;
+      }
+    } else if (error) {
       console.error(`[COACH_REQUEST] Insert failed for ${telegramId}:`, error.message);
       await ctx.reply(t("coach_request.error", lang));
       return;
     }
 
-    await notifyCoachAboutIndividRequest(telegramId, from, requestId);
+    await notifyCoachAboutIndividRequest(telegramId, from.username, name, requestId);
     await ctx.reply(t("coach_request.sent", lang));
   } catch (err) {
     console.error(`[COACH_REQUEST] submitIndividRequest failed for ${telegramId}:`, err);
@@ -378,7 +368,8 @@ async function submitIndividRequest(
 // видна в панели (фиксируем в bot_logs).
 async function notifyCoachAboutIndividRequest(
   telegramId: number,
-  from: { first_name?: string; last_name?: string; username?: string },
+  username: string | undefined,
+  name: string,
   requestId: string,
 ): Promise<void> {
   let notificationFailed = false;
@@ -388,9 +379,8 @@ async function notifyCoachAboutIndividRequest(
       await bot.api.sendMessage(
         String(config.coachChatId),
         buildCoachRequestCoachMessage({
-          firstName: from.first_name ?? null,
-          lastName: from.last_name ?? null,
-          username: from.username ?? null,
+          name,
+          username: username ?? null,
           telegramId,
         }),
       );

@@ -4,8 +4,14 @@ import { startProgramPeriod } from "@/lib/program-periods";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { sendCoachAlertOnce } from "@/lib/coach-alert";
 import { buildProgramInstructions } from "@/lib/program-instructions";
-import { UUID_REGEX, formatContact, sanitizeText } from "@/lib/validation";
+import {
+  UUID_REGEX,
+  isValidClientDisplayName,
+  sanitizeText,
+  telegramDisplayName,
+} from "@/lib/validation";
 import { formatPrice } from "@/lib/format-price";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 
 const MAX_NAME_LENGTH = 120;
 const STALE_LINK_MS = 10 * 60 * 1000;
@@ -231,7 +237,6 @@ function truncateText(text: string, maxLength: number): string {
 export function buildActivationCoachMessage({
   clientName,
   telegramId,
-  contact,
   programTitle,
   price,
   amount,
@@ -240,7 +245,6 @@ export function buildActivationCoachMessage({
 }: {
   clientName: string;
   telegramId: number | null;
-  contact: string | null;
   programTitle: string;
   price: number | null;
   amount: number | null;
@@ -261,18 +265,15 @@ export function buildActivationCoachMessage({
     amount !== null && amount !== undefined && amount !== price
       ? `\nСумма оплаты: ${amount.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`
       : "";
-  const contactLine = contact
-    ? `\n📱 Контакт: ${sanitizeText(formatContact(contact))}`
-    : telegramId !== null && telegramId !== undefined
-      ? `\n🆔 TG ID: ${telegramId}`
-      : "";
+  const tgIdLine =
+    telegramId !== null && telegramId !== undefined ? `\n🆔 TG ID: ${telegramId}` : "";
   const dateLine = `\nДоступ до: ${new Intl.DateTimeFormat("ru-RU").format(new Date(accessEndDate))}`;
 
   return (
     `✅ Оплата подтверждена\n\n` +
     `Программа: ${cleanProgram}${priceLine}${amountLine}\n` +
     `Длительность: ${durationWeeks} нед.\n\n` +
-    `👤 Клиент: ${cleanName}${contactLine}${dateLine}`
+    `👤 Клиент: ${cleanName}${tgIdLine}${dateLine}`
   );
 }
 
@@ -294,7 +295,6 @@ export async function applyProgramActivation({
   price,
   durationWeeks,
   amount,
-  contact,
   coachId,
   telegramIdToRecord,
 }: {
@@ -305,7 +305,6 @@ export async function applyProgramActivation({
   price: number | null;
   durationWeeks: number;
   amount: number | null;
-  contact: string | null;
   coachId: string | null;
   telegramIdToRecord?: number | null;
 }): Promise<ActivationResult> {
@@ -383,7 +382,6 @@ export async function applyProgramActivation({
       buildActivationCoachMessage({
         clientName: client.name ?? "Клиент",
         telegramId: client.telegram_id,
-        contact,
         programTitle,
         price,
         amount,
@@ -405,7 +403,6 @@ export async function applyProgramActivation({
 
 type CancelledPaymentInfo = {
   name: string;
-  contact: string;
   amount: number | null;
 };
 
@@ -419,7 +416,7 @@ async function alertCancelledPayment(
       : "";
   return sendCoachAlertOnce(
     `cancelled_payment:${orderId}`,
-    `⚠️ Получена оплата${amountText} по ОТМЕНЁННОЙ заявке ${orderId} (клиент: ${sanitizeText(request.name)}, контакт: ${formatContact(request.contact)}). Доступ не выдан - сделайте возврат или выдайте доступ вручную.`,
+    `⚠️ Получена оплата${amountText} по ОТМЕНЁННОЙ заявке ${orderId} (клиент: ${sanitizeText(request.name)}). Доступ не выдан - сделайте возврат или выдайте доступ вручную.`,
   );
 }
 
@@ -446,7 +443,7 @@ export async function activatePurchaseByOrder({
     const { data: request, error: requestError } = await supabaseAdmin
       .from("purchase_requests")
       .select(
-        "id, status, sub_type, program_id, amount, name, contact, telegram_id, first_name, last_name, consent_given, consent_at, consent_version, client_id",
+        "id, status, sub_type, program_id, amount, name, telegram_id, consent_given, consent_at, consent_version, client_id",
       )
       .eq("order_id", orderId)
       .maybeSingle();
@@ -472,8 +469,11 @@ export async function activatePurchaseByOrder({
     if (request.program_id === null) {
       return { error: "Программа недоступна для активации." };
     }
-    if (!request.consent_given) {
-      return { error: "Не подтверждено согласие на обработку данных." };
+    if (
+      !request.consent_given ||
+      request.consent_version !== PRIVACY_POLICY_VERSION
+    ) {
+      return { error: "Не подтверждено согласие 18+ на обработку данных." };
     }
 
     const { data: program, error: programError } = await supabaseAdmin
@@ -554,7 +554,7 @@ export async function activatePurchaseByOrder({
     const { data: claimedRequest, error: claimedRequestError } =
       await supabaseAdmin
         .from("purchase_requests")
-        .select("status, client_id, consent_given")
+        .select("status, client_id, consent_given, consent_version")
         .eq("id", request.id)
         .maybeSingle();
     if (claimedRequestError) {
@@ -567,7 +567,8 @@ export async function activatePurchaseByOrder({
     if (
       !claimedRequest ||
       claimedRequest.status !== "paid" ||
-      !claimedRequest.consent_given
+      !claimedRequest.consent_given ||
+      claimedRequest.consent_version !== PRIVACY_POLICY_VERSION
     ) {
       return {
         error: "Заявка отменена.",
@@ -637,8 +638,6 @@ export async function activatePurchaseByOrder({
           client_id: claimedRequest.client_id,
           telegram_id: request.telegram_id,
           name: request.name,
-          first_name: request.first_name,
-          last_name: request.last_name,
           consent_given: request.consent_given,
           consent_at: request.consent_at,
           consent_version: request.consent_version,
@@ -778,7 +777,6 @@ export async function activatePurchaseByOrder({
       price,
       durationWeeks: program.duration_weeks,
       amount,
-      contact: request.contact,
       coachId,
       telegramIdToRecord: request.telegram_id,
     });
@@ -931,8 +929,6 @@ async function resolveOrCreateClient(
     client_id: string | null;
     telegram_id: number | null;
     name: string;
-    first_name: string | null;
-    last_name: string | null;
     consent_given: boolean;
     consent_at: string | null;
     consent_version: string | null;
@@ -1020,16 +1016,13 @@ async function resolveOrCreateClient(
     const endDate = new Date(
       now.getTime() + durationWeeks * 7 * 24 * 60 * 60 * 1000,
     );
-    const name =
-      truncateText(
-        sanitizeText(
-          [request.first_name, request.last_name]
-            .filter(Boolean)
-            .join(" ")
-            .trim() || request.name,
-        ),
-        MAX_NAME_LENGTH,
-      ) || "Клиент";
+    const sanitizedRequestName = sanitizeText(request.name);
+    const name = isValidClientDisplayName(sanitizedRequestName)
+      ? truncateText(sanitizedRequestName, MAX_NAME_LENGTH)
+      : telegramDisplayName(
+          null,
+          String(request.client_id ?? request.telegram_id ?? "0"),
+        );
     const consentAt = request.consent_at ?? null;
 
     const { data: createdClient, error: createError } = await supabaseAdmin

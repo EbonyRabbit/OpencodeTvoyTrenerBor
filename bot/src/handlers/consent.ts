@@ -6,12 +6,24 @@ import { InlineKeyboard, GrammyError } from "grammy";
 import { runAfterConnect } from "./connect-flow.js";
 
 // ⚠️ MUST stay in sync with web/src/lib/consent.ts (portal shows the version it records)
-export const PRIVACY_POLICY_VERSION = "2026-11-18";
+export const PRIVACY_POLICY_VERSION = "2026-11-18.18plus";
 
 const PRIVACY_URL_FALLBACK = "https://твой-тренер.ру/privacy";
 
 export function buildPrivacyUrl(): string {
   return config.clientPortalUrl ? `${config.clientPortalUrl}/privacy` : PRIVACY_URL_FALLBACK;
+}
+
+type ConsentState = {
+  client_consent_given: boolean;
+  client_consent_version: string | null;
+};
+
+export function hasCurrentConsent(client: ConsentState | null | undefined): boolean {
+  return (
+    client?.client_consent_given === true &&
+    client.client_consent_version === PRIVACY_POLICY_VERSION
+  );
 }
 
 export function buildConsentMessage(lang: Language): string {
@@ -61,7 +73,7 @@ export async function handleConsentAccept(ctx: MyContext): Promise<void> {
 
   applyClientLanguage(ctx, client.language);
 
-  if (client.client_consent_given) {
+  if (hasCurrentConsent(client)) {
     await ctx.answerCallbackQuery().catch(() => {});
     await sendAcceptedReply(ctx);
     return;
@@ -89,6 +101,7 @@ export async function handleConsentAccept(ctx: MyContext): Promise<void> {
 
   await ctx.answerCallbackQuery().catch(() => {});
   client.client_consent_given = true;
+  client.client_consent_version = PRIVACY_POLICY_VERSION;
   await sendAcceptedReply(ctx);
   await runAfterConnect(ctx);
 }

@@ -30,7 +30,7 @@ import type { MyContext } from "../../bot.js";
 
 function makeCtx(): MyContext {
   return {
-    from: { id: 123456789, username: "buyer", first_name: "Иван" },
+    from: { id: 123456789, username: "buyer" },
     language: "ru",
     reply: vi.fn().mockResolvedValue({}),
     answerCallbackQuery: vi.fn().mockResolvedValue({}),

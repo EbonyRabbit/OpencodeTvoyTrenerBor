@@ -51,14 +51,15 @@ export function ConsentScreen({ clientName }: ConsentScreenProps) {
 
           <div className="mb-4 max-h-64 overflow-y-auto rounded-md bg-muted/50 p-4 text-sm leading-relaxed text-muted-foreground">
             <p className="mb-3">
-              Для использования сервиса &laquo;ТвойТренерБот&raquo; необходимо
-              дать согласие на обработку ваших персональных данных в
-              соответствии с Федеральным законом от 27.07.2006 &laquo;О
+              Сервис &laquo;ТвойТренерБот&raquo; предназначен только для лиц
+              старше 18 лет. Для использования сервиса необходимо подтвердить
+              совершеннолетие и дать согласие на обработку персональных данных
+              в соответствии с Федеральным законом от 27.07.2006 &laquo;О
               персональных данных&raquo; №152-ФЗ.
             </p>
             <p className="mb-3">Мы собираем и обрабатываем:</p>
             <ul className="mb-3 ml-4 list-inside list-disc space-y-1">
-              <li>Имя и идентификатор в Telegram</li>
+              <li>Telegram username и идентификатор в Telegram</li>
               <li>Данные о тренировках и расписании</li>
               <li>Данные о программах, подписках и платежах</li>
               <li>Технические данные, необходимые для работы сервиса</li>
@@ -90,8 +91,9 @@ export function ConsentScreen({ clientName }: ConsentScreenProps) {
               className="mt-0.5"
             />
             <label htmlFor="client-consent" className="text-sm">
-              Я ознакомлен(а) с Политикой конфиденциальности и даю согласие
-              на обработку моих персональных данных
+              Мне исполнилось 18 лет, я ознакомлен(а) с Политикой
+              конфиденциальности и даю согласие на обработку моих персональных
+              данных
             </label>
           </div>
 

@@ -85,10 +85,7 @@ export interface Database {
           program_id: string | null;
           client_id: string | null;
           name: string;
-          contact: string;
           telegram_id: number | null;
-          first_name: string | null;
-          last_name: string | null;
           status: string;
           order_id: string | null;
           amount: number | null;
@@ -105,10 +102,7 @@ export interface Database {
           program_id?: string | null;
           client_id?: string | null;
           name: string;
-          contact: string;
           telegram_id?: number | null;
-          first_name?: string | null;
-          last_name?: string | null;
           status?: string;
           order_id?: string | null;
           amount?: number | null;

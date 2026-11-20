@@ -96,7 +96,6 @@ function formatAmount(amount: number | null): string {
 
 type CancelledRequestRow = {
   name: string;
-  contact: string;
   telegram_id: number | null;
   amount: number | null;
   sub_type: string;
@@ -107,8 +106,7 @@ function buildCancelCoachMessage(row: CancelledRequestRow): string {
     row.sub_type === "individ" ? "Индивидуальное ведение" : "Программа";
   return (
     `❌ Заявка отменена\n\n` +
-    `Клиент: ${row.name}\n` +
-    `Контакт: ${row.contact}` +
+    `Клиент: ${row.name}` +
     (row.telegram_id !== null ? `\nTG ID: ${row.telegram_id}` : "") +
     `\nТип: ${kind}\n` +
     `Сумма: ${formatAmount(row.amount)}`
@@ -208,7 +206,7 @@ async function handleCancellation(orderId: string): Promise<Response> {
     .update({ status: "cancelled" })
     .eq("id", orderId)
     .eq("status", "pending")
-    .select("name, contact, telegram_id, amount, sub_type")
+    .select("name, telegram_id, amount, sub_type")
     .maybeSingle();
   if (error) {
     console.error("[PRODAMUS WEBHOOK] Cancel update failed:", error.message);

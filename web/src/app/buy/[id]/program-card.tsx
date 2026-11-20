@@ -71,9 +71,9 @@ export function ProgramCardPage({
   program: BuyProgram;
   botDeepLink: string;
 }) {
-  const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
+  const [username, setUsername] = useState("");
   const [coachConsent, setCoachConsent] = useState(false);
+  const [age18, setAge18] = useState(false);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachSubmitted, setCoachSubmitted] = useState(false);
   const [coachError, setCoachError] = useState<string | null>(null);
@@ -85,9 +85,9 @@ export function ProgramCardPage({
 
     try {
       const result = await createCoachRequest({
-        name,
-        contact,
+        username,
         consentGiven: coachConsent,
+        age18,
       });
       if (
         result.error &&
@@ -142,37 +142,36 @@ export function ProgramCardPage({
 
               <div className="space-y-2">
                 <label
-                  htmlFor="coach-name"
+                  htmlFor="coach-username"
                   className="text-xs text-muted-foreground"
                 >
-                  Ваше имя
+                  Telegram username
                 </label>
                 <Input
-                  id="coach-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Иван"
-                  maxLength={200}
+                  id="coach-username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="@username"
+                  maxLength={64}
                   className="h-10"
                 />
               </div>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="coach-contact"
-                  className="text-xs text-muted-foreground"
-                >
-                  Telegram для связи
-                </label>
-                <Input
-                  id="coach-contact"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder="@username"
-                  maxLength={120}
-                  className="h-10"
+              <label
+                htmlFor="coach-age18"
+                className="flex items-start gap-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  id="coach-age18"
+                  required
+                  checked={age18}
+                  onChange={(e) => setAge18(e.target.checked)}
+                  disabled={coachLoading}
+                  className="mt-0.5"
                 />
-              </div>
+                <span>Мне исполнилось 18 лет</span>
+              </label>
 
               <label
                 htmlFor="coach-consent"

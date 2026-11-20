@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { sendCoachAlertOnce } from "@/lib/coach-alert";
 import { toFiniteNumber } from "@/lib/activate-purchase";
+import { hasCurrentConsent } from "@/lib/consent";
 
 export type SubscriptionPaymentResult = {
   outcome:
@@ -51,6 +52,7 @@ type ClientRow = {
   id: string;
   telegram_id: number | null;
   client_consent_given: boolean;
+  client_consent_version: string | null;
   client_status: string | null;
   language: string | null;
 };
@@ -121,7 +123,7 @@ async function loadPayment(
 async function loadClient(clientId: string): Promise<ClientRow | null> {
   const { data, error } = await supabaseAdmin
     .from("clients")
-    .select("id, telegram_id, client_consent_given, status, language")
+    .select("id, telegram_id, client_consent_given, client_consent_version, status, language")
     .eq("id", clientId)
     .maybeSingle();
   if (error) {
@@ -274,10 +276,10 @@ export async function handleSubscriptionSuccess({
     const plan = planOf(sub);
     const client = await loadClient(sub.client_id);
     if (!client) return { outcome: "db_error", retryable: true };
-    if (!client.client_consent_given) {
+    if (!hasCurrentConsent(client)) {
       await alertCoachOnce(
         `sub_consent:${orderId}`,
-        `⚠️ Подписка ${orderId} оплачена, но клиент отозвал согласие на обработку данных. Активация заблокирована.`,
+        `⚠️ Подписка ${orderId} оплачена, но клиент не принял актуальное согласие 18+. Активация заблокирована.`,
       );
       return { outcome: "consent_missing", manual: true };
     }

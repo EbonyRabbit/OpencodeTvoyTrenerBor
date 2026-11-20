@@ -46,21 +46,19 @@ export function CreateClientDialog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [telegramId, setTelegramId] = useState("");
+  const [username, setUsername] = useState("");
   const [language, setLanguage] = useState("ru");
   const [timezone, setTimezone] = useState("Europe/Moscow");
   const [paymentStatus, setPaymentStatus] = useState("pending");
   const [consentGiven, setConsentGiven] = useState(false);
 
   const canSubmit = useMemo(
-    () => !loading && name.trim().length > 0 && consentGiven,
-    [loading, name, consentGiven],
+    () => !loading && consentGiven,
+    [loading, consentGiven],
   );
 
   const reset = useCallback(() => {
-    setName("");
-    setTelegramId("");
+    setUsername("");
     setLanguage("ru");
     setTimezone("Europe/Moscow");
     setPaymentStatus("pending");
@@ -71,33 +69,15 @@ export function CreateClientDialog() {
   const handleSubmit = useCallback(async () => {
     setError(null);
 
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError("Введите имя клиента");
-      return;
-    }
-
     if (!consentGiven) {
       setError("Необходимо подтверждение согласия клиента на обработку персональных данных");
-      return;
-    }
-
-    const parsedTelegramId = telegramId.trim()
-      ? Number(telegramId.trim())
-      : null;
-    if (
-      parsedTelegramId !== null &&
-      (!Number.isInteger(parsedTelegramId) || parsedTelegramId <= 0)
-    ) {
-      setError("Некорректный Telegram ID");
       return;
     }
 
     setLoading(true);
     try {
       const result = await createClient({
-        name: trimmedName,
-        telegram_id: parsedTelegramId,
+        username: username.trim(),
         language,
         timezone,
         payment_status: paymentStatus,
@@ -117,7 +97,7 @@ export function CreateClientDialog() {
     } finally {
       setLoading(false);
     }
-  }, [name, telegramId, language, timezone, paymentStatus, consentGiven, reset, router]);
+  }, [username, language, timezone, paymentStatus, consentGiven, reset, router]);
 
   return (
     <Dialog
@@ -133,8 +113,8 @@ export function CreateClientDialog() {
         <DialogHeader>
           <DialogTitle>Добавить клиента</DialogTitle>
           <DialogDescription>
-            Создайте нового клиента. Имя обязательно, остальные поля можно
-            заполнить позже.
+            Создайте нового клиента. Telegram username можно оставить пустым -
+            тогда имя будет назначено автоматически.
           </DialogDescription>
         </DialogHeader>
 
@@ -152,34 +132,20 @@ export function CreateClientDialog() {
         >
           <div className="grid gap-3">
             <div className="grid gap-1.5">
-              <label htmlFor="client-name" className="text-sm font-medium">
-                Имя *
+              <label htmlFor="client-username" className="text-sm font-medium">
+                Telegram username
               </label>
               <Input
-                id="client-name"
-                placeholder="Иван Иванов"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                id="client-username"
+                placeholder="@username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 disabled={loading}
                 autoFocus
-                aria-required="true"
               />
-            </div>
-
-            <div className="grid gap-1.5">
-              <label htmlFor="client-telegram" className="text-sm font-medium">
-                Telegram ID
-              </label>
-              <Input
-                id="client-telegram"
-                type="number"
-                step="1"
-                min="1"
-                placeholder="Опционально"
-                value={telegramId}
-                onChange={(e) => setTelegramId(e.target.value)}
-                disabled={loading}
-              />
+              <p className="text-xs text-muted-foreground">
+                Если не указать, клиенту будет присвоено имя вида «Клиент #A1B2C3».
+              </p>
             </div>
 
             <div className="grid gap-1.5">

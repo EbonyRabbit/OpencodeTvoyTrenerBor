@@ -1067,14 +1067,18 @@ export function ClientActions({
             className="space-y-4"
           >
             <div className="space-y-2">
-              <label htmlFor="edit-name" className="text-sm font-medium">Имя</label>
+              <label htmlFor="edit-name" className="text-sm font-medium">Telegram username</label>
               <Input
                 id="edit-name"
                 type="text"
-                maxLength={200}
+                placeholder="@username"
                 value={editForm.name}
                 onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                disabled={editLoading}
               />
+              <p className="text-xs text-muted-foreground">
+                Оставьте пустым, чтобы использовать имя по умолчанию.
+              </p>
             </div>
             <div className="space-y-2">
               <label htmlFor="edit-language" className="text-sm font-medium">Язык</label>
@@ -1161,7 +1165,7 @@ export function ClientActions({
               <DialogClose render={<Button variant="outline" type="button" />}>
                 Отмена
               </DialogClose>
-              <Button type="submit" disabled={editLoading || !editForm.name.trim()}>
+              <Button type="submit" disabled={editLoading}>
                 {editLoading ? "Сохранение..." : "Сохранить"}
               </Button>
             </DialogFooter>

@@ -3,14 +3,24 @@ import {
   findClientByTelegramId,
   findClientByConnectCode,
   connectClientToTelegram,
+  syncClientName,
+  type Client,
 } from "../lib/clients.js";
 import { t, applyClientLanguage } from "../i18n/index.js";
 import { InlineKeyboard } from "grammy";
 import { runAfterConnect } from "./connect-flow.js";
-import { sendConsentPrompt } from "./consent.js";
+import { hasCurrentConsent, sendConsentPrompt } from "./consent.js";
 import { handleWelcome, WELCOME_PARAMS } from "./welcome.js";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
+
+async function syncClientNameBestEffort(client: Client, username?: string | null): Promise<void> {
+  try {
+    client.name = await syncClientName(client.id, username, client.name);
+  } catch (err) {
+    console.warn(`[START] Name sync skipped for ${client.id}:`, err);
+  }
+}
 
 export async function startHandler(ctx: MyContext): Promise<void> {
   const telegramId = ctx.from?.id;
@@ -38,6 +48,8 @@ export async function startHandler(ctx: MyContext): Promise<void> {
     try {
       const existing = await findClientByTelegramId(telegramId);
       if (existing) {
+        await syncClientNameBestEffort(existing, ctx.from?.username);
+        ctx.client = existing;
         await ctx.reply(t("client.no_program", ctx.language));
         return;
       }
@@ -50,9 +62,10 @@ export async function startHandler(ctx: MyContext): Promise<void> {
 
       applyClientLanguage(ctx, client.language);
       await connectClientToTelegram(client.id, telegramId);
+      await syncClientNameBestEffort(client, ctx.from?.username);
       ctx.client = client;
 
-      if (!client.client_consent_given) {
+      if (!hasCurrentConsent(client)) {
         await sendConsentPrompt(ctx);
       } else {
         await runAfterConnect(ctx);
@@ -79,11 +92,12 @@ export async function startHandler(ctx: MyContext): Promise<void> {
     }
 
     applyClientLanguage(ctx, client.language);
+    await syncClientNameBestEffort(client, ctx.from?.username);
+    ctx.client = client;
 
     if (client.status === "active" && client.payment_status === "paid") {
-      ctx.client = client;
 
-      if (!client.client_consent_given) {
+      if (!hasCurrentConsent(client)) {
         await sendConsentPrompt(ctx);
       } else {
         await runAfterConnect(ctx);

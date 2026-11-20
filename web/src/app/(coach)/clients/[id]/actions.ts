@@ -9,7 +9,8 @@ import type { Database, PaymentStatus } from "@/types/supabase";
 import { TIMEZONE_LIST, LANGUAGE_LABELS, isQuarterTime } from "@/lib/clients";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { resolvePaymentUrl } from "@/lib/prodamus";
-import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
+import { hasCurrentConsent, PRIVACY_POLICY_VERSION } from "@/lib/consent";
+import { normalizeTelegramUsername, telegramDisplayName } from "@/lib/validation";
 import {
   CLIENT_TOKEN_EXPIRY_DAYS,
   generateClientTokenValue,
@@ -600,7 +601,6 @@ export async function markPurchased(
       price: toFiniteNumber(program.price),
       durationWeeks: program.duration_weeks,
       amount: null,
-      contact: null,
       coachId: profile.id,
     });
 
@@ -710,10 +710,10 @@ export async function createPaymentLink(
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
-    if (!client.client_consent_given) {
+    if (!hasCurrentConsent(client)) {
       return {
         error:
-          "Клиент не принял политику конфиденциальности - отправьте согласие через портал или бота",
+          "Клиент не принял актуальную политику конфиденциальности 18+ - отправьте согласие через портал или бота",
       };
     }
 
@@ -760,18 +760,13 @@ export async function createPaymentLink(
       const insert = async () =>
         supabaseAdmin.from("purchase_requests").insert({
           id: requestId,
-          order_id: requestId, // order_id = id заявки (конвенция миграции)
-          amount: price, // снимок цены на момент создания ссылки
+          order_id: requestId,
+          amount: price,
           client_id: clientId,
           program_id: programId,
           name: client.name,
-          contact: "panel",
           telegram_id: client.telegram_id,
           sub_type: "program",
-          // Согласие: панельная ссылка создаётся тренером для клиента,
-          // который УЖЕ принял политику (проверено выше - client_consent_given).
-          // Без consent_given=true вебхук отклонил бы активацию уже
-          // оплаченной заявки (fail-closed). Фиксируем версию политики клиента.
           consent_given: true,
           consent_at: new Date().toISOString(),
           consent_version: client.client_consent_version ?? PRIVACY_POLICY_VERSION,
@@ -833,12 +828,12 @@ export async function createSubscriptionPaymentLink(
 
     const { data: client } = await supabaseAdmin
       .from("clients")
-      .select("id, status, telegram_id, client_consent_given")
+      .select("id, status, telegram_id, client_consent_given, client_consent_version")
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
-    if (!client.client_consent_given) {
-      return { error: "Клиент отозвал согласие на обработку данных" };
+    if (!hasCurrentConsent(client)) {
+      return { error: "Клиент не принял актуальное согласие 18+ - отправьте согласие через портал или бота" };
     }
     if (client.status === "inactive") {
       return { error: "Клиент отключён. Сначала верни доступ" };
@@ -1018,14 +1013,14 @@ export async function sendSubscriptionLinkToClient(
 
     const { data: client } = await supabaseAdmin
       .from("clients")
-      .select("id, status, telegram_id, client_consent_given")
+      .select("id, status, telegram_id, client_consent_given, client_consent_version")
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
     if (client.status === "inactive") return { error: "Клиент отключён. Сначала верни доступ" };
     if (client.telegram_id == null) return { error: "Клиент не подключён к боту" };
-    if (!client.client_consent_given) {
-      return { error: "Клиент отозвал согласие на обработку данных" };
+    if (!hasCurrentConsent(client)) {
+      return { error: "Клиент не принял актуальное согласие 18+ - отправьте согласие через портал или бота" };
     }
 
     const { data: payment } = await supabaseAdmin
@@ -1141,15 +1136,15 @@ export async function sendPaymentLinkToClient(
 
     const { data: client } = await supabaseAdmin
       .from("clients")
-      .select("id, telegram_id, client_consent_given")
+      .select("id, telegram_id, client_consent_given, client_consent_version")
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
     if (client.telegram_id == null) {
       return { error: "Клиент не подключён к боту" };
     }
-    if (!client.client_consent_given) {
-      return { error: "Клиент отозвал согласие на обработку данных" };
+    if (!hasCurrentConsent(client)) {
+      return { error: "Клиент не принял актуальное согласие 18+ - отправьте согласие через портал или бота" };
     }
 
     const { data: request } = await supabaseAdmin
@@ -1239,9 +1234,15 @@ export async function updateClient(
 
     if (data.name !== undefined) {
       const trimmed = data.name.trim();
-      if (!trimmed) return { error: "Имя не может быть пустым" };
-      if (trimmed.length > 200) return { error: "Имя слишком длинное" };
-      update.name = trimmed;
+      const normalizedUsername = trimmed
+        ? normalizeTelegramUsername(trimmed)
+        : null;
+      if (trimmed && !normalizedUsername) {
+        return { error: "Укажите Telegram username (например, @username)." };
+      }
+      update.name = normalizedUsername
+        ? `@${normalizedUsername}`
+        : telegramDisplayName(null, clientId);
     }
 
     if (data.language !== undefined) {

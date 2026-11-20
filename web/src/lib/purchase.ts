@@ -6,17 +6,12 @@ export const COACH_REQUEST_ALREADY_SENT_MESSAGE =
 
 export function buildCoachRequestCoachMessage({
   name,
-  contact,
-  formatContact,
 }: {
   name: string;
-  contact: string;
-  formatContact: (value: string) => string;
 }): string {
   return (
     `🤝 Хочу индивидуальное ведение/кураторство\n\n` +
-    `👤 Имя: ${name}\n` +
-    `📱 Контакт: ${formatContact(contact)}\n\n` +
+    `👤 Telegram: ${name}\n\n` +
     `Свяжитесь с клиентом в Telegram.`
   );
 }

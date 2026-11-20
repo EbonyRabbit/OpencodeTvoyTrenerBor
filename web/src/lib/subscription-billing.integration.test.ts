@@ -5,6 +5,7 @@ import {
   handleSubscriptionFailure,
   handleSubscriptionSuccess,
 } from "@/lib/subscription-billing";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import { resetDb } from "@/test/integration/db";
 
 const mocks = vi.hoisted(() => ({
@@ -49,6 +50,7 @@ async function seedClient(
       status,
       language: "ru",
       client_consent_given: true,
+      client_consent_version: PRIVACY_POLICY_VERSION,
     })
     .select("id")
     .single();

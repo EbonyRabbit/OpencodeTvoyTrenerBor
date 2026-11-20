@@ -39,9 +39,8 @@ describe("toFiniteNumber", () => {
 describe("buildActivationCoachMessage", () => {
   it("omits the amount line when it equals the price", () => {
     const message = buildActivationCoachMessage({
-      clientName: "Иван",
+      clientName: "@ivan",
       telegramId: null,
-      contact: null,
       programTitle: "Сила",
       price: 5900,
       amount: 5900,
@@ -49,13 +48,13 @@ describe("buildActivationCoachMessage", () => {
       accessEndDate: NOW,
     });
     expect(message).not.toContain("Сумма оплаты:");
+    expect(message).not.toContain("Контакт");
   });
 
-  it("omits contact and price lines when absent", () => {
+  it("omits price and tg id lines when absent", () => {
     const message = buildActivationCoachMessage({
-      clientName: "Иван",
+      clientName: "@ivan",
       telegramId: null,
-      contact: null,
       programTitle: "Сила",
       price: null,
       amount: null,
@@ -64,7 +63,7 @@ describe("buildActivationCoachMessage", () => {
     });
     expect(message).not.toContain("Цена:");
     expect(message).not.toContain("Сумма оплаты:");
-    expect(message).not.toContain("Контакт:");
+    expect(message).not.toContain("Контакт");
     expect(message).not.toContain("TG ID");
   });
 });

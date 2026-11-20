@@ -4,21 +4,13 @@ import { headers } from "next/headers";
 import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
-import {
-  sanitizeText,
-  isValidContact,
-  formatContact,
-  PHONE_REGEX,
-} from "@/lib/validation";
+import { normalizeTelegramUsername } from "@/lib/validation";
 import {
   DEDUP_ERROR_MESSAGE,
   COACH_REQUEST_ALREADY_SENT_MESSAGE,
   buildCoachRequestCoachMessage,
 } from "@/lib/purchase";
 import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
-
-const NAME_MAX_LENGTH = 200;
-const CONTACT_MAX_LENGTH = 120;
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 5;
@@ -90,38 +82,28 @@ async function deleteDedupKey(key: string): Promise<void> {
 const GENERIC_ERROR_MESSAGE = "Произошла ошибка. Попробуйте позже.";
 
 export type CoachRequestInput = {
-  name: string;
-  contact: string;
+  username: string;
   consentGiven: boolean;
+  age18: boolean;
 };
 
-function hashContact(value: string): string {
+function hashUsername(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function normalizeContactKey(value: string): string {
-  const trimmed = value.replace(/^@/, "").trim().toLowerCase();
-  if (PHONE_REGEX.test(trimmed)) {
-    const digits = trimmed.replace(/[^\d]/g, "");
-    return trimmed.startsWith("+") ? `+${digits}` : digits;
-  }
-  return trimmed;
-}
-
-async function findPendingIndividByContact(
-  contactNorm: string,
-): Promise<boolean> {
+async function findPendingIndividByUsername(username: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin
     .from("purchase_requests")
-    .select("id, contact")
+    .select("id, name")
     .eq("sub_type", "individ")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   if (error) {
-    throw new Error(`Pending individ contact check failed: ${error.message}`);
+    throw new Error(`Pending individ username check failed: ${error.message}`);
   }
+  const needle = `@${username}`;
   return (data ?? []).some(
-    (row) => normalizeContactKey(row.contact ?? "") === contactNorm,
+    (row) => typeof row.name === "string" && row.name.toLowerCase() === needle,
   );
 }
 
@@ -137,32 +119,25 @@ export async function createCoachRequest(
       return { error: "Слишком много заявок. Попробуйте позже." };
     }
 
-    const name = sanitizeText(input.name);
-    if (!name) return { error: "Укажите ваше имя." };
-    if (name.length > NAME_MAX_LENGTH) {
-      return { error: "Имя слишком длинное." };
+    const username = normalizeTelegramUsername(input.username);
+    if (!username) {
+      return { error: "Укажите Telegram username (например, @username)." };
     }
+    const displayName = `@${username}`;
 
-    const contact = sanitizeText(input.contact).replace(/^@/, "");
-    if (!contact) return { error: "Укажите контакт для связи (Telegram)." };
-    if (contact.length > CONTACT_MAX_LENGTH) {
-      return { error: "Контакт слишком длинный." };
-    }
-    if (!isValidContact(contact)) {
-      return { error: "Укажите @username или номер телефона." };
+    if (typeof input.age18 !== "boolean" || !input.age18) {
+      return { error: "Необходимо подтвердить, что вам исполнилось 18 лет." };
     }
 
     if (typeof input.consentGiven !== "boolean" || !input.consentGiven) {
       return { error: "Необходимо согласие на обработку персональных данных." };
     }
 
-    // Веб-строки никогда не претендуют на bot-идентичность: параметр ?tg= на
-    // публичной странице не аутентифицирован, поэтому запись чужого ID
-    // позволила бы заблокировать чужой pending-слот. Дедупликация для веба
-    // строится на контакте.
+    // Веб-строки идентифицируются только username: параметр ?tg= на публичной
+    // странице не аутентифицирован, поэтому запись чужого ID заблокировала бы
+    // чужой pending-слот. Дедупликация строится на нормализованном username.
     const now = Date.now();
-    const contactNorm = normalizeContactKey(contact);
-    dedupKey = `${ip}:individ:${contactNorm}`;
+    dedupKey = `${ip}:individ:${username}`;
     if (
       dedupMap.has(dedupKey) &&
       now - (dedupMap.get(dedupKey) ?? 0) < DEDUP_WINDOW_MS
@@ -171,13 +146,13 @@ export async function createCoachRequest(
     }
     dedupMap.set(dedupKey, now);
 
-    const pendingExists = await findPendingIndividByContact(contactNorm);
+    const pendingExists = await findPendingIndividByUsername(username);
     if (pendingExists) {
       dedupMap.delete(dedupKey);
       return { error: COACH_REQUEST_ALREADY_SENT_MESSAGE };
     }
 
-    dbDedupKey = `individ:${hashContact(contactNorm)}`;
+    dbDedupKey = `individ:${hashUsername(username)}`;
     const nowIso = new Date().toISOString();
     const { error: purgeError } = await supabaseAdmin
       .from("bot_dedup")
@@ -211,8 +186,7 @@ export async function createCoachRequest(
       .from("purchase_requests")
       .insert({
         sub_type: "individ",
-        name,
-        contact,
+        name: displayName,
         status: "pending",
         consent_given: true,
         consent_at: new Date().toISOString(),
@@ -252,7 +226,7 @@ export async function createCoachRequest(
     if (coachChatId) {
       const sent = await sendTelegramMessage(
         coachChatId,
-        buildCoachRequestCoachMessage({ name, contact, formatContact }),
+        buildCoachRequestCoachMessage({ name: displayName }),
       );
       if (!sent) {
         console.error("[COACH_REQUEST] Coach notification failed");

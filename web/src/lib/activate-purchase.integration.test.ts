@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { activatePurchaseByOrder } from "@/lib/activate-purchase";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import { resetDb } from "@/test/integration/db";
 
 const mocks = vi.hoisted(() => ({
@@ -44,6 +45,7 @@ async function seedRequest({
   paidAt = null,
   subType = "program",
   telegramId = TELEGRAM_ID,
+  name = "@ivan_petrov",
 }: {
   programId: string;
   status?: "pending" | "paid" | "cancelled";
@@ -53,6 +55,7 @@ async function seedRequest({
   paidAt?: string | null;
   subType?: "program" | "individ";
   telegramId?: number | null;
+  name?: string;
 }) {
   const id = randomUUID();
   const { error } = await supabaseAdmin.from("purchase_requests").insert({
@@ -61,14 +64,12 @@ async function seedRequest({
     program_id: programId,
     client_id: clientId,
     telegram_id: telegramId,
-    name: "Иван Петров",
-    contact: "@buyer",
-    first_name: "Иван",
-    last_name: "Петров",
+    name,
     sub_type: subType,
     status,
     amount,
     consent_given: consent,
+    consent_version: consent ? PRIVACY_POLICY_VERSION : null,
     paid_at: paidAt,
   });
   if (error) throw error;

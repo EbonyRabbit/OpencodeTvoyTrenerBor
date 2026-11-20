@@ -311,7 +311,6 @@ describe("prodamus webhook", () => {
         Promise.resolve({
           data: {
             name: "Иван Петров",
-            contact: "+79001234567",
             telegram_id: null,
             amount: 5900,
             sub_type: "program",
@@ -327,6 +326,7 @@ describe("prodamus webhook", () => {
     expect(sent.mock.calls[0][0]).toBe("42");
     expect(sent.mock.calls[0][1]).toContain("Иван Петров");
     expect(sent.mock.calls[0][1]).toContain("отменена");
+    expect(sent.mock.calls[0][1]).not.toContain("Контакт");
     expect(activationMock).not.toHaveBeenCalled();
   });
 
@@ -339,7 +339,6 @@ describe("prodamus webhook", () => {
         Promise.resolve({
           data: {
             name: "Шошин Андрей",
-            contact: "+79978797709",
             telegram_id: 856271201,
             amount: 7770,
             sub_type: "program",

@@ -989,11 +989,8 @@ export type Database = {
           consent_at: string | null
           consent_given: boolean
           consent_version: string | null
-          contact: string
           created_at: string
-          first_name: string | null
           id: string
-          last_name: string | null
           name: string
           order_id: string | null
           paid_at: string | null
@@ -1009,11 +1006,8 @@ export type Database = {
           consent_at?: string | null
           consent_given?: boolean
           consent_version?: string | null
-          contact: string
           created_at?: string
-          first_name?: string | null
           id?: string
-          last_name?: string | null
           name: string
           order_id?: string | null
           paid_at?: string | null
@@ -1029,11 +1023,8 @@ export type Database = {
           consent_at?: string | null
           consent_given?: boolean
           consent_version?: string | null
-          contact?: string
           created_at?: string
-          first_name?: string | null
           id?: string
-          last_name?: string | null
           name?: string
           order_id?: string | null
           paid_at?: string | null

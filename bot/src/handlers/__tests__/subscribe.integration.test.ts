@@ -19,13 +19,11 @@ vi.mock("../../bot.js", () => ({
 const TELEGRAM_ID = 123456789;
 const TELEGRAM_ID_EN = 987654321;
 
-function makeCtx(telegramId = TELEGRAM_ID): MyContext {
+function makeCtx(telegramId = TELEGRAM_ID, username: string | null = "Buyer"): MyContext {
   return {
     from: {
       id: telegramId,
-      username: "buyer",
-      first_name: "Иван",
-      last_name: "Петров",
+      ...(username == null ? {} : { username }),
     },
     language: "ru",
     reply: vi.fn().mockResolvedValue({}),
@@ -436,7 +434,7 @@ describe("coach request flow on real data", () => {
 
     let { data, error } = await supabaseAdmin
       .from("purchase_requests")
-      .select("id, sub_type, status, consent_given, telegram_id")
+      .select("id, sub_type, status, consent_given, telegram_id, name")
       .eq("telegram_id", TELEGRAM_ID);
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
@@ -445,8 +443,12 @@ describe("coach request flow on real data", () => {
       status: "pending",
       consent_given: true,
       telegram_id: TELEGRAM_ID,
+      name: "@buyer",
     });
     expect(bot.api.sendMessage).toHaveBeenCalledTimes(1);
+    const coachText = (bot.api.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as string;
+    expect(coachText).toContain("@buyer");
+    expect(coachText).not.toContain("Петров");
 
     const second = makeCtx();
     await handleConsentCoachRequest(second);
@@ -457,5 +459,19 @@ describe("coach request flow on real data", () => {
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
     expect(bot.api.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores fallback name for coach request without username", async () => {
+    const ctx = makeCtx(999111222, null);
+    await startCoachRequest(ctx);
+    await handleConsentCoachRequest(ctx);
+
+    const { data, error } = await supabaseAdmin
+      .from("purchase_requests")
+      .select("name")
+      .eq("telegram_id", 999111222)
+      .single();
+    expect(error).toBeNull();
+    expect(data?.name).toMatch(/^Клиент #[A-F0-9]{6}$/);
   });
 });

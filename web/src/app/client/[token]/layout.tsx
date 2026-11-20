@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { CLIENT_STATUS_LABELS, type ClientRow } from "@/lib/clients";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import { ConsentScreen } from "./_components/consent-screen";
 
 async function lazyExpireAccess(client: ClientRow): Promise<boolean> {
@@ -114,7 +115,10 @@ export default async function ClientPortalLayout({
     redirect("/client/expired");
   }
 
-  if (!client.client_consent_given) {
+  if (
+    !client.client_consent_given ||
+    client.client_consent_version !== PRIVACY_POLICY_VERSION
+  ) {
     return (
       <ConsentScreen clientName={client.name} />
     );

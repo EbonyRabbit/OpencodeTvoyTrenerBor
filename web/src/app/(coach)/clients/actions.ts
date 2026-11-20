@@ -1,18 +1,18 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifySession } from "@/lib/dal";
 import type { Database, PaymentStatus } from "@/types/supabase";
+import { normalizeTelegramUsername, telegramDisplayName } from "@/lib/validation";
 
 type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];
 
 const TIMEZONE_REGEX = /^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/;
-const MAX_NAME_LENGTH = 100;
 
 export async function createClient(formData: {
-  name: string;
-  telegram_id?: number | null;
+  username?: string;
   language: string;
   timezone: string;
   payment_status: string;
@@ -24,14 +24,16 @@ export async function createClient(formData: {
       return { error: "Нет прав" };
     }
 
-    const name = formData.name.trim();
-    if (!name) return { error: "Имя обязательно" };
-    if (name.length > MAX_NAME_LENGTH) {
-      return { error: `Имя не должно превышать ${MAX_NAME_LENGTH} символов` };
-    }
-
     if (!formData.consent_given) {
       return { error: "Необходимо согласие клиента на обработку персональных данных" };
+    }
+
+    const rawUsername = (formData.username ?? "").trim();
+    const normalizedUsername = rawUsername
+      ? normalizeTelegramUsername(rawUsername)
+      : null;
+    if (rawUsername && !normalizedUsername) {
+      return { error: "Укажите Telegram username (например, @username)." };
     }
 
     const language = formData.language === "en" ? "en" : "ru";
@@ -40,7 +42,13 @@ export async function createClient(formData: {
     const payment_status: PaymentStatus =
       formData.payment_status === "paid" ? "paid" : "pending";
 
+    const clientId = randomUUID();
+    const name = normalizedUsername
+      ? `@${normalizedUsername}`
+      : telegramDisplayName(null, clientId);
+
     const insertData: ClientInsert = {
+      id: clientId,
       name,
       language,
       timezone,
@@ -67,25 +75,14 @@ export async function createClient(formData: {
       client_consent_version: null,
     };
 
-    if (formData.telegram_id && formData.telegram_id > 0) {
-      insertData.telegram_id = Math.floor(formData.telegram_id);
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from("clients")
-      .insert(insertData)
-      .select("id")
-      .single();
+    const { error } = await supabaseAdmin.from("clients").insert(insertData);
 
     if (error) {
-      if (error.code === "23505") {
-        return { error: "Клиент с таким Telegram ID уже существует" };
-      }
       return { error: "Не удалось создать клиента" };
     }
 
     revalidatePath("/clients");
-    return { id: data.id };
+    return { id: clientId };
   } catch {
     return { error: "Произошла ошибка" };
   }

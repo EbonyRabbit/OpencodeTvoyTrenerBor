@@ -7,6 +7,7 @@ vi.mock("@/lib/coach-alert", () => ({ sendCoachAlertOnce: vi.fn().mockResolvedVa
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { handleSubscriptionSuccess, handleSubscriptionFailure } from "../subscription-billing";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 
 const SUB_ID = "aaaaaaaa-1111-4111-8111-111111111111";
 const CLIENT_ID = "bbbbbbbb-2222-4222-8222-222222222222";
@@ -160,6 +161,7 @@ const clientRow = {
   status: "active",
   telegram_id: 12345,
   client_consent_given: true,
+  client_consent_version: PRIVACY_POLICY_VERSION,
   language: "ru",
 };
 
@@ -199,6 +201,25 @@ describe("30.9 подписочные платежи", () => {
       12345,
       expect.stringContaining("Подписка активна"),
     );
+  });
+
+  it("блокирует активацию при устаревшей версии согласия 18+", async () => {
+    const state: State = {
+      payment: paymentRow(),
+      client: { ...clientRow, client_consent_version: "2026-11-18" },
+      captured: capturedRow(),
+      renewalRow: null,
+      renewInsertError: null,
+    };
+    mockDb(state);
+
+    const result = await handleSubscriptionSuccess({
+      orderId: ORDER_ID,
+      paidSum: 4900,
+      providerOrderId: "100500",
+    });
+
+    expect(result).toEqual({ outcome: "consent_missing", manual: true });
   });
 
   it("суржик первого платежа с тем же provider id не продлевает", async () => {

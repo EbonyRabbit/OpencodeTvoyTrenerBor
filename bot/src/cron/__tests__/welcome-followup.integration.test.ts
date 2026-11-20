@@ -222,8 +222,7 @@ describe("runWelcomeFollowup on real data", () => {
       details: "channel_grow",
     });
     const { error } = await supabaseAdmin.from("purchase_requests").insert({
-      name: "Paid User",
-      contact: "@paid",
+      name: "@paid",
       telegram_id: 444,
       status: "paid",
       sub_type: "program",

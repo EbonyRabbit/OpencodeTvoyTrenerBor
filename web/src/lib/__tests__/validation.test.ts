@@ -1,17 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { formatContact } from "../validation";
+import {
+  isValidTelegramUsername,
+  normalizeTelegramUsername,
+  telegramDisplayName,
+} from "../validation";
 
-describe("formatContact", () => {
-  it("keeps an existing username prefix", () => {
-    expect(formatContact("@buyer")).toBe("@buyer");
+describe("telegram username helpers", () => {
+  it("normalizes username by stripping @, trimming and lowercasing", () => {
+    expect(normalizeTelegramUsername("  @Ivan_User  ")).toBe("ivan_user");
+    expect(normalizeTelegramUsername("ivan")).toBe("ivan");
   });
 
-  it("adds a username prefix", () => {
-    expect(formatContact("buyer")).toBe("@buyer");
+  it("rejects invalid usernames", () => {
+    expect(normalizeTelegramUsername("")).toBeNull();
+    expect(normalizeTelegramUsername("ab")).toBeNull();
+    expect(normalizeTelegramUsername("не_юзер")).toBeNull();
+    expect(normalizeTelegramUsername("toolong_username_over_32_chars____")).toBeNull();
+    expect(isValidTelegramUsername("bad-name")).toBe(false);
   });
 
-  it("keeps numeric Telegram ids and phones bare", () => {
-    expect(formatContact("123456789")).toBe("123456789");
-    expect(formatContact("+7 999 123-45-67")).toBe("+7 999 123-45-67");
+  it("builds stable fallback from seed", () => {
+    const seed = "123e4567-e89b-12d3-a456-426614174000";
+    expect(telegramDisplayName(null, seed)).toBe(
+      telegramDisplayName(null, seed),
+    );
+    expect(telegramDisplayName(null, seed)).toMatch(/^Клиент #[A-Z0-9]{6}$/);
+    expect(telegramDisplayName("ivan", seed)).toBe("@ivan");
   });
 });

@@ -12,6 +12,7 @@ vi.mock("@/lib/prodamus", () => ({
 import { verifySession } from "@/lib/dal";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolvePaymentUrl } from "@/lib/prodamus";
+import { PRIVACY_POLICY_VERSION } from "@/lib/consent";
 import { createSubscriptionPaymentLink } from "../actions";
 
 const CLIENT_ID = "11111111-2222-3333-4444-555555555555";
@@ -104,6 +105,7 @@ const baseState = (): State => ({
     status: "active",
     telegram_id: 12345,
     client_consent_given: true,
+    client_consent_version: PRIVACY_POLICY_VERSION,
   },
   liveSub: null,
   pendingSub: { id: SUB_ID },
@@ -196,5 +198,18 @@ describe("createSubscriptionPaymentLink", () => {
     const result = await createSubscriptionPaymentLink(CLIENT_ID);
 
     expect(result.error).toBe("Клиент отключён. Сначала верни доступ");
+  });
+
+  it("блокирует клиента с устаревшей версией согласия 18+", async () => {
+    const state = baseState();
+    state.client = { ...state.client, client_consent_version: "2026-11-18" };
+    mockDb(state);
+
+    const result = await createSubscriptionPaymentLink(CLIENT_ID);
+
+    expect(result.error).toBe(
+      "Клиент не принял актуальное согласие 18+ - отправьте согласие через портал или бота",
+    );
+    expect(result.url).toBeUndefined();
   });
 });

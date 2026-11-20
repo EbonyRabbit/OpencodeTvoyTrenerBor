@@ -25,17 +25,20 @@ vi.mock("../../handlers/consent.js", () => ({
 }));
 
 const insertedLogs: Record<string, unknown>[] = [];
+const gtCalls: Array<[string, unknown]> = [];
 let clientChain: Record<string, unknown>;
 
 type QueryResult = { data: unknown; error: unknown };
 
 function makeChain(getResult: () => QueryResult, table?: string) {
   const chain: Record<string, unknown> = {};
-  for (
-    const method of ["select", "not", "eq", "in", "lt", "gt", "order", "limit"]
-  ) {
+  for (const method of ["select", "not", "eq", "in", "lt", "order", "limit"]) {
     chain[method] = () => chain;
   }
+  chain.gt = (column: string, value: unknown) => {
+    gtCalls.push([column, value]);
+    return chain;
+  };
   chain.update = vi.fn(() => chain);
   chain.insert = (row: Record<string, unknown>) => {
     if (table === "bot_logs") insertedLogs.push(row);
@@ -49,6 +52,7 @@ function makeChain(getResult: () => QueryResult, table?: string) {
 
 function mockDb(pages: unknown[][]) {
   insertedLogs.length = 0;
+  gtCalls.length = 0;
   let pageIndex = 0;
   const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
   fromMock.from.mockImplementation((table: string) => {
@@ -133,6 +137,7 @@ describe("runPolicyNotice", () => {
 
     await runPolicyNotice(bot);
 
+    expect(gtCalls).toContainEqual(["id", "current-199"]);
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage.mock.calls[0][0]).toBe(9999);
     expect(markAsSent).toHaveBeenCalledWith(

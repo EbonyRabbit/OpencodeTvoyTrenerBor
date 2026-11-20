@@ -713,6 +713,13 @@ describe("getPreviousWorkoutLogs", () => {
     expect(builder.order).toHaveBeenCalledWith("date", { ascending: false });
   });
 
+  it("filters previous weights by the active program period", async () => {
+    clearWorkoutLogsCache();
+    const builder = mockLogsQuery([]);
+    await getPreviousWorkoutLogs(client, ["Присед"]);
+    expect(builder.eq).toHaveBeenCalledWith("program_period_id", "period-1");
+  });
+
   it("escapes reserved and wildcard characters in or-filter", async () => {
     const builder = mockLogsQuery([]);
     await getPreviousWorkoutLogs(client, [
@@ -870,6 +877,17 @@ describe("previous logs cache", () => {
     mockLogsQuery([{ exercise: "Приседания", date: "2026-10-01", weight: 90, sets: 3, reps: "5" }]);
     const result = await getPreviousWorkoutLogs(client, ["Приседания"]);
     expect(result.get("приседания")?.date).toBe("2026-10-01");
+  });
+
+  it("does not reuse old weights after switching to a new program period", async () => {
+    clearWorkoutLogsCache();
+    mockLogsQuery([{ exercise: "Приседания", date: "2026-10-01", weight: 90, sets: 3, reps: "5" }]);
+    expect((await getPreviousWorkoutLogs(client, ["Приседания"])).get("приседания")?.weight).toBe(90);
+
+    periodMock.getActiveProgramPeriod.mockResolvedValue({ id: "period-2", program_id: "prog-2" });
+    mockLogsQuery([{ exercise: "Приседания", date: "2026-10-02", weight: 95, sets: 3, reps: "5" }]);
+    const switched = await getPreviousWorkoutLogs(client, ["Приседания"]);
+    expect(switched.get("приседания")?.weight).toBe(95);
   });
 });
 

@@ -212,6 +212,35 @@ describe("guardActiveClient - ленивое автоистечение дост
     expect(result).toHaveProperty("client");
   });
 
+  it("30.14: отменённая подписка держит доступ до конца оплаченного периода", async () => {
+    const capturedCalls: Record<string, ChainCall[]> = {};
+    const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    fromMock.from.mockImplementation((table: string) => {
+      const c = makeChain({
+        data: table === "subscriptions"
+          ? { id: "sub-3", cancel_at_period_end: true }
+          : null,
+        error: null,
+      });
+      capturedCalls[table] = c.calls;
+      return c.chain;
+    });
+    vi.mocked(findClientByTelegramId).mockResolvedValue(
+      makeClient({
+        access_end_date: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+      }),
+    );
+
+    const result = await guardActiveClient(makeCtx());
+
+    expect(result).toHaveProperty("client");
+    const statusFilter = (capturedCalls.subscriptions ?? []).find(
+      (c) => c.method === "in",
+    );
+    expect(statusFilter?.args).toEqual(["status", ["active", "past_due"]]);
+    expect(capturedCalls.clients ?? []).toEqual([]);
+  });
+
   it("30.8: без живой подписки (cancelled/expired) условный UPDATE выполняется", async () => {
     const capturedCalls: Record<string, ChainCall[]> = {};
     const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };

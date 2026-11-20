@@ -63,6 +63,10 @@ BEGIN
 END $$;
 `;
 
+export function dbQuery(sql: string): string {
+  return psql(sql);
+}
+
 export function dbDate(): string {
   return execFileSync(
     "docker",

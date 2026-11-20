@@ -12,7 +12,6 @@ describe("client tokens", () => {
       "e0bebd22819993425814866b62701e2919ea26f1370499c1037b53b9d49c2c8a",
     );
     expect(hashClientToken("ABC123")).toHaveLength(64);
-    expect(hashClientToken("ABC123")).toBe(hashClientToken("ABC123"));
     expect(hashClientToken("ABC123")).not.toBe(hashClientToken("ABC124"));
   });
 

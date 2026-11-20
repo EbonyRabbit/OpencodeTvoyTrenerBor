@@ -390,7 +390,10 @@ describe("30.8: подписочные напоминания и grace", () => {
   });
 
   it("арифметика отсечки: cutoff = now минус 3 дня grace, lt строгий", async () => {
-    const captured: { lts: unknown[][] } = { lts: [] };
+    const captured: { lts: unknown[][]; methods: string[] } = {
+      lts: [],
+      methods: [],
+    };
     const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
     fromMock.from.mockImplementation((table: string) => {
       if (table !== "subscriptions") return makeChain({ data: [], error: null }, table);
@@ -398,6 +401,7 @@ describe("30.8: подписочные напоминания и grace", () => {
       chain.update = () => chain;
       chain.eq = () => chain;
       chain.lt = (...args: unknown[]) => {
+        captured.methods.push("lt");
         captured.lts.push(args);
         return chain;
       };
@@ -410,10 +414,8 @@ describe("30.8: подписочные напоминания и grace", () => {
 
     await expireStalePastDueSubscriptions(now);
 
-    // арифметика отсечки: now минус ровно 3 дня
+    expect(captured.lts[0]?.[0]).toBe("current_period_end");
     expect(captured.lts[0]?.[1]).toBe("2026-11-14T12:00:00.000Z");
-    // период ровно на границе 3 дней не попадает в отсечку (lt строгий)
-    const cutoff = (captured.lts[0] as [string, string])[1];
-    expect(new Date("2026-11-14T12:00:00.000Z") < new Date(cutoff)).toBe(false);
+    expect(captured.methods).toEqual(["lt"]);
   });
 });

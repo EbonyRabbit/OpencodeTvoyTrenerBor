@@ -162,6 +162,35 @@ describe("30.9 subscription billing on real data", () => {
     );
   });
 
+  it("вытесняет старую живую подписку при реактивации клиента", async () => {
+    const plan = await seedPlan();
+    const clientId = await seedClient("active");
+    const oldSubId = await seedSubscription(clientId, plan.id);
+    const { error: activateError } = await supabaseAdmin
+      .from("subscriptions")
+      .update({
+        status: "active",
+        current_period_start: new Date().toISOString(),
+        current_period_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+        cancel_at_period_end: true,
+      })
+      .eq("id", oldSubId);
+    expect(activateError).toBeNull();
+
+    const subId = await seedSubscription(clientId, plan.id);
+    const orderId = await seedPayment(subId, plan.price);
+
+    const result = await handleSubscriptionSuccess({
+      orderId,
+      paidSum: plan.price,
+      providerOrderId: "provider-reactivate",
+    });
+
+    expect(result.outcome).toBe("activated");
+    expect((await getSubscription(oldSubId)).status).toBe("cancelled");
+    expect((await getSubscription(subId)).status).toBe("active");
+  });
+
   it("переигрывает эффекты оплаты, если платёж уже success, но applied_at пуст", async () => {
     const plan = await seedPlan();
     const clientId = await seedClient();

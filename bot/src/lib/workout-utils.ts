@@ -484,7 +484,7 @@ export async function getPreviousWorkoutLogs(
   return result;
 }
 
-function toHistoryEntry(row: Record<string, unknown>): ExerciseHistoryEntry {
+export function toExerciseHistoryEntry(row: Record<string, unknown>): ExerciseHistoryEntry {
   return {
     date: String(row.date ?? ""),
     weight: (row.weight as number | null) ?? null,
@@ -523,7 +523,7 @@ export async function getExerciseHistory(
   }
 
   return (data ?? [])
-    .map((row) => toHistoryEntry(row as Record<string, unknown>))
+    .map((row) => toExerciseHistoryEntry(row as Record<string, unknown>))
     .filter((entry) => entry.date !== "");
 }
 

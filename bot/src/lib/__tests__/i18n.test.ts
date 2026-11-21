@@ -43,11 +43,15 @@ describe("progress menu i18n", () => {
   it("has Russian menu and progress translations", () => {
     expect(t("menu.progress", "ru")).toBe("/progress - прогресс тренировок");
     expect(t("progress.title", "ru")).toBe("Прогресс:");
+    expect(t("progress.no_data", "ru")).toContain("логов тренировок");
+    expect(t("progress.no_data", "ru")).toContain("/today");
   });
 
   it("has English menu and progress translations", () => {
     expect(t("menu.progress", "en")).toBe("/progress - training progress");
     expect(t("progress.title", "en")).toBe("Progress:");
+    expect(t("progress.no_data", "en")).toContain("workout logs");
+    expect(t("progress.no_data", "en")).toContain("/today");
   });
 });
 

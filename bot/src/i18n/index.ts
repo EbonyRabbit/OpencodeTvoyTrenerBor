@@ -49,6 +49,8 @@ const resources = {
       },
       progress: {
         title: "Прогресс:",
+        no_data: "Пока нет логов тренировок. Отметь первую тренировку через /today и здесь появится динамика.",
+        truncation_suffix: "\n\nПоказываю первые упражнения. Остальные смотри в истории тренировок.",
       },
       program: {
         title_label: "Программа: {{title}}",
@@ -486,6 +488,8 @@ const resources = {
       },
       progress: {
         title: "Progress:",
+        no_data: "No workout logs yet. Log your first workout with /today and your progress will show up here.",
+        truncation_suffix: "\n\nShowing the first exercises. See the rest in workout history.",
       },
       program: {
         title_label: "Program: {{title}}",

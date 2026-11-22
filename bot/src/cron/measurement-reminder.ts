@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
+import { filterClientsWithAccess } from "../lib/client-access.js";
 import { t, type Language } from "../i18n/index.js";
 import {
   getTodayDateStr,
@@ -64,7 +65,7 @@ export async function runMeasurementReminder(bot: Bot<MyContext>): Promise<void>
   for (;;) {
     const { data: clients, error } = await supabaseAdmin
       .from("clients")
-      .select("id, telegram_id, timezone, language, measurement_day, measurement_time, name")
+      .select("id, telegram_id, timezone, language, measurement_day, measurement_time, name, status, payment_status, access_end_date")
       .eq("status", "active")
       .not("telegram_id", "is", null)
       .not("measurement_day", "is", null)
@@ -79,7 +80,8 @@ export async function runMeasurementReminder(bot: Bot<MyContext>): Promise<void>
       break;
     }
 
-    for (const client of clients) {
+    const eligibleClients = await filterClientsWithAccess(clients);
+    for (const client of eligibleClients) {
       if (pausedIds.has(client.id)) continue;
       if (!client.telegram_id) continue;
       if (client.measurement_day == null || client.measurement_time == null) continue;

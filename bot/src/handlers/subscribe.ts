@@ -10,6 +10,7 @@ import {
   telegramDisplayName,
   type Client,
 } from "../lib/clients.js";
+import { findLiveSubscription } from "../lib/client-access.js";
 import { getParsedContent } from "../lib/program-utils.js";
 import { switchProgramPeriod } from "../lib/program-periods.js";
 import { InlineKeyboard } from "grammy";
@@ -44,24 +45,6 @@ interface CatalogProgram {
   id: string;
   title: string;
   parsed_content: unknown;
-}
-
-// Живая подписка (active/past_due) открывает выбор любой программы.
-// Клиент должен быть status='active': у неактивного подписка гасится в
-// disableClient, а access_expired нельзя оживить старой подпиской.
-async function findLiveSubscription(clientId: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin
-    .from("subscriptions")
-    .select("id")
-    .eq("client_id", clientId)
-    .in("status", ["active", "past_due"])
-    .limit(1)
-    .maybeSingle<{ id: string }>();
-  if (error) {
-    // fail-closed: нельзя проверить подписку - выбор не открываем
-    throw new Error(`Subscription check failed for ${clientId}: ${error.message}`);
-  }
-  return data !== null;
 }
 
 async function fetchCatalogProgram(

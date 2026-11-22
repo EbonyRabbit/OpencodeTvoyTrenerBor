@@ -212,6 +212,26 @@ describe("guardActiveClient - ленивое автоистечение дост
     expect(result).toHaveProperty("client");
   });
 
+  it("31.1: pending + живая подписка проходит guard", async () => {
+    mockFrom({ liveSubRow: { id: "sub-live" } });
+    vi.mocked(findClientByTelegramId).mockResolvedValue(
+      makeClient({ payment_status: "pending" }),
+    );
+
+    const result = await guardActiveClient(makeCtx());
+    expect(result).toHaveProperty("client");
+  });
+
+  it("31.1: pending без живой подписки блокируется", async () => {
+    mockFrom({});
+    vi.mocked(findClientByTelegramId).mockResolvedValue(
+      makeClient({ payment_status: "pending" }),
+    );
+
+    const result = await guardActiveClient(makeCtx());
+    expect(result).toBe("t:client.payment_pending");
+  });
+
   it("30.14: отменённая подписка держит доступ до конца оплаченного периода", async () => {
     const capturedCalls: Record<string, ChainCall[]> = {};
     const fromMock = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };

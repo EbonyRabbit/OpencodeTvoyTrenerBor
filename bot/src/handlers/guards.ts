@@ -2,6 +2,7 @@ import type { MyContext } from "../bot.js";
 import { findClientByTelegramId } from "../lib/clients.js";
 import type { Client } from "../lib/clients.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
+import { findLiveSubscription, hasClientAccess } from "../lib/client-access.js";
 import { t, applyClientLanguage } from "../i18n/index.js";
 
 export interface GuardResult {
@@ -19,12 +20,19 @@ export interface GuardResult {
  * access_end_date при живой подписке ленивое истечение не трогает:
  * подписку гасит её собственный жизненный цикл (cron access-expiry).
  */
-async function lazyExpireAccess(client: Client): Promise<boolean> {
-  if (client.status !== "active" || !client.access_end_date) return false;
-  if (new Date(client.access_end_date).getTime() >= Date.now()) return false;
+interface LazyExpireResult {
+  expired: boolean;
+  paused: boolean;
+  renewed: boolean;
+}
+
+async function lazyExpireAccess(client: Client): Promise<LazyExpireResult> {
+  const notExpired = { expired: false, paused: false, renewed: false };
+  if (client.status !== "active" || !client.access_end_date) return notExpired;
+  if (new Date(client.access_end_date).getTime() >= Date.now()) return notExpired;
 
   // Активная пауза - доступ не истекает во время паузы. Ошибка запроса
-  // тоже пропускает истечение в этот заход: гейт перезапустится на
+  // оставляет решение следующему визиту: гейт перезапустится на
   // следующем визите, а ошибочное истечение живого клиента не лечится
   // само.
   const pauseResult = await supabaseAdmin
@@ -36,23 +44,16 @@ async function lazyExpireAccess(client: Client): Promise<boolean> {
     .maybeSingle();
   if (pauseResult.error) {
     console.error("[GUARD] Pause check failed:", pauseResult.error.message);
-    return false;
+    return notExpired;
   }
-  if (pauseResult.data) return false;
+  if (pauseResult.data) return { expired: false, paused: true, renewed: false };
 
-  // Живая подписка (включая past_due grace) - доступ решает подписка.
-  const subResult = await supabaseAdmin
-    .from("subscriptions")
-    .select("id")
-    .eq("client_id", client.id)
-    .in("status", ["active", "past_due"])
-    .limit(1)
-    .maybeSingle();
-  if (subResult.error) {
-    console.error("[GUARD] Subscription check failed:", subResult.error.message);
-    return false;
+  try {
+    if (await findLiveSubscription(client.id)) return notExpired;
+  } catch (err) {
+    console.error("[GUARD] Subscription check failed:", err);
+    return notExpired;
   }
-  if (subResult.data) return false;
 
   const nowIso = new Date().toISOString();
   const { data, error } = await supabaseAdmin
@@ -64,10 +65,10 @@ async function lazyExpireAccess(client: Client): Promise<boolean> {
     .select("id");
   if (error) {
     console.error("[GUARD] Failed to expire access:", error.message);
-    return false;
+    return notExpired;
   }
-  // 0 строк = дату успели продлить в гонке - доступ остаётся активным.
-  return Array.isArray(data) && data.length > 0;
+  const expired = Array.isArray(data) && data.length > 0;
+  return { expired, paused: false, renewed: !expired };
 }
 
 async function baseGuard(ctx: MyContext, requireProgram: boolean): Promise<GuardResult | string> {
@@ -83,7 +84,8 @@ async function baseGuard(ctx: MyContext, requireProgram: boolean): Promise<Guard
 
   applyClientLanguage(ctx, client.language);
 
-  if (await lazyExpireAccess(client)) {
+  const expiry = await lazyExpireAccess(client);
+  if (expiry.expired) {
     return t("client.access_expired", ctx.language);
   }
 
@@ -96,8 +98,11 @@ async function baseGuard(ctx: MyContext, requireProgram: boolean): Promise<Guard
     return t("client.inactive", ctx.language);
   }
 
-  if (client.payment_status === "pending") {
-    return t("client.payment_pending", ctx.language);
+  if (!(await hasClientAccess(client, { allowExpiredPaid: expiry.paused || expiry.renewed }))) {
+    return t(
+      client.payment_status === "pending" ? "client.payment_pending" : "client.access_expired",
+      ctx.language,
+    );
   }
 
   if (requireProgram && !client.program_id) {

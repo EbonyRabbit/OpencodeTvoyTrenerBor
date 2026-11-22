@@ -159,6 +159,7 @@ async function runSubscriptionReminder(
       "id",
       cancelSubs.map((sub) => sub.client_id),
     )
+    .eq("status", "active")
     .not("telegram_id", "is", null);
   if (error) {
     console.error("[ACCESS_EXPIRY] Failed to fetch sub clients:", error.code);

@@ -9,6 +9,7 @@ import {
 } from "./cron/subscription-reconcile.js";
 import { startupWarnings } from "./startup-warnings.js";
 import { syncBotCommands } from "./lib/bot-commands.js";
+import { buildWebhookOptions } from "./lib/webhook-config.js";
 
 const { server } = createApp({
   bot,
@@ -49,11 +50,7 @@ async function main(): Promise<void> {
     console.warn(warning);
   }
 
-  await bot.api.setWebhook(webhookUrl, {
-    secret_token: config.telegram.webhookSecret,
-    allowed_updates: ["message", "callback_query"],
-    drop_pending_updates: true,
-  });
+  await bot.api.setWebhook(webhookUrl, buildWebhookOptions(config.telegram.webhookSecret));
   console.log(`Webhook set to: ${webhookUrl}`);
 }
 

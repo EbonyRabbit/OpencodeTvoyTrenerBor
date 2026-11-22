@@ -42,6 +42,7 @@ function setupClientsDb(opts: {
   byTelegramId?: Record<number, { data: unknown; error: unknown }>;
   byConnectCode?: Record<string, { data: unknown; error: unknown }>;
   connectUpdate?: { data: unknown; error: unknown };
+  subscriptionRow?: unknown;
   nameUpdateError?: unknown;
 }) {
   const queries: Query[] = [];
@@ -53,6 +54,9 @@ function setupClientsDb(opts: {
         const payload = state.updatePayload ?? {};
         if ("name" in payload) return { data: null, error: opts.nameUpdateError ?? null };
         return opts.connectUpdate ?? { data: { id: state.eq.id }, error: null };
+      }
+      if (table === "subscriptions") {
+        return { data: opts.subscriptionRow ?? null, error: null };
       }
       if ("telegram_id" in state.eq) {
         const key = state.eq.telegram_id as number;
@@ -80,6 +84,8 @@ function setupClientsDb(opts: {
         state.is[col] = val;
         return chain;
       },
+      in: () => chain,
+      limit: () => chain,
       maybeSingle: resolve,
       single: resolve,
       then: (onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown) =>
@@ -143,6 +149,37 @@ describe("startHandler", () => {
     expect((ctx.client as any).name).toBe("@buyer_123");
   });
 
+  it("lets a pending client with a live subscription through /start", async () => {
+    const client = {
+      id: "11111111-1111-1111-1111-111111111116",
+      telegram_id: 123456789,
+      name: "@buyer_123",
+      status: "active",
+      payment_status: "pending",
+      client_consent_given: true,
+      client_consent_version: "2026-11-20.subscription",
+      language: "ru",
+      program_id: "prog-1",
+      training_days: [1, 2, 3],
+    };
+    setupClientsDb({
+      byTelegramId: { 123456789: { data: client, error: null } },
+      subscriptionRow: { id: "sub-1" },
+    });
+    const ctx = makeCtx();
+
+    await startHandler(ctx);
+
+    const replies = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => String(call[0]),
+    );
+    expect(replies.some((text) => text.includes("Программа ещё не назначена"))).toBe(false);
+    const keyboard = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
+      reply_markup?: unknown;
+    };
+    expect(JSON.stringify(keyboard.reply_markup ?? {})).toContain("programs_open");
+  });
+
   it("uses stable fallback when username is missing", async () => {
     const client = {
       id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -201,6 +238,37 @@ describe("startHandler", () => {
     );
     expect(nameUpdates).toHaveLength(1);
     expect((ctx.client as any).name).toBe("@buyer_123");
+  });
+
+  it("does not reject a connected subscriber on a repeated /start CODE", async () => {
+    const existing = {
+      id: "22222222-2222-2222-2222-222222222226",
+      telegram_id: 123456789,
+      name: "@buyer_123",
+      status: "active",
+      payment_status: "pending",
+      client_consent_given: true,
+      client_consent_version: "2026-11-20.subscription",
+      language: "ru",
+      program_id: "prog-1",
+      training_days: [1, 2, 3],
+    };
+    setupClientsDb({
+      byTelegramId: { 123456789: { data: existing, error: null } },
+      subscriptionRow: { id: "sub-2" },
+    });
+    const ctx = makeCtx({ text: "/start ABCD1234" });
+
+    await startHandler(ctx);
+
+    const replies = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => String(call[0]),
+    );
+    expect(replies.some((text) => text.includes("Программа ещё не назначена"))).toBe(false);
+    const keyboard = (ctx.reply as ReturnType<typeof vi.fn>).mock.calls[0][1] as {
+      reply_markup?: unknown;
+    };
+    expect(JSON.stringify(keyboard.reply_markup ?? {})).toContain("programs_open");
   });
 
   it("syncs username after connecting by code", async () => {

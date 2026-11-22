@@ -2,6 +2,7 @@ import { InlineKeyboard, type Bot } from "grammy";
 import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { findClientByTelegramId } from "../lib/clients.js";
+import { filterClientsWithAccess } from "../lib/client-access.js";
 import { t, type Language } from "../i18n/index.js";
 import {
   getTodayWorkout,
@@ -86,7 +87,7 @@ export async function runMorningNotification(bot: Bot<MyContext>): Promise<void>
   for (;;) {
     const { data: clients, error } = await supabaseAdmin
       .from("clients")
-      .select("id, telegram_id, timezone, language, program_id, morning_time, name")
+      .select("id, telegram_id, timezone, language, program_id, morning_time, name, status, payment_status, access_end_date")
       .eq("status", "active")
       .not("telegram_id", "is", null)
       .not("program_id", "is", null)
@@ -98,7 +99,8 @@ export async function runMorningNotification(bot: Bot<MyContext>): Promise<void>
       break;
     }
 
-    for (const client of clients) {
+    const eligibleClients = await filterClientsWithAccess(clients);
+    for (const client of eligibleClients) {
       if (!client.telegram_id) continue;
       if (pausedIds.has(client.id)) continue;
       if (!client.morning_time) continue;

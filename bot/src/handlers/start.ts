@@ -6,6 +6,7 @@ import {
   syncClientName,
   type Client,
 } from "../lib/clients.js";
+import { hasClientAccess } from "../lib/client-access.js";
 import { t, applyClientLanguage } from "../i18n/index.js";
 import { InlineKeyboard } from "grammy";
 import { runAfterConnect } from "./connect-flow.js";
@@ -50,6 +51,14 @@ export async function startHandler(ctx: MyContext): Promise<void> {
       if (existing) {
         await syncClientNameBestEffort(existing, ctx.from?.username);
         ctx.client = existing;
+        if (await hasClientAccess(existing)) {
+          if (!hasCurrentConsent(existing)) {
+            await sendConsentPrompt(ctx);
+          } else {
+            await runAfterConnect(ctx);
+          }
+          return;
+        }
         await ctx.reply(t("client.no_program", ctx.language));
         return;
       }
@@ -95,8 +104,7 @@ export async function startHandler(ctx: MyContext): Promise<void> {
     await syncClientNameBestEffort(client, ctx.from?.username);
     ctx.client = client;
 
-    if (client.status === "active" && client.payment_status === "paid") {
-
+    if (await hasClientAccess(client)) {
       if (!hasCurrentConsent(client)) {
         await sendConsentPrompt(ctx);
       } else {

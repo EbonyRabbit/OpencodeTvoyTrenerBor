@@ -2,6 +2,7 @@ import type { Bot } from "grammy";
 import type { MyContext } from "../bot.js";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import type { Client } from "../lib/clients.js";
+import { hasClientAccess } from "../lib/client-access.js";
 import { t, type Language } from "../i18n/index.js";
 import { getTodayDateStr, getTodayWorkout, isTodayWorkoutCompleted, formatWorkoutMessage, truncateMessage } from "../lib/workout-utils.js";
 import { markAsSent } from "./dedup.js";
@@ -67,11 +68,11 @@ export async function runAutoResume(bot: Bot<MyContext>): Promise<void> {
         continue;
       }
 
-      if (client.status !== "active") {
+      if (client.status !== "active" || !(await hasClientAccess(client))) {
         await logBotEvent("cron:auto_resume", {
           clientId: pause.client_id,
           status: "info",
-          details: `Client status is ${client.status}`,
+          details: `Client access check failed (${client.status})`,
         });
         continue;
       }
@@ -158,7 +159,7 @@ export async function runResumeReminder(bot: Bot<MyContext>): Promise<void> {
     try {
       const client = await fetchClient(pause.client_id);
       if (!client || !client.telegram_id) continue;
-      if (client.status !== "active") continue;
+      if (!(await hasClientAccess(client))) continue;
 
       const tz = client.timezone || DEFAULT_TIMEZONE;
       const clientToday = getTodayDateStr(tz);

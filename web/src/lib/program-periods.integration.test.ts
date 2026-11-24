@@ -1,9 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { startProgramPeriod, getActiveProgramPeriod } from "@/lib/program-periods";
-import { dbDate, resetDb } from "@/test/integration/db";
+import { startProgramPeriod, getActiveProgramPeriod, listProgramPeriods } from "@/lib/program-periods";
+import { dbDate, dbQuery, resetDb } from "@/test/integration/db";
 import type { Database } from "@/types/supabase";
+
+const backfillSql = readFileSync(
+  path.resolve(
+    process.cwd(),
+    "../supabase/migrations/20261124000000_stamp_archived_schedule_periods.sql",
+  ),
+  "utf8",
+);
 
 type PeriodRow =
   Database["public"]["Tables"]["client_program_periods"]["Row"];
@@ -122,7 +132,7 @@ describe("start_program_period on real data", () => {
   it("archives the old schedule and stamps new rows with program and period", async () => {
     const programId = await seedProgram();
     const clientId = await seedClient(programId);
-    await seedActivePeriod(clientId, programId);
+    const oldPeriodId = await seedActivePeriod(clientId, programId);
     await supabaseAdmin
       .from("program_schedule")
       .insert({ client_id: clientId, week_number: 1, status: "active" });
@@ -152,8 +162,8 @@ describe("start_program_period on real data", () => {
     expect(fresh[0]?.is_deload).toBe(false);
     expect(fresh[1]?.is_deload).toBe(true);
     expect(fresh[1]?.training_days).toBeNull();
-    expect(archived[0]?.program_period_id).toBeNull();
-    expect(archived[0]?.program_id).toBeNull();
+    expect(archived[0]?.program_period_id).toBe(oldPeriodId);
+    expect(archived[0]?.program_id).toBe(programId);
   });
 
   it("closes active plan pauses on the switch", async () => {
@@ -348,5 +358,97 @@ describe("getActiveProgramPeriod on real data", () => {
     expect(periods).toHaveLength(2);
     expect(periods?.[0]).toMatchObject({ status: "completed", program_id: programId });
     expect(periods?.[1]).toMatchObject({ status: "active", program_id: nextProgramId });
+  });
+});
+
+describe("listProgramPeriods on real data", () => {
+  it("keeps old periods with their program titles after a switch", async () => {
+    const firstProgram = await seedProgram();
+    const secondProgram = await seedProgram();
+    await supabaseAdmin.from("programs").update({ title: "Первая программа" }).eq("id", firstProgram);
+    await supabaseAdmin.from("programs").update({ title: "Вторая программа" }).eq("id", secondProgram);
+    const clientId = await seedClient(firstProgram);
+    const oldPeriodId = await seedActivePeriod(clientId, firstProgram);
+
+    const { error } = await supabaseAdmin.rpc("start_program_period", {
+      p_client_id: clientId,
+      p_program_id: secondProgram,
+      p_schedule: scheduleEntries(),
+    });
+    expect(error).toBeNull();
+
+    const { periods } = await listProgramPeriods(clientId);
+    expect(periods).toHaveLength(2);
+    expect(periods[0]?.status).toBe("active");
+    expect(periods[0]?.programId).toBe(secondProgram);
+    expect(periods[0]?.programTitle).toBe("Вторая программа");
+
+    const oldPeriod = periods.find((period) => period.id === oldPeriodId);
+    expect(oldPeriod?.status).toBe("completed");
+    expect(oldPeriod?.programId).toBe(firstProgram);
+    expect(oldPeriod?.programTitle).toBe("Первая программа");
+  });
+});
+
+describe("archived schedule backfill on real data", () => {
+  it("assigns boundary weeks to the closing period and is idempotent", async () => {
+    const programId = await seedProgram();
+    const clientId = await seedClient(programId);
+    const oldPeriodId = randomUUID();
+    const newPeriodId = randomUUID();
+    dbQuery(`
+      INSERT INTO public.client_program_periods (id, client_id, program_id, status, started_at, ended_at)
+      VALUES
+        ('${oldPeriodId}', '${clientId}', '${programId}', 'completed', '2026-11-01T00:00:00Z', '2026-11-15T00:00:00Z'),
+        ('${newPeriodId}', '${clientId}', '${programId}', 'completed', '2026-11-16T00:00:00Z', '2026-11-30T00:00:00Z');
+    `);
+    const oldPeriod = { id: oldPeriodId };
+    const newPeriod = { id: newPeriodId };
+
+    const { error: scheduleError } = await supabaseAdmin
+      .from("program_schedule")
+      .insert([
+        {
+          client_id: clientId,
+          week_number: 1,
+          status: "archived",
+          start_date: "2026-11-10",
+          end_date: "2026-11-20",
+        },
+        {
+          client_id: clientId,
+          week_number: 2,
+          status: "archived",
+          start_date: "2026-11-16",
+          end_date: "2026-11-22",
+        },
+      ]);
+    expect(scheduleError).toBeNull();
+
+    dbQuery(backfillSql);
+
+    const { data: stamped } = await supabaseAdmin
+      .from("program_schedule")
+      .select("week_number, program_id, program_period_id, updated_at")
+      .eq("client_id", clientId)
+      .order("week_number", { ascending: true });
+    expect(stamped?.find((w) => w.week_number === 1)?.program_period_id).toBe(oldPeriod.id);
+    expect(stamped?.find((w) => w.week_number === 2)?.program_period_id).toBe(newPeriod.id);
+    expect(stamped?.every((w) => w.program_id === programId)).toBe(true);
+
+    dbQuery(backfillSql);
+
+    const { data: afterSecondRun } = await supabaseAdmin
+      .from("program_schedule")
+      .select("week_number, program_period_id, updated_at")
+      .eq("client_id", clientId)
+      .order("week_number", { ascending: true });
+    expect(afterSecondRun).toEqual(
+      stamped?.map((w) => ({
+        week_number: w.week_number,
+        program_period_id: w.program_period_id,
+        updated_at: w.updated_at,
+      })),
+    );
   });
 });

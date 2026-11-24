@@ -2,7 +2,7 @@
 
 > **🔴 P0 (следующие задачи):**
 > - Фаза 30: пивот на подписку, все программы, история периодов и автосписание Prodamus (30.1–30.14)
-> - Фаза 31: единая проверка доступа и webhook после пивота (31.1–31.2)
+> - Фаза 31: единая проверка доступа и webhook после пивота (31.1–31.3)
 
 ---
 
@@ -1684,6 +1684,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 |---|--------|----------|--------|
 | **31.1** | Доступ, webhook, cron eligibility | Вынести живую подписку и проверку доступа в общий `client-access`. Считать подписку источником истины, но проверять `access_end_date` для paid-клиентов без подписки; паузы сохранять как исключение. Обновить guards, `/start`, `subscribe`, resume и cron-рассылки. Добавить `chat_member` в `allowed_updates`. | ✅ done 22.11.2026 (bot 620 unit + build + 18 subscribe integration; `npx tsc --noEmit` чист; ревью 9.6/10, блокеров нет; продовый `chat_member` smoke остаётся ручной проверкой) |
 | **31.2** | Единый доступ в web | Ввести `effective-access` helper для карточки клиента и server actions. Живая подписка active/past_due становится источником даты доступа, legacy `access_end_date` и активная пауза работают как fallback. Убрать дублирующий запрос подписки и ложные алерты, перевести кнопки и проверки activate/instructions на единый доступ. | ✅ done 24.11.2026 (web 317 unit tests, `npx tsc --noEmit`, build, eslint, `git diff --check` чист; ревью 9.5/10, блокеров нет) |
+| **31.3** | История прошлых программ в портале | Вернуть просмотр старых периодов на странице `/client/[token]/history`. Добавить выбор периода и режим «Все тренировки», чтобы после назначения новой программы старые логи оставались доступны, а текущие веса по-прежнему считались только по активному периоду. | ✅ done 24.11.2026 (web 325 unit tests, `npx tsc --noEmit`, build, eslint, `git diff --check` чист; integration 17 tests; ревью 9.6/10, блокеров нет) |
 
 ### Файлы
 
@@ -1697,6 +1698,9 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `web/src/lib/effective-access.ts`, `web/src/lib/effective-access-server.ts` | Новые (единый доступ в web) |
 | `web/src/app/(coach)/clients/[id]/page.tsx`, `_components/client-profile.tsx`, `_components/client-actions.tsx`, `actions.ts` | Изменение (один источник доступа в UI и server actions) |
 | `web/src/lib/__tests__/effective-access.test.ts`, `web/src/app/(coach)/clients/[id]/__tests__/instructions.test.ts` | Новые/изменение (регрессионные тесты) |
+| `web/src/lib/history-periods.ts`, `web/src/app/client/[token]/history/history-all-list.tsx` | Новые (выбор периода и общая история тренировок) |
+| `web/src/lib/program-periods.ts`, `web/src/app/client/[token]/history/page.tsx`, `web/src/lib/schema-migrations.integration.test.ts` | Изменение (список периодов и фильтрация по выбранному периоду) |
+| `supabase/migrations/20261124000000_stamp_archived_schedule_periods.sql`, `web/src/lib/program-periods.integration.test.ts` | Новые/изменение (простановка периода старым архивным неделям и их бэкоап) |
 
 ### Критерии приёмки
 
@@ -1706,3 +1710,5 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 - Webhook разрешает `chat_member`, который уже обрабатывается ботом.
 - Web-карточка и server actions используют один `EffectiveAccess` и не перезаписывают `access_end_date`, когда доступом управляет живая подписка.
 - Paid-клиент без живой подписки получает доступ только при валидной дате или активной паузе, а при ошибке lookup доступ fail-closed.
+- Портал клиента показывает активный период по умолчанию, но позволяет открыть прошлые периоды и общий список всех тренировок без смешивания сеток программ.
+- Архивные недели и старые логи получают период закрытия программы как при переключении, так и при одноразовом бэкоапе существующих данных.

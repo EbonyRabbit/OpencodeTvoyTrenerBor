@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getParsedContent, flattenLoggableExercises, getCompositeLetters, type ParsedDay, type ParsedExercise } from "@/lib/program-utils";
@@ -7,9 +8,16 @@ import { getTodayDateStr } from "@/lib/date-utils";
 import { weekdayDateInWeek } from "@/lib/week-days";
 import { weekdayIsoFromName } from "@/lib/day-names";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { getActiveProgramPeriod } from "@/lib/program-periods";
+import { listProgramPeriods } from "@/lib/program-periods";
+import {
+  formatPeriodLabel,
+  resolveHistorySelection,
+  type HistoryPeriodOption,
+  type HistorySelection,
+} from "@/lib/history-periods";
 import { Card, CardContent } from "@/components/ui/card";
 import { HistoryGrid } from "./history-grid";
+import { HistoryAllList, type HistoryAllLog } from "./history-all-list";
 
 type WorkoutLogRow = {
   date: string;
@@ -81,6 +89,37 @@ function dayExerciseNames(day: ParsedDay | undefined): Set<string> {
   return names;
 }
 
+function HistoryPeriodSelector({
+  periods,
+  selection,
+}: {
+  periods: HistoryPeriodOption[];
+  selection: HistorySelection;
+}) {
+  const baseClass = "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors";
+  const activeClass = "border-primary bg-primary text-primary-foreground";
+  const inactiveClass = "border-border bg-card text-muted-foreground hover:text-foreground";
+  return (
+    <div className="mb-4 flex flex-wrap gap-2">
+      <Link
+        href="?period=all"
+        className={`${baseClass} ${selection.mode === "all" ? activeClass : inactiveClass}`}
+      >
+        Все тренировки
+      </Link>
+      {periods.map((period, index) => (
+        <Link
+          key={period.id}
+          href={`?period=${encodeURIComponent(period.id)}`}
+          className={`${baseClass} ${selection.mode === "period" && selection.periodId === period.id ? activeClass : inactiveClass}`}
+        >
+          {formatPeriodLabel(period) || `Период ${index + 1}`}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function getIsoWeekday(dateStr: string): number {
   const date = new Date(`${dateStr}T12:00:00Z`);
   if (isNaN(date.getTime())) return 0;
@@ -88,7 +127,11 @@ function getIsoWeekday(dateStr: string): number {
   return iso === 0 ? 7 : iso;
 }
 
-export default async function HistoryPage() {
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string | string[] | undefined }>;
+}) {
   const h = await headers();
   const clientId = h.get("x-client-id");
   if (!clientId) {
@@ -107,44 +150,107 @@ export default async function HistoryPage() {
     .eq("id", clientId)
     .maybeSingle<Pick<ClientRow, "program_id" | "timezone" | "training_days">>();
 
-  if (!client?.program_id) {
+  if (!client) {
     return (
       <Card>
         <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground">Программа не назначена</p>
+          <p className="text-muted-foreground">Клиент не найден</p>
         </CardContent>
       </Card>
+    );
+  }
+
+  const { periods, error: periodsError } = await listProgramPeriods(clientId);
+  if (periodsError) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">Не удалось загрузить периоды тренировок</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  const activePeriod = periods.find((period) => period.status === "active") ?? null;
+  const query = await searchParams;
+  const selection = resolveHistorySelection(query.period, periods, activePeriod?.id ?? null);
+  const selector = <HistoryPeriodSelector periods={periods} selection={selection} />;
+
+  if (selection.mode === "all") {
+    const { data: allLogs, error: allLogsError } = await supabaseAdmin
+      .from("workout_logs")
+      .select("date, week, day_order, exercise, sets, reps, weight, rpe, rounds, distance_km, duration_sec, pace, comment, program_period_id, created_at")
+      .eq("client_id", clientId)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(2001);
+    if (allLogsError) {
+      console.error(`[HISTORY] All logs query failed for ${clientId}:`, allLogsError.message);
+    }
+    return (
+      <div>
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">История тренировок</h2>
+          <p className="text-sm text-muted-foreground">Все периоды в одном списке</p>
+        </div>
+        {selector}
+        {allLogsError && (
+          <Card className="mb-4">
+            <CardContent className="py-4 text-center text-destructive">
+              Не удалось загрузить часть данных тренировок
+            </CardContent>
+          </Card>
+        )}
+        <HistoryAllList
+          logs={((allLogs ?? []) as HistoryAllLog[]).slice(0, 2000)}
+          periods={periods}
+          truncated={(allLogs?.length ?? 0) > 2000}
+        />
+      </div>
+    );
+  }
+
+  const selectedPeriod = periods.find((period) => period.id === selection.periodId) ?? null;
+  const programId =
+    selectedPeriod?.programId ?? (selection.periodId === null ? client.program_id : null);
+  if (!programId) {
+    return (
+      <div>
+        {selector}
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground">Программа не назначена</p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   const { data: program } = await supabaseAdmin
     .from("programs")
     .select("*")
-    .eq("id", client.program_id)
+    .eq("id", programId)
     .maybeSingle();
 
   const parsed = program ? getParsedContent(program) : null;
   if (!program || !parsed?.weeks?.length) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground">Нет данных по программе</p>
-        </CardContent>
-      </Card>
+      <div>
+        {selector}
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground">Нет данных по программе</p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
-
-  // 30.6: сетка истории строится по активному периоду, чтобы логи прошлых
-  // программ не смешивались с текущей сеткой недель. Общая история упражнения
-  // в боте показывает все периоды.
-  const activePeriod = await getActiveProgramPeriod(clientId);
 
   const historyScheduleQuery = supabaseAdmin
     .from("program_schedule")
     .select("week_number, start_date, end_date, training_days")
     .eq("client_id", clientId);
-  const { data: schedule } = await (activePeriod
-    ? historyScheduleQuery.eq("program_period_id", activePeriod.id)
+  const { data: schedule } = await (selection.periodId
+    ? historyScheduleQuery.eq("program_period_id", selection.periodId)
     : historyScheduleQuery
   );
   const scheduleRows = (schedule ?? []) as ScheduleRow[];
@@ -154,7 +260,9 @@ export default async function HistoryPage() {
     .from("workout_logs")
     .select("date, week, day_order, exercise, sets, reps, weight, rpe, rounds, distance_km, duration_sec, pace, comment")
     .eq("client_id", clientId);
-  if (activePeriod) historyLogsQuery = historyLogsQuery.eq("program_period_id", activePeriod.id);
+  if (selection.periodId) {
+    historyLogsQuery = historyLogsQuery.eq("program_period_id", selection.periodId);
+  }
   const { data: logs, error: logsError } = await historyLogsQuery
     .order("date", { ascending: true })
     .order("created_at", { ascending: true });
@@ -368,6 +476,7 @@ export default async function HistoryPage() {
           Фактические результаты по неделям. Всего недель: {weekCount}
         </p>
       </div>
+      {selector}
       {logsError && (
         <Card className="mb-4">
           <CardContent className="py-4 text-center text-destructive">

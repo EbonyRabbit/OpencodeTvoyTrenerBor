@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { Database } from "@/types/supabase";
 import { buildScheduleEntries } from "@/lib/plan-adjustment";
+import type { HistoryPeriodOption } from "@/lib/history-periods";
 
 // Phase 30.5: assigning a program to a client is one atomic RPC
 // (start_program_period in migration 20261111000200). It closes the old
@@ -70,4 +71,55 @@ export async function getActiveProgramPeriod(
     return null;
   }
   return data ?? null;
+}
+
+export async function listProgramPeriods(
+  clientId: string,
+): Promise<{ periods: HistoryPeriodOption[]; error?: string }> {
+  const { data, error } = await supabaseAdmin
+    .from("client_program_periods")
+    .select("id, program_id, started_at, ended_at, status")
+    .eq("client_id", clientId)
+    .order("started_at", { ascending: false });
+  if (error) {
+    console.error("[PERIOD] Period list failed:", error.message);
+    return { periods: [], error: error.message };
+  }
+
+  const periods = (data ?? []) as Array<{
+    id: string;
+    program_id: string | null;
+    started_at: string;
+    ended_at: string | null;
+    status: string;
+  }>;
+  const programIds = [...new Set(periods.map((period) => period.program_id))].filter(
+    (id): id is string => Boolean(id),
+  );
+  const { data: programs, error: programsError } = programIds.length
+    ? await supabaseAdmin
+        .from("programs")
+        .select("id, title")
+        .in("id", programIds)
+    : { data: [], error: null };
+  if (programsError) {
+    console.error("[PERIOD] Period program titles failed:", programsError.message);
+  }
+  const titles = new Map(
+    ((programs ?? []) as Array<{ id: string; title: string }>).map((program) => [
+      program.id,
+      program.title,
+    ]),
+  );
+
+  return {
+    periods: periods.map((period) => ({
+      id: period.id,
+      programId: period.program_id,
+      programTitle: period.program_id ? titles.get(period.program_id) ?? "Без программы" : "Без программы",
+      startedAt: period.started_at,
+      endedAt: period.ended_at,
+      status: period.status,
+    })),
+  };
 }

@@ -27,6 +27,7 @@ import type { ParsedContent } from "@/lib/program-utils";
 import type { NextWorkoutDay } from "@/lib/next-workout";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
+import type { EffectiveAccess } from "@/lib/effective-access";
 import type { Database, Json } from "@/types/supabase";
 
 type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "telegram_id" | "status" | "payment_status" | "program_id" | "connect_code" | "spreadsheet_id" | "language" | "timezone" | "morning_time" | "training_days" | "access_start_date" | "access_end_date" | "purchase_date" | "consent_given" | "consent_given_at" | "client_consent_given" | "client_consent_given_at" | "client_consent_version" | "created_at" | "updated_at"> & { program: { id: string; title: string; active: boolean; parsed_content: Json | null } | null };
@@ -136,26 +137,30 @@ function SectionCard({
 }
 
 function AccessBadge({
-  accessStart,
-  accessEnd,
+  active,
+  expired,
+  inactive,
+  paused,
 }: {
-  accessStart: string | null;
-  accessEnd: string | null;
+  active: boolean;
+  expired: boolean;
+  inactive: boolean;
+  paused: boolean;
 }) {
-  const now = new Date();
-  const end = accessEnd ? new Date(accessEnd) : null;
-  const isExpired = end && end < now;
+  if (inactive) {
+    return <Badge variant="secondary">Неактивен</Badge>;
+  }
 
-  if (isExpired) {
+  if (expired) {
     return <Badge variant="destructive">Доступ истёк</Badge>;
   }
 
-  if (accessStart && end) {
-    return <Badge variant="default">Активен</Badge>;
+  if (paused && !active) {
+    return <Badge variant="outline">Пауза</Badge>;
   }
 
-  if (accessStart && !end) {
-    return <Badge variant="default">Бессрочно</Badge>;
+  if (active) {
+    return <Badge variant="default">Активен</Badge>;
   }
 
   return <Badge variant="secondary">Не указан</Badge>;
@@ -170,7 +175,7 @@ export function ClientProfile({
   initialActivityEvents,
   loadMoreActivity,
   purchaseRequests,
-  subscription,
+  access,
 }: {
   client: ClientRow;
   workoutCount: number | null;
@@ -180,12 +185,7 @@ export function ClientProfile({
   initialActivityEvents: ActivityEvent[];
   loadMoreActivity: (offset: number) => Promise<ActivityEvent[] | { error: string }>;
   purchaseRequests: PurchaseRequestRow[];
-  subscription: {
-    id: string;
-    status: string;
-    current_period_end: string | null;
-    cancel_at_period_end: boolean;
-  } | null;
+  access: EffectiveAccess;
 }) {
   const accessDays = daysSince(client.access_start_date);
   const programStatus = client.program ? getProgramStatus(client.program) : null;
@@ -228,17 +228,17 @@ export function ClientProfile({
         </div>
       </div>
 
-      {client.status === "access_expired" && (
+      {access.isExpired && (
         <Alert role="alert" variant="destructive">
           <AlertTitle>Доступ клиента истёк</AlertTitle>
           <AlertDescription>
-            Срок доступа закончился {formatDate(client.access_end_date)}.
+            Срок доступа закончился {formatDate(access.endDate)}.
             Продлите доступ, чтобы клиент мог пользоваться программой.
           </AlertDescription>
         </Alert>
       )}
 
-      {client.payment_status === "pending" && (
+      {access.showPaymentWarning && (
         <Alert role="alert" variant="destructive">
           <AlertTitle>Оплата не получена</AlertTitle>
           <AlertDescription>
@@ -269,12 +269,20 @@ export function ClientProfile({
         <SectionCard title="Доступ и программа">
           <InfoRow label="Начало доступа" value={formatDate(client.access_start_date)} />
           <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-muted-foreground">Окончание доступа</span>
+            <span className="text-muted-foreground">Доступ</span>
             <div className="flex items-center gap-2">
-              <span>{formatDate(client.access_end_date)}</span>
+              <span>
+                {access.endDate
+                  ? formatDate(access.endDate)
+                  : access.active
+                    ? "Бессрочно"
+                    : "-"}
+              </span>
               <AccessBadge
-                accessStart={client.access_start_date}
-                accessEnd={client.access_end_date}
+                active={access.active}
+                expired={access.isExpired}
+                inactive={client.status === "inactive"}
+                paused={access.paused}
               />
             </div>
           </div>
@@ -496,7 +504,7 @@ export function ClientProfile({
         clientTrainingDays={client.training_days}
         programDayOrders={programDayOrders}
         clientTelegramId={client.telegram_id}
-        subscription={subscription}
+        access={access}
       />
 
       <div className="flex justify-end gap-2">

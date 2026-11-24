@@ -33,6 +33,7 @@ const COACH_ID = "22222222-2222-2222-2222-222222222222";
 type State = {
   client: Record<string, unknown> | null;
   program: Record<string, unknown> | null;
+  subscription?: Record<string, unknown> | null;
   updateError?: { message?: string } | null;
   insertError?: { message?: string } | null;
 };
@@ -43,9 +44,18 @@ function mockDb(state: State) {
     const chain = {
       select: vi.fn(() => chain),
       eq: vi.fn(() => chain),
+      in: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
       maybeSingle: vi.fn(() =>
         Promise.resolve({
-          data: table === "clients" ? state.client : table === "programs" ? state.program : null,
+          data:
+            table === "clients"
+              ? state.client
+              : table === "programs"
+                ? state.program
+                : table === "subscriptions"
+                  ? (state.subscription ?? null)
+                  : null,
           error: null,
         }),
       ),
@@ -64,6 +74,7 @@ function mockDb(state: State) {
 const baseClient = {
   id: CLIENT_ID,
   name: "Иван",
+  status: "active",
   language: "ru",
   connect_code: null,
   program_id: null,
@@ -76,6 +87,13 @@ const baseProgram = {
   duration_weeks: 12,
   type: "template",
   client_id: null,
+};
+
+const activeSubscription = {
+  id: "33333333-4444-5555-6666-777777777777",
+  status: "active",
+  current_period_end: "2026-12-24T12:00:00.000Z",
+  cancel_at_period_end: false,
 };
 
 beforeEach(() => {
@@ -345,6 +363,64 @@ describe("activateProgram", () => {
     expect(result.error).toBe("Сначала подтвердите оплату");
   });
 
+  it("allows activation for a pending client with a live subscription", async () => {
+    mockDb({
+      client: { ...baseClient, payment_status: "pending" },
+      program: baseProgram,
+      subscription: activeSubscription,
+    });
+
+    const result = await activateProgram(CLIENT_ID, PROGRAM_ID);
+    expect(result.error).toBeUndefined();
+    expect(startProgramPeriod).toHaveBeenCalledWith(CLIENT_ID, PROGRAM_ID);
+  });
+
+  it("does not overwrite access_end_date when a subscription drives access", async () => {
+    const fake = supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> };
+    const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+    fake.from.mockImplementation((table: string) => {
+      const chain = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        limit: vi.fn(() => chain),
+        maybeSingle: vi.fn(() =>
+          Promise.resolve({
+            data:
+              table === "clients"
+                ? { ...baseClient, payment_status: "pending", telegram_id: 12345 }
+                : table === "subscriptions"
+                  ? activeSubscription
+                  : table === "programs"
+                    ? baseProgram
+                    : null,
+            error: null,
+          }),
+        ),
+        update: vi.fn((payload: Record<string, unknown>) => {
+          updates.push({ table, payload });
+          return { eq: vi.fn(() => Promise.resolve({ error: null })) };
+        }),
+        delete: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
+        insert: vi.fn(() => Promise.resolve({ error: null })),
+      };
+      return chain;
+    });
+
+    const result = await activateProgram(CLIENT_ID, PROGRAM_ID);
+    const assignment = updates
+      .filter((entry) => entry.table === "clients")
+      .find((entry) => "program_id" in entry.payload);
+
+    expect(result.error).toBeUndefined();
+    expect(assignment).toBeDefined();
+    expect(assignment?.payload).not.toHaveProperty("access_end_date");
+    expect(sendTelegramMessage).toHaveBeenCalledWith(
+      12345,
+      expect.stringContaining("24.12.2026"),
+    );
+  });
+
   it("returns an error when the program is missing", async () => {
     mockDb({ client: { ...baseClient, payment_status: "paid" }, program: null });
 
@@ -359,12 +435,18 @@ describe("activateProgram", () => {
       const chain = {
         select: vi.fn(() => chain),
         eq: vi.fn(() => chain),
+        in: vi.fn(() => chain),
+        limit: vi.fn(() => chain),
         maybeSingle: vi.fn(() =>
           Promise.resolve({
             data:
               table === "clients"
                 ? { ...baseClient, payment_status: "paid", program_id: "old-program" }
-                : baseProgram,
+                : table === "subscriptions"
+                  ? null
+                  : table === "programs"
+                    ? baseProgram
+                    : null,
             error: null,
           }),
         ),
@@ -437,6 +519,26 @@ describe("sendProgramInstructions", () => {
 
     const result = await sendProgramInstructions(CLIENT_ID);
     expect(result.error).toBe("Сначала подтвердите оплату");
+  });
+
+  it("sends instructions for a pending client with a live subscription", async () => {
+    mockDb({
+      client: {
+        ...baseClient,
+        program_id: PROGRAM_ID,
+        payment_status: "pending",
+        telegram_id: 12345,
+      },
+      program: baseProgram,
+      subscription: activeSubscription,
+    });
+
+    const result = await sendProgramInstructions(CLIENT_ID);
+    expect(result.error).toBeUndefined();
+    expect(sendTelegramMessage).toHaveBeenCalledWith(
+      12345,
+      expect.stringContaining("24.12.2026"),
+    );
   });
 
   it("sends instructions to a connected client", async () => {

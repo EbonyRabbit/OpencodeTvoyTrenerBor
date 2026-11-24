@@ -21,6 +21,7 @@ import {
   cancelClientSubscription,
 } from "../actions";
 import { TIMEZONE_LIST, LANGUAGE_LABELS, WEEKDAY_OPTIONS } from "@/lib/clients";
+import type { EffectiveAccess } from "@/lib/effective-access";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,7 +56,7 @@ export function ClientActions({
   clientTrainingDays,
   programDayOrders,
   clientTelegramId,
-  subscription,
+  access,
 }: {
   clientId: string;
   currentCode: string | null;
@@ -69,12 +70,7 @@ export function ClientActions({
   clientTrainingDays?: number[] | null;
   programDayOrders?: number[];
   clientTelegramId?: number | null;
-  subscription?: {
-    id: string;
-    status: string;
-    current_period_end: string | null;
-    cancel_at_period_end: boolean;
-  } | null;
+  access: EffectiveAccess;
 }) {
   const router = useRouter();
   const [activating, setActivating] = useState(false);
@@ -544,19 +540,16 @@ export function ClientActions({
     <div className="space-y-3">
       <div className="rounded-lg border p-3">
         <p className="text-sm font-medium">Подписка</p>
-        {subscription ? (
+        {access.subscriptionStatus ? (
           <p className="text-sm text-muted-foreground">
-            {subscription.status === "past_due" ? "Просрочена" : "Активна"}
-            {subscription.current_period_end
-              ? ` до ${new Date(subscription.current_period_end).toLocaleDateString("ru-RU")}`
-              : ""}
-            {subscription.cancel_at_period_end ? " · отмена запланирована" : ""}
+            {access.subscriptionStatus === "past_due" ? "Просрочена" : "Активна"}
+            {access.cancelAtPeriodEnd ? " · отмена запланирована" : ""}
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">Нет активной подписки</p>
         )}
         <div className="mt-2 flex flex-wrap gap-2">
-          {!subscription && (
+          {!access.subscriptionStatus && (
             <Button
               type="button"
               variant="outline"
@@ -567,7 +560,7 @@ export function ClientActions({
               {subLoading ? "Создание..." : "Ссылка на подписку"}
             </Button>
           )}
-          {subscription && !subscription.cancel_at_period_end && (
+          {access.subscriptionStatus && !access.cancelAtPeriodEnd && (
             <Button
               type="button"
               variant="outline"
@@ -610,8 +603,8 @@ export function ClientActions({
             type="button"
             variant="outline"
             onClick={loadPrograms}
-            disabled={currentPaymentStatus !== "paid" || loadingPrograms}
-            title={currentPaymentStatus !== "paid" ? "Сначала подтвердите оплату" : ""}
+            disabled={!access.active || loadingPrograms}
+            title={!access.active ? "Нет активного доступа" : ""}
           >
             {loadingPrograms ? "Загрузка..." : "Активировать программу"}
           </Button>
@@ -668,14 +661,12 @@ export function ClientActions({
           type="button"
           variant="outline"
           onClick={handleSendInstructions}
-          disabled={
-            !currentProgramId || currentPaymentStatus !== "paid" || instructing
-          }
+          disabled={!currentProgramId || !access.active || instructing}
           title={
             !currentProgramId
               ? "Сначала назначьте программу"
-              : currentPaymentStatus !== "paid"
-                ? "Сначала подтвердите оплату"
+              : !access.active
+                ? "Нет активного доступа"
                 : ""
           }
         >

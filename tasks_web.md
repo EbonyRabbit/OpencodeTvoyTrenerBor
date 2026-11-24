@@ -2,7 +2,7 @@
 
 > **🔴 P0 (следующие задачи):**
 > - Фаза 30: пивот на подписку, все программы, история периодов и автосписание Prodamus (30.1–30.14)
-> - Фаза 31: единая проверка доступа и webhook после пивота (31.1)
+> - Фаза 31: единая проверка доступа и webhook после пивота (31.1–31.2)
 
 ---
 
@@ -1683,6 +1683,7 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | # | Задача | Описание | Статус |
 |---|--------|----------|--------|
 | **31.1** | Доступ, webhook, cron eligibility | Вынести живую подписку и проверку доступа в общий `client-access`. Считать подписку источником истины, но проверять `access_end_date` для paid-клиентов без подписки; паузы сохранять как исключение. Обновить guards, `/start`, `subscribe`, resume и cron-рассылки. Добавить `chat_member` в `allowed_updates`. | ✅ done 22.11.2026 (bot 620 unit + build + 18 subscribe integration; `npx tsc --noEmit` чист; ревью 9.6/10, блокеров нет; продовый `chat_member` smoke остаётся ручной проверкой) |
+| **31.2** | Единый доступ в web | Ввести `effective-access` helper для карточки клиента и server actions. Живая подписка active/past_due становится источником даты доступа, legacy `access_end_date` и активная пауза работают как fallback. Убрать дублирующий запрос подписки и ложные алерты, перевести кнопки и проверки activate/instructions на единый доступ. | ✅ done 24.11.2026 (web 317 unit tests, `npx tsc --noEmit`, build, eslint, `git diff --check` чист; ревью 9.5/10, блокеров нет) |
 
 ### Файлы
 
@@ -1693,6 +1694,9 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 | `bot/src/handlers/guards.ts`, `start.ts`, `subscribe.ts` | Изменение (единый доступ) |
 | `bot/src/cron/access-expiry.ts`, `morning.ts`, `evening-scheduler.ts`, `measurement-reminder.ts`, `resume.ts` | Изменение (eligibility) |
 | `bot/src/index.ts` | Изменение (webhook options) |
+| `web/src/lib/effective-access.ts`, `web/src/lib/effective-access-server.ts` | Новые (единый доступ в web) |
+| `web/src/app/(coach)/clients/[id]/page.tsx`, `_components/client-profile.tsx`, `_components/client-actions.tsx`, `actions.ts` | Изменение (один источник доступа в UI и server actions) |
+| `web/src/lib/__tests__/effective-access.test.ts`, `web/src/app/(coach)/clients/[id]/__tests__/instructions.test.ts` | Новые/изменение (регрессионные тесты) |
 
 ### Критерии приёмки
 
@@ -1700,3 +1704,5 @@ Telegram → Render (Node.js/grammY) → Supabase DB (PostgreSQL)
 - Paid-клиент без живой подписки проходит только при валидной `access_end_date` или активной паузе.
 - Cron-рассылки и авто-resume используют ту же проверку доступа.
 - Webhook разрешает `chat_member`, который уже обрабатывается ботом.
+- Web-карточка и server actions используют один `EffectiveAccess` и не перезаписывают `access_end_date`, когда доступом управляет живая подписка.
+- Paid-клиент без живой подписки получает доступ только при валидной дате или активной паузе, а при ошибке lookup доступ fail-closed.

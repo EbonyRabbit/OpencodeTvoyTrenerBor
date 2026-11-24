@@ -10,6 +10,7 @@ import { getNextWorkoutDay } from "@/lib/next-workout";
 import { getTodayDateStr } from "@/lib/date-utils";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { getActiveProgramPeriod, NIL_PERIOD_ID } from "@/lib/program-periods";
+import { getEffectiveAccessForClient } from "@/lib/effective-access-server";
 import type { Database } from "@/types/supabase";
 import { ClientProfile } from "./_components/client-profile";
 import { ExerciseSwapsSection } from "./_components/exercise-swaps-section";
@@ -74,7 +75,7 @@ export default async function ClientProfilePage({
     scheduleResult,
     workoutLogsResult,
     purchaseRequestsResult,
-    subscriptionResult,
+    access,
   ] = await Promise.all([
     supabase.rpc("count_client_workout_days", { p_client_id: id }),
     safeFetch(
@@ -98,16 +99,7 @@ export default async function ClientProfilePage({
       })(),
       [],
     ),
-    safeFetch(
-      supabase
-        .from("subscriptions")
-        .select("id, status, current_period_end, cancel_at_period_end")
-        .eq("client_id", id)
-        .in("status", ["active", "past_due"])
-        .limit(1)
-        .maybeSingle(),
-      null,
-    ),
+    getEffectiveAccessForClient(typedClient),
   ]);
 
   const parsedContent = typedClient.program ? getParsedContent(typedClient.program) : null;
@@ -140,7 +132,7 @@ export default async function ClientProfilePage({
         initialActivityEvents={initialActivityEvents}
         loadMoreActivity={loadMoreActivity.bind(null, id)}
         purchaseRequests={purchaseRequestsResult.data ?? []}
-        subscription={subscriptionResult.data ?? null}
+        access={access}
       />
       <div className="mx-auto mt-6 max-w-4xl">
         <ExerciseSwapsSection clientId={id} />

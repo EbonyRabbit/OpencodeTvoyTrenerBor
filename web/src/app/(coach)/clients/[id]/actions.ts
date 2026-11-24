@@ -24,6 +24,10 @@ import {
   toFiniteNumber,
 } from "@/lib/activate-purchase";
 import { startProgramPeriod } from "@/lib/program-periods";
+import {
+  accessDeniedError,
+  getEffectiveAccessForClient,
+} from "@/lib/effective-access-server";
 import type { ActivityEvent } from "./activity-types";
 import { ACTIVITY_PAGE_SIZE } from "./activity-types";
 
@@ -191,13 +195,14 @@ export async function activateProgram(
     const { data: client } = await supabaseAdmin
       .from("clients")
       .select(
-        "id, name, telegram_id, language, connect_code, payment_status, program_id, access_end_date, timezone",
+        "id, name, telegram_id, language, connect_code, status, payment_status, program_id, access_end_date, timezone",
       )
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
-    if (client.payment_status !== "paid") {
-      return { error: "Сначала подтвердите оплату" };
+    const access = await getEffectiveAccessForClient(client);
+    if (!access.active) {
+      return { error: accessDeniedError(client, access) };
     }
 
     const { data: program } = await supabaseAdmin
@@ -216,9 +221,12 @@ export async function activateProgram(
       return { error: "Некорректная длительность программы" };
 
     const now = new Date();
-    const endDate = new Date(
-      now.getTime() + program.duration_weeks * 7 * 24 * 60 * 60 * 1000,
-    );
+    const endDate: string | null =
+      access.source === "subscription"
+        ? access.endDate
+        : new Date(
+            now.getTime() + program.duration_weeks * 7 * 24 * 60 * 60 * 1000,
+          ).toISOString();
 
     // Хвост 30.6-5: период и расписание переключает RPC; только после
     // успешного RPC обновляем строку клиента, иначе ошибка RPC оставила бы
@@ -233,15 +241,19 @@ export async function activateProgram(
       return { error: periodResult.error, programAssigned: true };
     }
 
+    const clientUpdate: Database["public"]["Tables"]["clients"]["Update"] = {
+      program_id: programId,
+      purchase_date: now.toISOString(),
+      status: "active",
+      access_start_date: now.toISOString(),
+    };
+    if (access.source !== "subscription") {
+      clientUpdate.access_end_date = endDate;
+    }
+
     const { error } = await supabaseAdmin
       .from("clients")
-      .update({
-        program_id: programId,
-        purchase_date: now.toISOString(),
-        status: "active",
-        access_start_date: now.toISOString(),
-        access_end_date: endDate.toISOString(),
-      })
+      .update(clientUpdate)
       .eq("id", clientId);
     if (error) return { error: error.message };
 
@@ -249,7 +261,7 @@ export async function activateProgram(
       clientId,
       client,
       program.title,
-      endDate.toISOString(),
+      endDate,
       profile.id,
     );
 
@@ -274,14 +286,15 @@ export async function sendProgramInstructions(
     const { data: client } = await supabaseAdmin
       .from("clients")
       .select(
-        "id, name, telegram_id, language, connect_code, program_id, access_end_date, payment_status, timezone",
+        "id, name, telegram_id, language, connect_code, program_id, access_end_date, status, payment_status, timezone",
       )
       .eq("id", clientId)
       .maybeSingle();
     if (!client) return { error: "Клиент не найден" };
     if (!client.program_id) return { error: "Сначала назначьте программу" };
-    if (client.payment_status !== "paid") {
-      return { error: "Сначала подтвердите оплату" };
+    const access = await getEffectiveAccessForClient(client);
+    if (!access.active) {
+      return { error: accessDeniedError(client, access) };
     }
 
     const { data: program } = await supabaseAdmin
@@ -295,7 +308,7 @@ export async function sendProgramInstructions(
       clientId,
       client,
       program.title,
-      client.access_end_date,
+      access.source === "subscription" ? access.endDate : client.access_end_date,
       profile.id,
     );
 
